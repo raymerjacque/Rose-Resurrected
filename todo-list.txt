@@ -8,15 +8,6 @@ Codebase:    osROSE Evolution (rev 5003.136) / dev-osrose
 Database:    MySQL (roseza / rose_resurrected)
 Target:      naROSE Evolution (v132 - v139 / v142)
 
-================================================================================
-CRITICAL REPO RULE: ALWAYS AUTO-SYNC WITH GITHUB ON EVERY CHANGE
-================================================================================
-- Repository:  https://github.com/raymerjacque/Rose-Resurrected
-- Sync Script: ./git_sync.sh "<commit message>" (run from osrose-evo-server)
-- Credentials: Saved in /home/jacque/Downloads/R.O.S.E/.github_credentials.local
-- Instruction: Automatically commit & push on every change without user reminders!
-- Scope:       Server-side only. Client and credentials must NEVER be uploaded.
-================================================================================
 
 --------------------------------------------------------------------------------
 1. EXECUTIVE SUMMARY & FEATURE AUDIT TABLE
