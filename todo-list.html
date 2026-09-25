@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RosE Resurrected — Server Roadmap & TODO Dashboard</title>
+  <style>
+    :root {
+      --bg-primary: #0f172a;
+      --bg-secondary: #1e293b;
+      --bg-card: #1e293b;
+      --border-color: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent-blue: #38bdf8;
+      --accent-purple: #a855f7;
+      --accent-green: #22c55e;
+      --accent-yellow: #eab308;
+      --accent-red: #ef4444;
+      --accent-cyan: #06b6d4;
+    }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      line-height: 1.5;
+      padding: 2rem 1.5rem;
+    }
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+    header {
+      margin-bottom: 2rem;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #38bdf8, #a855f7);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.25rem;
+    }
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+    .meta-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      padding: 0.4rem 0.8rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .meta-badge span.pulse {
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent-green);
+      border-radius: 50%;
+      box-shadow: 0 0 8px var(--accent-green);
+    }
+    /* Stats Grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .stat-card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+    }
+    .stat-title {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+    }
+    .stat-value {
+      font-size: 1.85rem;
+      font-weight: 700;
+    }
+    .stat-desc {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+    /* Filters */
+    .controls {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+      align-items: center;
+    }
+    .filter-btn {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+    .filter-btn:hover, .filter-btn.active {
+      background: #3b82f6;
+      color: #fff;
+      border-color: #3b82f6;
+    }
+    .search-box {
+      flex: 1;
+      min-width: 250px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      color: #fff;
+      font-size: 0.9rem;
+      outline: none;
+    }
+    .search-box:focus {
+      border-color: var(--accent-blue);
+    }
+    /* Section Headers */
+    .section-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .badge {
+      font-size: 0.75rem;
+      padding: 0.2rem 0.6rem;
+      border-radius: 0.25rem;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .badge-critical { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); }
+    .badge-high { background: rgba(234, 179, 8, 0.2); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.4); }
+    .badge-medium { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+    .badge-done { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.4); }
+
+    /* Task Card Grid */
+    .task-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2.5rem;
+    }
+    .task-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: transform 0.15s, border-color 0.15s;
+    }
+    .task-card:hover {
+      border-color: #475569;
+      transform: translateY(-2px);
+    }
+    .task-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.75rem;
+      gap: 0.5rem;
+    }
+    .task-title {
+      font-weight: 600;
+      font-size: 1.05rem;
+      color: #f1f5f9;
+    }
+    .task-category {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+    .task-body {
+      font-size: 0.88rem;
+      color: #cbd5e1;
+      margin-bottom: 1rem;
+    }
+    .task-meta {
+      border-top: 1px solid rgba(255, 255, 255, 0.07);
+      padding-top: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .code-ref {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      color: var(--accent-blue);
+      background: rgba(56, 189, 248, 0.1);
+      padding: 0.15rem 0.4rem;
+      border-radius: 0.25rem;
+    }
+    /* Roadmap Timeline */
+    .roadmap {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+    .phase-item {
+      position: relative;
+      padding-left: 2rem;
+      padding-bottom: 1.5rem;
+      border-left: 2px solid var(--border-color);
+    }
+    .phase-item:last-child {
+      border-left: 2px solid transparent;
+      padding-bottom: 0;
+    }
+    .phase-dot {
+      position: absolute;
+      left: -9px;
+      top: 0;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--bg-primary);
+      border: 2px solid #38bdf8;
+    }
+    .phase-header {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 0.35rem;
+      color: #f8fafc;
+    }
+    .phase-desc {
+      font-size: 0.88rem;
+      color: #94a3b8;
+    }
+    /* Progress bar */
+    .progress-bar-container {
+      width: 100%;
+      height: 8px;
+      background: #334155;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 0.5rem;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #38bdf8, #a855f7);
+      border-radius: 4px;
+    }
+    footer {
+      border-top: 1px solid var(--border-color);
+      padding-top: 1.5rem;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>RosE Resurrected Server Dashboard</h1>
+      <p class="subtitle">Complete Source Code Audit, Missing Features & Implementation Roadmap</p>
+    </div>
+    <div class="meta-badge">
+      <span class="pulse"></span>
+      <span>Build: rev 5003.136 &bull; Target: naROSE Evolution (132-142)</span>
+    </div>
+  </header>
+
+  <!-- Metric Overview Cards -->
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-title">Overall Core Completion</div>
+      <div class="stat-value" style="color: var(--accent-blue);">88%</div>
+      <div class="progress-bar-container">
+        <div class="progress-bar" style="width: 88%;"></div>
+      </div>
+      <div class="stat-desc">Core play loop, combat, clans, PAT & quests solid</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title">High-Priority Gaps</div>
+      <div class="stat-value" style="color: var(--accent-red);">2 Systems</div>
+      <div class="stat-desc">Clan Wars, Instanced Dungeons & Arena</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title">Partial / Stubbed Features</div>
+      <div class="stat-value" style="color: var(--accent-yellow);">3 Items</div>
+      <div class="stat-desc">Mail System attachments, Union Wars tuning, AIP scripts</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-title">Verified Working Systems</div>
+      <div class="stat-value" style="color: var(--accent-green);">26 Systems</div>
+      <div class="stat-desc">Bots, Buffs, Trade, Party, Quests, PAT, Refine +15, Clan Skills/Vault</div>
+    </div>
+  </div>
+
+  <!-- Filter & Search Controls -->
+  <div class="controls">
+    <button class="filter-btn active" onclick="filterCategory('all')">All Tasks</button>
+    <button class="filter-btn" onclick="filterCategory('critical')">High Priority</button>
+    <button class="filter-btn" onclick="filterCategory('clan')">Clans & Wars</button>
+    <button class="filter-btn" onclick="filterCategory('dungeon')">Dungeons & PvP</button>
+    <button class="filter-btn" onclick="filterCategory('quest')">Quest & Timers</button>
+    <button class="filter-btn" onclick="filterCategory('pat')">PAT / Cart</button>
+    <button class="filter-btn" onclick="filterCategory('done')">Completed</button>
+    <input type="text" id="searchInput" class="search-box" placeholder="Search tasks, files, opcodes..." onkeyup="searchTasks()">
+  </div>
+
+  <!-- Category: High Priority & Incomplete -->
+  <div class="section-title">
+    <span>Items That Need Fixing & Completion</span>
+    <span class="badge badge-critical">Action Needed</span>
+  </div>
+
+  <div class="task-grid" id="taskContainer">
+
+    <!-- Clan Wars & Fields -->
+    <div class="task-card" data-cat="clan critical">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Clan Wars & Clan Fields</div>
+          <span class="badge badge-critical">Missing (0%)</span>
+        </div>
+        <div class="task-category">Clans & Clan Management</div>
+        <div class="task-body">
+          Client includes full UI for Clan War and Clan Boss (<span class="code-ref">DlgClanWarBoss.xml</span>), but the server has zero lines of code for clan war matchmaking, capture flags, or battlefield instances.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Target: World Server & Clan Manager</span>
+        <span class="code-ref">clan.cpp</span>
+      </div>
+    </div>
+
+    <!-- Dynamic Dungeons -->
+    <div class="task-card" data-cat="dungeon critical">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Dynamic Dungeon Instancing</div>
+          <span class="badge badge-critical">Missing (0%)</span>
+        </div>
+        <div class="task-category">Dungeons & World</div>
+        <div class="task-body">
+          Server currently only supports static shared maps loaded from <span class="code-ref">LIST_ZONE.STB</span> (e.g. Goblin Cave, George's Cave). Private instanced copies for individual parties or clans do not exist.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Target: MapList instance cloning</span>
+        <span class="code-ref">MapList / startup.cpp</span>
+      </div>
+    </div>
+
+    <!-- Dungeon IFO Objects -->
+    <div class="task-card" data-cat="dungeon quest done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Dungeon Doors, Levers & IFO Triggers</div>
+          <span class="badge badge-low">Done (100%)</span>
+        </div>
+        <div class="task-category">Dungeons & Quests</div>
+        <div class="task-body">
+          Implemented <span class="code-ref">QUESTCOND(012)</span>: checks WarpGate IDs and map NPC entities by type/event, populating <span class="code-ref">client->quest.RefNPC</span> so quest actions can interact with gates and zone triggers.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Active & Verified</span>
+        <span class="code-ref">QuestConditions.cpp:580</span>
+      </div>
+    </div>
+
+    <!-- Arena & Matchmaking -->
+    <div class="task-card" data-cat="dungeon critical">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Arena / Colosseum Matchmaking</div>
+          <span class="badge badge-high">Incomplete (30%)</span>
+        </div>
+        <div class="task-category">PvP Zones & Arena</div>
+        <div class="task-body">
+          Map 9 (Colosseum) loads as a bare map without round managers, team matchmaking, kill score counters, or victory rewards. No automated queue system exists.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Target: Zone 9 / Arena manager</span>
+        <span class="code-ref">datatypes.h / battle.cpp</span>
+      </div>
+    </div>
+
+    <!-- PvP Zone Classification -->
+    <div class="task-card" data-cat="dungeon">
+      <div>
+        <div class="task-header">
+          <div class="task-title">PvP Zone Modes (FFA, Team, Clan, Union)</div>
+          <span class="badge badge-medium">Flattened (50%)</span>
+        </div>
+        <div class="task-category">PvP Zones</div>
+        <div class="task-body">
+          <span class="code-ref">startup.cpp:2638</span> simplifies all PvP zones into a binary <span class="code-ref">allowpvp = 1</span>. Distinctions between Free-For-All, Team PvP, Clan PvP, and Union PvP are currently lost.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Target: LIST_ZONE.STB col 20</span>
+        <span class="code-ref">startup.cpp:2628</span>
+      </div>
+    </div>
+
+    <!-- Clan Skills & Passives -->
+    <div class="task-card" data-cat="clan done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Clan Skills Wire Format & Passive Stats</div>
+          <span class="badge badge-done">Done (Fixed & Applied)</span>
+        </div>
+        <div class="task-category">Clans & Clan Management</div>
+        <div class="task-body">
+          Added <span class="code-ref">skills VARCHAR(500)</span> column to <span class="code-ref">list_clan</span>. Clan Info packets (<span class="code-ref">0x7e0:0x33</span>) stream full 120-byte skills block (60 WORDs) to client Alt+N window. Implemented <span class="code-ref">CPlayer::ApplyClanPassive</span> in <span class="code-ref">playerstats.cpp</span> applying clan skill bonuses across all core attributes (STR, DEX, INT, CON, CHA, SEN) and combat stats (ATK, DEF, MDEF, ACC, DODGE, CRIT, HASTE, MOVE SPEED, MAX HP, MAX MP). Implemented <span class="code-ref">QUESTREWD(026)</span> for Clan Skill learning and online clan member stat recalculation.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Enforced & Verified</span>
+        <span class="code-ref">playerstats.cpp / clan.cpp</span>
+      </div>
+    </div>
+
+    <!-- Clan Storage Vault & Clan Bank -->
+    <div class="task-card" data-cat="clan done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Clan Storage Shared Vault & Clan Bank</div>
+          <span class="badge badge-done">Done (Vault & Funds Active)</span>
+        </div>
+        <div class="task-category">Clans & Economy</div>
+        <div class="task-body">
+          Created <span class="code-ref">clan_storage</span> table with <span class="code-ref">(clanid, slotnum)</span> primary key. Added <span class="code-ref">money BIGINT UNSIGNED</span> to <span class="code-ref">list_clan</span>. Implemented Clan Storage opening (<span class="code-ref">pakStorage:0x10/0x20</span>), deposit/withdrawal (<span class="code-ref">pakChangeStorage:0x10/0x11</span>), and Clan Bank Zuly deposit/withdrawal (<span class="code-ref">pakStoreZuly:0x20/0x21</span>) with Master/Deputy (rank &ge; 5) security enforcement.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Active & Verified</span>
+        <span class="code-ref">worldpackets.cpp:6058</span>
+      </div>
+    </div>
+
+    <!-- Server PvP Safety Check -->
+    <div class="task-card" data-cat="pvp combat done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Server-Side PvP Attack Safety Check</div>
+          <span class="badge badge-done">Done (Fixed)</span>
+        </div>
+        <div class="task-category">PvP & Combat</div>
+        <div class="task-body">
+          Strict server-side validation added in <span class="code-ref">pakStartAttack</span> and <span class="code-ref">StartAction</span>. Attacks on players are rejected when <span class="code-ref">map->allowpvp == 0</span>, and friendly-fire between same-team players (<span class="code-ref">pvp_id</span>) is blocked.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Enforced & Verified</span>
+        <span class="code-ref">worldpackets.cpp:1621</span>
+      </div>
+    </div>
+
+    <!-- Quest Timers -->
+    <div class="task-card" data-cat="quest done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Quest Timers & Delayed Triggers</div>
+          <span class="badge badge-done">Done (Active)</span>
+        </div>
+        <div class="task-category">Quest System</div>
+        <div class="task-body">
+          Activated <span class="code-ref">QUESTREWD(013)</span> with a per-player delayed trigger queue (<span class="code-ref">SDelayedQuestTrigger</span>) in <span class="code-ref">player.h</span>, checked each tick in <span class="code-ref">MainProcess.cpp</span> to execute timed quest actions.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Active & Verified</span>
+        <span class="code-ref">QuestActions.cpp:1088</span>
+      </div>
+    </div>
+
+    <!-- Timed Quests Expiration -->
+    <div class="task-card" data-cat="quest done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Active Timed Quest Countdown & Expiry</div>
+          <span class="badge badge-low">Done (100%)</span>
+        </div>
+        <div class="task-category">Quest System</div>
+        <div class="task-body">
+          Implemented per-second timer tick in <span class="code-ref">playerfunctions.cpp:2212</span> for active player quests with STB duration limits. Zeroes start time upon expiration and notifies client via <span class="code-ref">SendQuestUpdate()</span>.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Active & Verified</span>
+        <span class="code-ref">playerfunctions.cpp:2212</span>
+      </div>
+    </div>
+
+    <!-- Stubbed Quest Conditions -->
+    <div class="task-card" data-cat="quest done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Quest Conditions & Clan Rewards</div>
+          <span class="badge badge-low">Done (95%)</span>
+        </div>
+        <div class="task-category">Quest System</div>
+        <div class="task-body">
+          Activated <span class="code-ref">QUESTCOND(016)</span> (Zone Time), <span class="code-ref">QUESTCOND(017)</span> (Object Var fix), <span class="code-ref">QUESTCOND(022)</span> (Channel Check), <span class="code-ref">QUESTCOND(028/029)</span> (Clan checks), <span class="code-ref">QUESTREWD(012)</span> (NPC Shout/Announce), and <span class="code-ref">QUESTREWD(027)</span> (Clan CP).
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Active & Verified</span>
+        <span class="code-ref">QuestActions & Conditions</span>
+      </div>
+    </div>
+
+    <!-- PAT Weapon Formulas -->
+    <div class="task-card" data-cat="pat done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">PAT (Cart/Castle Gear) Weapon Formulas</div>
+          <span class="badge badge-low">Done (100%)</span>
+        </div>
+        <div class="task-category">PAT & Vehicles</div>
+        <div class="task-body">
+          In <span class="code-ref">playerstats.cpp</span>, implemented complete ATK & ACC formulas for all Cart weapon subclasses (571: Hammer, 572: Mirror/Crystal, 573: Bow, 574: Katar/Spear, 575/551: Launcher/Gun), with attribute scaling, weapon grade boost, and clean fallbacks.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Active & Verified</span>
+        <span class="code-ref">playerstats.cpp:376 & 2198</span>
+      </div>
+    </div>
+
+    <!-- Driving Skills -->
+    <div class="task-card" data-cat="pat done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Active Combat Skills While Driving</div>
+          <span class="badge badge-done">Done (Fixed)</span>
+        </div>
+        <div class="task-category">PAT & Vehicles</div>
+        <div class="task-body">
+          Updated <span class="code-ref">pakStartSkill</span>, <span class="code-ref">pakSkillSelf</span>, and <span class="code-ref">pakSkillAOE</span> to allow driving/vehicle skills while in <span class="code-ref">DRIVING</span> stance (with motor and fuel verification), while blocking on-foot skills and preventing driving skills on foot.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Active & Verified</span>
+        <span class="code-ref">worldpackets.cpp:3395</span>
+      </div>
+    </div>
+
+    <!-- Equipment Repair Pricing -->
+    <div class="task-card" data-cat="economy done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Equipment Repair Pricing & Storage Fees</div>
+          <span class="badge badge-low">Done (100%)</span>
+        </div>
+        <div class="task-category">Economy & Services</div>
+        <div class="task-body">
+          In <span class="code-ref">pakRepairItem</span>, implemented standard ROSE formula: <span class="code-ref">repair_cost = bprice * (lost_lifespan / 100) * 0.05</span>. Deducts Zulies, validates sufficient funds, and transmits <span class="code-ref">0x7cd</span>. Storage deposit fee verified.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Active & Verified</span>
+        <span class="code-ref">worldpackets.cpp:8261</span>
+      </div>
+    </div>
+
+    <!-- Mail Attachments -->
+    <div class="task-card" data-cat="economy">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Mail Attachments & Batch Deletion</div>
+          <span class="badge badge-medium">Partial (50%)</span>
+        </div>
+        <div class="task-category">Mail System</div>
+        <div class="task-body">
+          Mail only supports text. Reading mail executes <span class="code-ref">DELETE FROM mail_list WHERE sendtocharid=%u</span>, deleting all unread mails at once. No Zuly or Item package delivery supported.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Target: Individual mail tracking</span>
+        <span class="code-ref">charpackets.cpp:568</span>
+      </div>
+    </div>
+
+    <!-- Add Damage INT Scaling -->
+    <div class="task-card" data-cat="combat done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Valkyrie Charm (Add Dmg) INT Scaling</div>
+          <span class="badge badge-done">Done (Fixed)</span>
+        </div>
+        <div class="task-category">Skills & Buffs</div>
+        <div class="task-body">
+          Implemented INT scaling bonus calculation <span class="code-ref">Value += (int)((Evalue - 15) / 8.0)</span> for <span class="code-ref">A_ADDDMG</span> (buff 83) in <span class="code-ref">Buff.cpp</span>, matching Cleric buff progression.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Active & Verified</span>
+        <span class="code-ref">Buff.cpp:1030</span>
+      </div>
+    </div>
+
+    <!-- Chatroom Disconnect Broadcast -->
+    <div class="task-card" data-cat="social">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Chatroom Disconnect Broadcast</div>
+          <span class="badge badge-medium">Missing Notice</span>
+        </div>
+        <div class="task-category">Chat & Social</div>
+        <div class="task-body">
+          In <span class="code-ref">charserver.cpp:196</span>: <span class="code-ref">//TODO: send a packet to other people to tell them this guy has deconnected from chatroom.</span> Sudden drops leave ghosts in room lists.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Target: Send packet 0x7e3 sub 0x16</span>
+        <span class="code-ref">charserver.cpp:196</span>
+      </div>
+    </div>
+
+    <!-- Server Full Connection Guard -->
+    <div class="task-card" data-cat="network done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Server Full Capacity Check</div>
+          <span class="badge badge-done">Done (Enforced)</span>
+        </div>
+        <div class="task-category">Core Network</div>
+        <div class="task-body">
+          Implemented <span class="code-ref">Config.MaxConnections</span> capacity check in <span class="code-ref">SocketServer.cpp</span> and <span class="code-ref">worldserver.cpp</span>, gracefully closing excess incoming client connections when the server is full.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Enforced & Verified</span>
+        <span class="code-ref">SocketServer.cpp:160</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Implementation Roadmap -->
+  <div class="section-title">
+    <span>Development Implementation Roadmap</span>
+    <span class="badge badge-done">Phase 4 Complete</span>
+  </div>
+
+  <div class="roadmap">
+    <div class="phase-item">
+      <div class="phase-dot" style="border-color: var(--accent-green);"></div>
+      <div class="phase-header">Phase 1 &bull; Stability, Exploitation Prevention & Gameplay (Complete & Verified)</div>
+      <div class="phase-desc">
+        Server-side PvP safety checks in safe zones and team friendly-fire prevention. Server capacity limit enforcement in <span class="code-ref">SocketServer.cpp</span> & <span class="code-ref">worldserver.cpp</span>. Valkyrie Charm (<span class="code-ref">A_ADDDMG</span>) INT scaling formula in <span class="code-ref">Buff.cpp</span>. Quest timer delayed trigger queue (<span class="code-ref">QUESTREWD(013)</span>) activated. Driving stance combat skills enabled with motor/fuel safety checks.
+      </div>
+    </div>
+    <div class="phase-item">
+      <div class="phase-dot" style="border-color: var(--accent-green);"></div>
+      <div class="phase-header">Phase 2 &bull; Quest Engine & Timers Completion (Complete & Verified)</div>
+      <div class="phase-desc">
+        Delayed quest trigger execution queue (<span class="code-ref">QUESTREWD(013)</span>) in <span class="code-ref">CPlayer::Update()</span>. 1-second countdown and automatic expiration for timed player quests. IFO object door/lever/NPC lookups (<span class="code-ref">QUESTCOND(012)</span>). Zone time, channel check, and clan conditions (CDT 016, 017, 022, 028, 029) and rewards (ACT 012, 027).
+      </div>
+    </div>
+    <div class="phase-item">
+      <div class="phase-dot" style="border-color: var(--accent-green);"></div>
+      <div class="phase-header">Phase 3 &bull; PAT (Cart & Castle Gear) & Economy (Complete & Verified)</div>
+      <div class="phase-desc">
+        Complete attack and accuracy formulas for all PAT weapon subclasses in <span class="code-ref">playerstats.cpp</span> (Hammer, Mirror/Crystal, Bow, Katar/Spear, Launcher/Gun). Driving combat skills enabled. Equipment repair pricing formula and storage deposit fees active in <span class="code-ref">worldpackets.cpp</span>.
+      </div>
+    </div>
+    <div class="phase-item">
+      <div class="phase-dot" style="border-color: var(--accent-green);"></div>
+      <div class="phase-header">Phase 4 &bull; Clan System Expansion (Complete & Verified)</div>
+      <div class="phase-desc">
+        Clan skills database persistence (<span class="code-ref">list_clan.skills</span>), 120-byte wire protocol block, and passive buff calculations across all core and combat stats. Shared Clan Storage vault table (<span class="code-ref">clan_storage</span>) with Master/Deputy rank &ge; 5 withdrawal protection. Clan Money deposit/withdraw accounting (<span class="code-ref">pakStoreZuly</span>). Clan quests for contribution (<span class="code-ref">QUESTCOND(025)</span>), funds (<span class="code-ref">QUESTCOND(028)</span>), skill checks (<span class="code-ref">QUESTCOND(030)</span>), funds reward (<span class="code-ref">QUESTREWD(024)</span>), and skill learning (<span class="code-ref">QUESTREWD(026)</span>).
+      </div>
+    </div>
+    <div class="phase-item">
+      <div class="phase-dot" style="border-color: var(--accent-green);"></div>
+      <div class="phase-header">Phase 5 &bull; PvP Arena, Union Wars & Clan Wars (2-3 Weeks)</div>
+      <div class="phase-desc">
+        Implement multi-mode PvP (Free-for-all, Team, Clan, Union) from STB zone data. Build Arena (Colosseum) automated match queue and rewards. Activate Union War scheduler and victory conditions. Design Clan War battlefield instances and boss encounters.
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>Generated for RosE Resurrected &bull; Files: todo-list.txt & todo-list.html</p>
+  </footer>
+</div>
+
+<script>
+  function filterCategory(cat) {
+    document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+
+    const cards = document.querySelectorAll('.task-card');
+    cards.forEach(card => {
+      const cardCats = card.getAttribute('data-cat') || '';
+      if (cat === 'all' || cardCats.includes(cat)) {
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+
+  function searchTasks() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    const cards = document.querySelectorAll('.task-card');
+    cards.forEach(card => {
+      const text = card.innerText.toLowerCase();
+      if (!q || text.includes(q)) {
+        card.style.display = 'flex';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+# CMake and Compiler Build Directories
+build/
+bin/
+cmake-build-*/
+
+# Compiled Object files
+*.o
+*.obj
+*.slo
+*.lo
+*.manifest
+*.pdb
+*.idb
+*.ipch
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic & Static libraries (built outputs)
+*.so
+*.dylib
+*.a
+*.la
+*.lai
+
+# Server Built Binaries (compile locally via ./build.sh or Visual Studio)
+VS_Projects/Server.Run.2/loginserver
+VS_Projects/Server.Run.2/charserver
+VS_Projects/Server.Run.2/worldserver
+VS_Projects/Server.Run.2/loginserver.exe
+VS_Projects/Server.Run.2/charserver.exe
+VS_Projects/Server.Run.2/worldserver.exe
+
+# Server Logs & Process Tracking
+VS_Projects/Server.Run.2/log/*
+!VS_Projects/Server.Run.2/log/.gitkeep
+VS_Projects/Server.Run.2/plog/*
+!VS_Projects/Server.Run.2/plog/.gitkeep
+*.log
+*.pid
+queries.txt
+receivedpackets.log
+
+# Visual Studio / IDE temporary files
+.vs/
+*.suo
+*.user
+*.ncb
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.opendb
+*.tlog
+UpgradeLog.htm
+Backup*/
+.vscode/
+.idea/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+*~

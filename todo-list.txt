@@ -1,0 +1,328 @@
+================================================================================
+          RosE Resurrected Server — Comprehensive Status & Roadmap
+================================================================================
+Generated: 2026-09-25
+Project:   RosE Resurrected
+Codebase:  osROSE Evolution (rev 5003.136) / dev-osrose
+Database:  MySQL (roseza / rose_resurrected)
+Target:    naROSE Evolution (v132 - v139 / v142)
+
+--------------------------------------------------------------------------------
+1. EXECUTIVE SUMMARY & FEATURE AUDIT TABLE
+--------------------------------------------------------------------------------
+System / Feature           | Status       | Completion | Primary Source Files
+---------------------------+--------------+------------+------------------------
+Network & Crypt Handshake  | WORKING      | 100%       | rosecrypt.cpp, loginserver
+Auth, Character Management | WORKING      | 95%        | loginpackets, charpackets
+Basic Combat & Damage      | WORKING      | 90%        | battle.cpp, charfunctions
+Skills & Buffs System      | WORKING*     | 85%        | Buff.cpp, battle.cpp
+Inventory, Refine, Gems    | WORKING      | 90%        | worldpackets, extrafunctions
+Trade & Player Vending     | WORKING      | 90%        | worldpackets.cpp
+Party System               | WORKING      | 85%        | partyfunctions.cpp
+Fairy System               | WORKING      | 90%        | MainProcess, gmcmds.cpp
+PlayerBot AI & Buff Bots   | WORKING      | 95%        | PlayerBot.cpp, PlayerBot.h
+Messenger, Friends, Chat   | WORKING      | 90%        | community.cpp, charpackets
+Mail System                | PARTIAL      | 50%        | charpackets.cpp
+PAT (Cart & Castle Gear)   | WORKING      | 90%        | playerstats, worldpackets
+PvP Zones & Arena          | INCOMPLETE   | 40%        | startup.cpp, battle.cpp
+Quests & Timed Triggers    | WORKING      | 90%        | QuestActions, QuestConditions
+Clans & Clan Management    | WORKING      | 90%        | clan.cpp, worldpackets, playerstats
+Clan Skills & Clan Storage | WORKING      | 95%        | worldpackets, playerstats, QuestActions
+Clan Wars & Clan Fields    | MISSING      | 0%         | Not implemented
+Dynamic Instanced Dungeons | MISSING      | 0%         | Not implemented
+
+* Note on asterisks: Functional in core cases, but specific formulas or sub-features
+  are stubbed, hardcoded, or incomplete (see detailed breakdown below).
+
+
+--------------------------------------------------------------------------------
+2. WHAT IS COMPLETED & WORKING (DONE)
+--------------------------------------------------------------------------------
+[x] 3-Tier Server Architecture:
+    - Login Server (auth, account status, channel list dispatch).
+    - Character Server (character list, creation, deletion, appearances, clans, friends).
+    - World Server (game world, physics, combat, drops, NPCs, bots).
+
+[x] Network Protocol & Security:
+    - TriggerSoft 256-byte substitution table encryption (0x703 / 0x7ff).
+    - Session authentication between client, char server, and world server.
+    - MySQL SQL injection escaping across usernames, passwords, clan slogans, chats.
+
+[x] Character Core:
+    - Leveling (1 to 255), stat point allocation (STR, DEX, INT, CON, CHA, SEN).
+    - Natural HP/MP and Stamina regeneration formulas.
+    - Sitting, walking, running, stance synchronization.
+    - Equipment appearance updates visible to all nearby players.
+
+[x] Combat Mechanics:
+    - Normal attack loop with weapon speed, hit/miss (accuracy vs dodge), criticals.
+    - Physical and magical damage calculations against monster/player defenses.
+    - Single-target attack skills, buffs, debuffs, self-buffs, AoE ground/target skills.
+    - Respawn points, death penalties, and resurrection skills.
+
+[x] Economy, Crafting & Items:
+    - Item management: 8-byte Evolution item structures (ItemHead + ItemData).
+    - Refine system up to +15 with GradeList STB multipliers and success/fail chances.
+    - Gem socketing and weapon appraisal.
+    - Player-to-player direct secure trade window.
+    - Player personal vending shops (sell mode, price configuration, buyer interaction).
+    - NPC item buying/selling with economy pricing.
+
+[x] Social Systems:
+    - Party system: invite, leave, kick, shared party EXP, party HP bars, party drops.
+    - Friend list: invite, accept, refuse, delete, online/offline status updates.
+    - Chatrooms: create, password lock, join, chat broadcasting.
+    - Private messaging (whisper) and global shout channels.
+
+[x] World Bosses & Monsters:
+    - Dynamic monster spawning across all zone IFO spawn groups.
+    - AIP engine: aggressive behavior, call for help, roaming, coward flee.
+    - Fairy system: random spawn, fairy buffs (EXP, drop rate), stay/wait timers.
+
+[x] PlayerBot & Buff Bot AI (Recently Implemented):
+    - Full autonomous grinding bots with job-based skill and combat rotations.
+    - Worldwide Grind Spot Buff Bots (SisterAngela, Maria, Teresa, Claire, Rose, Grace, Faith).
+    - Automatic Large Bonfire (806) creation & maintenance with 3x HP/MP regen aura.
+    - Smart buff queue prioritizing real players, casting all 7 cleric charms with zero loops.
+    - Anti-bounce packet throttles on 0x79a movement packets.
+    - Complete combat immunity and targeting exclusion for bonfires.
+
+[x] Clan System Expansion (Milestone 4 - COMPLETED & VERIFIED):
+    - Clan Skills Wire Format & Persistence:
+      * Added `skills VARCHAR(500)` column to `list_clan` table.
+      * Loaded and parsed comma-separated clan skill IDs on login in Char Server and World Server.
+      * Updated Clan Info wire packets (`0x7e0:0x33`, `SendClanInfo`, `SendClanPoints`, etc.)
+        to stream the full 120-byte skill block (60 WORDs) to client Alt+N Clan window.
+    - Clan Passive Skill Stats:
+      * Implemented `CPlayer::ApplyClanPassive` in `playerstats.cpp`.
+      * Applied clan passive bonuses across core attributes (STR, DEX, INT, CON, CHA, SEN)
+        and combat stats (ATK, DEF, MDEF, ACC, DODGE, CRIT, HASTE, MOVE SPEED, MAX HP, MAX MP).
+    - Clan Storage Shared Vault:
+      * Created `clan_storage` table with (`clanid`, `slotnum`) primary key.
+      * Implemented vault open request (`pakStorage:0x10/0x20`), deposit/withdrawal (`pakChangeStorage:0x10/0x11`).
+      * Enforced Clan Master/Deputy rank check (rank >= 5) for vault withdrawals.
+    - Clan Bank & Funds:
+      * Added `money BIGINT UNSIGNED` to `list_clan` table and 8-byte QWORD packet serialization.
+      * Handled Clan Bank deposit and withdrawal (`pakStoreZuly:0x20/0x21`) with rank >= 5 verification.
+    - Clan Quests & Learning:
+      * Implemented `QUESTCOND(025)` (Clan Contribution check), `QUESTCOND(028)` (Clan Funds check),
+        and `QUESTCOND(030)` (Clan Skill learned check).
+      * Implemented `QUESTREWD(024)` (Clan Money adjustment) and `QUESTREWD(026)` (Clan Skill learn
+        reward with database persistence and real-time online clan member stat recalculation).
+
+
+--------------------------------------------------------------------------------
+3. WHAT STILL NEEDS TO BE FIXED (DETAILED DEFECT & GAP LIST)
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+A. CLANS, CLAN FIELDS & CLAN WARS (High Priority)
+--------------------------------------------------------------------------------
+[ ] Clan Wars & Clan Fields:
+    - ISSUE: 0% implemented in server. While the client includes XML interfaces
+      for Clan War and Clan Boss (DlgClanWarBoss.xml), the server has no handling
+      for clan war matchmaking, entry, territory control, or win/loss scoring.
+    - FIX NEEDED: Create Clan War manager in World Server, register clan battle map
+      instances or dedicated clan zones, handle team score and reward distribution.
+
+[x] Clan Skills:
+    - FIXED: In `Char_Server/clan.cpp`, `World_Server/worldpackets.cpp`, and `playerstats.cpp`:
+      * Added `skills` VARCHAR(500) column to `list_clan` table.
+      * Wire protocol now transmits full 120-byte skills block (60 WORDs) in packet 0x7e0:0x33.
+      * Implemented `CPlayer::ApplyClanPassive` across all core attributes and combat stats in `playerstats.cpp`.
+      * Implemented `QUESTREWD(026)` for Clan Skill learning and online clan member stat recalculation.
+
+[x] Clan Bank / Clan Storage:
+    - FIXED: In `World_Server/worldpackets.cpp`:
+      * Created `clan_storage` table with (`clanid`, `slotnum`) primary key.
+      * Implemented Clan Storage request (`pakStorage:0x10/0x20`) and item moves (`pakChangeStorage:0x10/0x11`).
+      * Enforced Master/Deputy permission check (rank >= 5) on all vault item withdrawals.
+
+[x] Clan Funds / Money:
+    - FIXED: In `Char_Server/clan.cpp`, `World_Server/worldpackets.cpp`, and `QuestActions.cpp`:
+      * Added `money BIGINT UNSIGNED` to `list_clan` and 8-byte QWORD packet serialization.
+      * Implemented Clan Bank deposit/withdraw (`pakStoreZuly:0x20/0x21`) with rank >= 5 verification.
+      * Implemented `QUESTCOND(028)` (Clan Funds check) and `QUESTREWD(024)` (Clan Money adjustment).
+
+[x] Clan Contribution Points (CP):
+    - FIXED: In `World_Server/quest/`:
+      * Implemented `QUESTCOND(025)` checking player clan contribution against quest requirement.
+      * Implemented `QUESTREWD(027)` rewarding Clan Contribution Points via `client->GiveCP()`.
+      * Implemented `QUESTCOND(030)` checking if clan has learned specific skill.
+
+--------------------------------------------------------------------------------
+B. DUNGEONS & INSTANCING (High Priority)
+--------------------------------------------------------------------------------
+[ ] Dynamic Dungeon Instancing:
+    - ISSUE: Server only supports static shared maps loaded from `LIST_ZONE.STB`.
+      If two parties enter Goblin Cave or George's Cave, they share the exact same
+      map instance. No private party instances exist.
+    - FIX NEEDED: Create dynamic `CMap` instance cloning in `MapList` for instance
+      dungeons, with unique instance IDs tied to party/clan IDs and cleanup on empty.
+
+[ ] Dungeon IFO Event Objects (Doors, Levers, Portals):
+    - ISSUE: `QUESTCOND(012)` ("Select an IFO object. NOT CODED") logs failure.
+      Dungeon doors and interactive levers cannot trigger quest progress or open gates.
+    - FIX NEEDED: Map IFO object IDs to zone event handlers in `QuestConditions.cpp`.
+
+[ ] Dungeon Timers & Wipe Mechanics:
+    - ISSUE: No instance time limit tracking or wipe handling.
+    - FIX NEEDED: Add countdown timer for timed dungeon challenges and auto-teleport
+      players back to town upon timeout or full party wipe.
+
+--------------------------------------------------------------------------------
+C. PVP ZONES, ARENA & UNION WARS (Medium-High Priority)
+--------------------------------------------------------------------------------
+[ ] Arena / Colosseum System:
+    - ISSUE: No automated Arena matchmaking or tournament runner. Map 9 (Colosseum)
+      is loaded as a standard map with no round manager, score tracking, or entry gatekeeper.
+    - FIX NEEDED: Implement Arena queue manager NPC, handle 1v1 / team matchups,
+      round countdowns, and reward medal payouts.
+
+[ ] PvP Zone Type Classification:
+    - ISSUE: In `startup.cpp:2628`, `ZoneData.rows[i][18]` (allowpvp) is simplified:
+      `if (newzone->allowpvp >= 1 && newzone->allowpvp <= 2) newzone->allowpvp = 1;`
+      The distinctions between Free-For-All (FFA), Group/Team PvP, Clan PvP, and
+      Union PvP are lost.
+    - FIX NEEDED: Use STB Zone Type column 20 to support distinct PvP modes:
+      Mode 1: Free For All (anyone can hit anyone)
+      Mode 2: Team / Party PvP (allies cannot be hit)
+      Mode 3: Clan PvP (same clan cannot be hit)
+      Mode 4: Union PvP (same union cannot be hit)
+
+[x] Server-Side PvP Attack Safety Validation:
+    - FIXED: In `worldpackets.cpp:1621` (`pakStartAttack`) and `charfunctions.cpp:120`
+      (`StartAction`), added strict validation rejecting player attacks when `map->allowpvp == 0`,
+      and blocking friendly fire between same-team players (`pvp_id`).
+
+[ ] Union War (UW):
+    - ISSUE: `UWNbPlayers` defaults to 0 (deactivated in worldserver.cpp:385).
+      While kill logging exists (`UWKill`), automated registration, schedule timer,
+      and capture point flags need end-to-end testing and balancing.
+    - FIX NEEDED: Activate UW scheduler, configure minimum player requirements,
+      and verify victory condition rewards.
+
+--------------------------------------------------------------------------------
+D. QUEST SYSTEM & QUEST TIMERS (Medium Priority)
+--------------------------------------------------------------------------------
+[x] Quest Timers (`QUESTREWD(013)`):
+    - FIXED: Implemented `SDelayedQuestTrigger` queue on `CPlayer` (`player.h`),
+      processed every tick in `MainProcess.cpp:234` / `playerfunctions.cpp:2188`,
+      and enabled queue submission in `QuestActions.cpp:1088` (`QUESTREWD(013)`).
+
+[x] Active Timed Quest Countdown & Expiry:
+    - FIXED: In `playerfunctions.cpp:2212`, active quests with STB_QUEST duration limits
+      are ticked per second. Upon expiration, StartTime is zeroed (set to 1) and
+      SendQuestUpdate() is dispatched, triggering the client time-up dialog and fail path.
+
+[x] Stubbed Quest Conditions & Actions:
+    - FIXED:
+      * `QUESTCOND(017)`: Corrected variable read typo in `QuestConditions.cpp:705`.
+      * `QUESTCOND(016)`: Implemented Zone Time window evaluation.
+      * `QUESTCOND(022)`: Implemented Server/Channel ID range check against Config.ServerID.
+      * `QUESTCOND(012)`: Implemented IFO / WarpGate / NPC search setting `client->quest.RefNPC`.
+      * `QUESTCOND(028)` & `(029)`: Verified Clan membership and live member count querying.
+      * `QUESTREWD(012)`: Implemented NPC Shout & Announce broadcasting with LTB text.
+      * `QUESTREWD(027)`: Implemented Clan Contribution Points award via `client->GiveCP()`.
+
+--------------------------------------------------------------------------------
+E. CART & CASTLE GEAR (PAT) MECHANICS (Medium Priority)
+--------------------------------------------------------------------------------
+[x] Missing PAT Weapon Attack & Accuracy Formulas:
+    - FIXED: In `playerstats.cpp`:
+      * Implemented specialized Cart weapon ATK formulas in `GetAttackPower()` for all
+        weapon subclasses (571: Hammer, 572: Mirror/Crystal, 573: Bow, 574: Katar/Spear,
+        575/551: Launcher/Gun), with stat scaling (STR, DEX, INT, CON, SEN) and weapon grade bonus.
+      * Implemented complete accuracy offsets in `GetAccuracy()` for all Cart weapon IDs
+        and types (including legacy 551), with reliable defaults eliminating all warning logs.
+
+[x] Skill Casting While Driving:
+    - FIXED: In `worldpackets.cpp` (`pakStartSkill`, `pakSkillSelf`, `pakSkillAOE`),
+      permitted driving skills (tab 30-39 / family 1) while in `DRIVING` stance (and checking
+      motor/fuel), while blocking on-foot skills and preventing driving skills on foot.
+
+[ ] Castle Gear Parts Wear & Ejection:
+    - ISSUE: When fuel runs out during combat, attack stops, but passengers and
+      broken parts are not automatically unmounted with appropriate client visual alerts.
+
+--------------------------------------------------------------------------------
+F. ECONOMY, SERVICES & POLISH (Medium-Low Priority)
+--------------------------------------------------------------------------------
+[x] Equipment Repair Pricing:
+    - FIXED: In `worldpackets.cpp:8261` (`pakRepairItem`), implemented standard ROSE
+      repair pricing formula based on base item price and lost condition:
+      `repair_cost = bprice * (lost_lifespan / 100) * 0.05`. Validates player Zulies,
+      deducts repair cost, restores lifespan, and transmits packet `0x7cd` with updated balance.
+
+[x] Storage Service Fee:
+    - FIXED: In `worldpackets.cpp:6063` (`pakChangeStorage`), deposit fee is calculated
+      from item price and rate, deducting Zulies from player inventory. (Withdrawals remain free).
+
+[ ] Mail System Upgrades:
+    - ISSUE: In `charpackets.cpp:568`, reading mail deletes ALL unread mails in a
+      single SQL query: `DELETE FROM mail_list WHERE sendtocharid=%u`.
+      No Zuly or Item attachments are supported.
+    - FIX NEEDED: Track individual mail IDs, support mail deletion per-message,
+      and add item/zuly attachment transfer support.
+
+[x] Valkyrie Charm (Add Damage) INT Scaling:
+    - FIXED: In `Buff.cpp:1031`, implemented INT scaling formula
+      `Value += (int)((Evalue - 15) / 8.0)` for `A_ADDDMG` (buff 83).
+
+[x] Chatroom Disconnect Notification:
+    - FIXED: Verified `charserver.cpp:196-212` broadcasts packet `0x7e3` sub-action `0x16`
+      to notify all remaining chatroom participants when a member disconnects.
+
+[x] Server Capacity Guard:
+    - FIXED: In `SocketServer.cpp:160` and `worldserver.cpp:273`, implemented active
+      connection count comparison against `Config.MaxConnections`, rejecting excess
+      incoming socket connections.
+
+[ ] Monster AIP Incomplete Opcodes:
+    - Charm check (CDT 015)
+    - WorldVar check (CDT 021)
+    - EconomyVar check (CDT 022)
+    - Game Map Time check (CDT 025)
+    - Server Channel check (CDT 026)
+    - Set World Variable (ACT 031)
+    - Set Economy Variable (ACT 032)
+    - Set Zone (ACT 034)
+
+
+--------------------------------------------------------------------------------
+4. SUGGESTED IMPLEMENTATION ROADMAP (MILESTONES)
+--------------------------------------------------------------------------------
+
+MILESTONE 1 — Stability, Exploitation Prevention & Gameplay (Completed / Active)
+[x] Add server-side PvP check to `pakStartAttack` (prevent attacking players in towns).
+[x] Implement server full capacity enforcement in `SocketServer.cpp` & `worldserver.cpp`.
+[x] Fix Add Damage (Valkyrie Charm) INT scaling in `Buff.cpp`.
+[x] Implement delayed quest trigger execution queue (`QUESTREWD(013)`).
+[x] Enable driving combat skills in `DRIVING` stance in `worldpackets.cpp`.
+[x] Fix chatroom disconnect broadcast in `charserver.cpp`.
+
+MILESTONE 2 — Quest Engine & Timers Completion (COMPLETED & VERIFIED)
+[x] Implement delayed trigger execution queue (`QUESTREWD(013)`) in `CPlayer::Update()`.
+[x] Implement active timed quest countdown and expiration logic.
+[x] Hook IFO object interactions for dungeon levers/doors (`QUESTCOND(012)`).
+[x] Implement time-based quest conditions (CDT 016, CDT 017, CDT 022).
+[x] Implement clan quest conditions and rewards (CDT 028, CDT 029, ACT 012, ACT 027).
+
+MILESTONE 3 — PAT (Cart & Castle Gear) Completion & Economy (COMPLETED & VERIFIED)
+[x] Finish all missing PAT weapon attack and accuracy formulas in `playerstats.cpp`.
+[x] Enable specialized driving combat skills in `worldpackets.cpp:3383`.
+[x] Hook repair cost calculation and storage transaction fees in `worldpackets.cpp`.
+
+MILESTONE 4 — Clan System Expansion (COMPLETED & VERIFIED)
+[x] Implement Clan Skills database persistence, skill learning NPC, and passive buffs.
+[x] Implement Clan Bank / shared clan storage vault.
+[x] Add Clan Money deposits and withdrawals.
+[x] Implement Clan Contribution Points earning and spending.
+
+MILESTONE 5 — PvP Arena, Union Wars & Clan Wars (2-3 Weeks)
+- Implement PvP Zone Type modes (FFA, Party, Clan, Union) from `LIST_ZONE.STB`.
+- Implement Arena / Colosseum automated match queue and rewards.
+- Activate and balance Union War scheduler and victory conditions.
+- Design and implement Clan War battlefield instances and boss mechanics.
+
+================================================================================
