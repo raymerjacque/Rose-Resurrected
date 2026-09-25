@@ -61,3 +61,12 @@ Backup*/
 .DS_Store
 Thumbs.db
 *~
+
+# Credentials & Private Local Files (Never commit)
+*.env
+*.env.*
+*.local
+*credential*
+*token*
+.github_credentials*
+
