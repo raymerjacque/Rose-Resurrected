@@ -1,4 +1,5 @@
 #include "PlayerBot.h"
+#include "VendingCatalog.h"
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -48,6 +49,7 @@ CBotManager* CBotManager::GetInstance( )
 CBotManager::CBotManager( )
     : m_ambientInitialized( false ),
       m_buffBotsInitialized( false ),
+      m_vendingBotsInitialized( false ),
       m_nameCounter( 0 )
 {
     pthread_mutex_init( &m_botMutex, NULL );
@@ -55,6 +57,7 @@ CBotManager::CBotManager( )
     m_lastAmbientCheck = clock( );
     m_lastPruneCheck = clock( );
     m_lastBuffBotCheck = clock( );
+    m_lastVendingBotCheck = clock( );
 }
 
 CBotManager::~CBotManager( )
@@ -185,10 +188,13 @@ void CBotManager::Update( )
     // 3. Persistent grind spot Buff Bots check
     CheckBuffBots( );
 
-    // 4. Dynamic proximity spawner check
+    // 4. Persistent market hub Vending Bots check
+    CheckVendingBots( );
+
+    // 5. Dynamic proximity spawner check
     CheckProximitySpawns( );
 
-    // 5. Prune orphaned dynamic bots
+    // 6. Prune orphaned dynamic bots
     PruneOrphanedBots( );
 }
 
@@ -363,6 +369,108 @@ CPlayer* CBotManager::SpawnBuffBot( const char* name, int mapId, fPoint pos )
         botAi->SetState( BOT_STATE_BUFF_BOT );
         botAi->EquipTieredGear( true );
         Log( MSG_INFO, "Buff Bot '%s' successfully spawned and initialized on map %d at (%.1f, %.1f)", name, mapId, pos.x, pos.y );
+    }
+    return bot;
+}
+
+void CBotManager::CheckVendingBots( )
+{
+    clock_t now = clock( );
+    if ( m_vendingBotsInitialized )
+    {
+        if ( ( now - m_lastVendingBotCheck ) < ( 30 * CLOCKS_PER_SEC ) ) return;
+    }
+    m_lastVendingBotCheck = now;
+    m_vendingBotsInitialized = true;
+
+    struct VendingBotLocation {
+        const char* name;
+        int job;
+        int level;
+        int mapId;
+        float x;
+        float y;
+        const char* shopTitle;
+        int category;
+    };
+
+    static const VendingBotLocation spots[] = {
+        // Junon Polis (Map 2) Hotspots
+        { "Merchant_Koji",       321, 100, 2, 5655.0f, 5210.0f, "[Gems] T5-T7 Jewels & Diamonds",     VEND_CAT_GEMS },
+        { "Trader_Jin",          111, 100, 2, 5662.0f, 5205.0f, "[Weapons] Rare Swords & Bows",        VEND_CAT_WEAPONS_HIGH },
+        { "Shop_Milo",           211, 100, 2, 5670.0f, 5200.0f, "[Pots] HP/MP & Return Scrolls",       VEND_CAT_POTIONS_SCROLLS },
+        { "Refiner_Orin",        322, 100, 2, 5724.0f, 5220.0f, "[Refine] Talismans & Runes",         VEND_CAT_REFINE },
+        { "Artisan_Bax",         322, 100, 2, 5730.0f, 5230.0f, "[Crafting] Ores, Woods & Leathers",   VEND_CAT_MATERIALS },
+        { "Armorer_Gale",        111, 100, 2, 5722.0f, 5280.0f, "[Armor] Class Sets & Shields",        VEND_CAT_ARMOR_HIGH },
+        { "Mechanic_Torque",     321, 100, 2, 5510.0f, 5235.0f, "[PAT] Frames, Engines & Wheels",      VEND_CAT_PAT },
+        { "Jeweler_Serena",      311, 100, 2, 5518.0f, 5240.0f, "[Jewelry] Stat Rings & Necklaces",    VEND_CAT_ACCESSORIES },
+        { "WingMaster_Aero",     411, 100, 2, 5505.0f, 5245.0f, "[Wings] Angel, Devil & Fairies",     VEND_CAT_WINGS },
+        { "Quartermaster_Rook",  411, 100, 2, 5295.0f, 5250.0f, "[Ammo] Elemental Arrows & Bullets",   VEND_CAT_AMMO },
+        { "Dealer_Vance",        411, 100, 2, 5320.0f, 5100.0f, "[Gear] Dual Weapons & Katars",        VEND_CAT_DUAL_KATARS },
+
+        // Canyon City of Zant (Map 1) Hotspots
+        { "Vendor_Pippin",       311,  50, 1, 5242.0f, 5115.0f, "[Starter] HP/MP Pots & Scrolls",      VEND_CAT_ZANT_STARTER },
+        { "Scout_Robin",         411,  50, 1, 5238.0f, 5122.0f, "[Ammo] Hunting Arrows & Bullets",     VEND_CAT_ZANT_AMMO },
+        { "Peddler_Toby",        311,  50, 1, 5245.0f, 5130.0f, "[Materials] Monster Drops & Iron",    VEND_CAT_ZANT_MATERIALS },
+        { "Smith_Brant",         111,  50, 1, 5250.0f, 5210.0f, "[Weapons] Swords, Staffs & Guns",     VEND_CAT_ZANT_WEAPONS },
+        { "Tailor_Lydia",        311,  50, 1, 5265.0f, 5218.0f, "[Armor] Novice & Leather Armor",      VEND_CAT_ZANT_ARMOR },
+        { "GemTrader_Ruby",      321,  50, 1, 5300.0f, 5228.0f, "[Gems] Cut Jewels & Talismans",       VEND_CAT_ZANT_GEMS },
+        { "Collector_Felix",     311,  50, 1, 5270.0f, 5250.0f, "[Accessories] Rings & Back Bags",    VEND_CAT_ZANT_ACCESSORIES }
+    };
+    static const size_t spotCount = sizeof( spots ) / sizeof( spots[0] );
+
+    for ( size_t s = 0; s < spotCount; s++ )
+    {
+        const VendingBotLocation& loc = spots[s];
+        if ( loc.mapId >= (UINT)GServer->MapList.max ) continue;
+        CMap* map = GServer->MapList.Index[loc.mapId];
+        if ( !map || map == GServer->MapList.nullzone ) continue;
+
+        // Check if this vending bot already exists
+        bool exists = false;
+        pthread_mutex_lock( &m_botMutex );
+        for ( size_t i = 0; i < m_bots.size( ); i++ )
+        {
+            CPlayerBot* bAi = m_bots[i];
+            if ( bAi && bAi->GetPlayer( ) && bAi->GetPlayer( )->CharInfo )
+            {
+                if ( strcmp( bAi->GetPlayer( )->CharInfo->charname, loc.name ) == 0 )
+                {
+                    exists = true;
+                    break;
+                }
+            }
+        }
+        pthread_mutex_unlock( &m_botMutex );
+
+        if ( !exists )
+        {
+            fPoint pos;
+            pos.x = loc.x;
+            pos.y = loc.y;
+            pos.z = 0.0f;
+            SpawnVendingBot( loc.name, loc.job, loc.level, loc.mapId, pos, loc.shopTitle, loc.category );
+        }
+    }
+}
+
+CPlayer* CBotManager::SpawnVendingBot( const char* name, int job, int level, int mapId, fPoint pos, const char* shopTitle, int category )
+{
+    // Spawn bot with designated job, level, static (isDynamic = false)
+    CPlayer* bot = SpawnBot( name, job, level, mapId, pos, false );
+    if ( !bot ) return NULL;
+
+    CPlayerBot* botAi = GetBotByPlayer( bot );
+    if ( botAi )
+    {
+        botAi->SetVendingBot( true );
+        botAi->SetAutoRoam( false );
+        botAi->SetDynamic( false );
+        botAi->SetState( BOT_STATE_VENDING );
+        botAi->EquipTieredGear( true );
+        botAi->SetupVendingShop( shopTitle, category );
+        Log( MSG_INFO, "Vending Bot '%s' successfully spawned and initialized on map %d at (%.1f, %.1f) [Category %d: %s]",
+             name, mapId, pos.x, pos.y, category, shopTitle ? shopTitle : "Shop" );
     }
     return bot;
 }
@@ -883,6 +991,9 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_lastBuffSay( 0 ),
       m_lastBuffCastTime( 0 ),
       m_lastBuffSeekTime( 0 ),
+      m_isVendingBot( false ),
+      m_vendingCategory( 0 ),
+      m_lastVendingSay( 0 ),
       m_isDynamic( false ),
       m_lastKnownLevel( 1 )
 {
@@ -928,6 +1039,7 @@ const char* CPlayerBot::GetStateString( ) const
         case BOT_STATE_DEAD:      return "DEAD";
         case BOT_STATE_BUFF_BOT:  return "BUFF_BOT";
         case BOT_STATE_SEEK_BUFF: return "SEEK_BUFF";
+        case BOT_STATE_VENDING:   return "VENDING";
         default:                  return "UNKNOWN";
     }
 }
@@ -1611,7 +1723,7 @@ void CPlayerBot::Update( )
     // Check death condition
     if ( m_player->IsDead( ) || m_player->Stats->HP <= 0 )
     {
-        if ( m_isBuffBot )
+        if ( m_isBuffBot || m_isVendingBot )
         {
             Respawn( );
             return;
@@ -1632,6 +1744,18 @@ void CPlayerBot::Update( )
             m_player->Stats->HP = m_player->Stats->MaxHP;
         }
         HandleBuffBot( );
+        return;
+    }
+
+    // Vending bot execution bypass
+    if ( m_isVendingBot )
+    {
+        m_player->Stats->MP = m_player->Stats->MaxMP;
+        if ( m_player->Stats->HP < m_player->Stats->MaxHP )
+        {
+            m_player->Stats->HP = m_player->Stats->MaxHP;
+        }
+        HandleVendingBot( );
         return;
     }
 
@@ -1679,6 +1803,7 @@ void CPlayerBot::Update( )
         case BOT_STATE_DEAD:      HandleDead( );      break;
         case BOT_STATE_BUFF_BOT:  HandleBuffBot( );   break;
         case BOT_STATE_SEEK_BUFF: HandleSeekBuff( );  break;
+        case BOT_STATE_VENDING:   HandleVendingBot( ); break;
     }
 }
 
@@ -2310,6 +2435,68 @@ void CPlayerBot::HandleBuffBot( )
                 snprintf( msg, sizeof(msg), "Blessings upon you, %s!", bestTarget->CharInfo->charname );
                 Say( msg );
             }
+        }
+    }
+}
+
+void CPlayerBot::SetupVendingShop( const char* shopTitle, int category )
+{
+    if ( !m_player || !m_player->Shop ) return;
+
+    m_vendingCategory = category;
+    m_shopTitle = shopTitle ? shopTitle : "Shop";
+
+    strncpy( m_player->Shop->name, shopTitle ? shopTitle : "Shop", sizeof(m_player->Shop->name) - 1 );
+    m_player->Shop->name[sizeof(m_player->Shop->name) - 1] = '\0';
+    m_player->Shop->ShopType = 0; // Selling shop
+
+    PopulateVendingInventory( m_player, category );
+
+    m_player->Status->Stance = 1; // Sitting stance
+
+    // Broadcast shop opening to nearby players
+    BEGINPACKET( pak, 0x796 );
+    ADDWORD    ( pak, m_player->clientid );
+    ADDFLOAT   ( pak, m_player->Position->current.x );
+    ADDFLOAT   ( pak, m_player->Position->current.y );
+    ADDWORD    ( pak, 0x9057 );
+    GServer->SendToVisible( &pak, m_player );
+
+    RESETPACKET( pak, 0x7c2 );
+    ADDWORD    ( pak, m_player->clientid );
+    ADDWORD    ( pak, m_player->Shop->ShopType );
+    ADDSTRING  ( pak, m_player->Shop->name );
+    ADDBYTE    ( pak, 0x00 );
+    GServer->SendToVisible( &pak, m_player );
+
+    m_lastVendingSay = clock( );
+}
+
+void CPlayerBot::HandleVendingBot( )
+{
+    if ( !m_player || !m_player->Shop ) return;
+
+    if ( m_player->IsDead( ) || m_player->Stats->HP <= 0 )
+    {
+        Respawn( );
+        return;
+    }
+
+    // Keep shop active, max HP/MP, and shop sitting stance maintained
+    m_player->Stats->HP = m_player->Stats->MaxHP;
+    m_player->Stats->MP = m_player->Stats->MaxMP;
+    m_player->Shop->open = true;
+    m_player->Status->Stance = 1;
+
+    // Periodic promotional shout
+    clock_t now = clock( );
+    if ( ( now - m_lastVendingSay ) > ( 60 * CLOCKS_PER_SEC ) )
+    {
+        m_lastVendingSay = now;
+        const char* promo = GetVendingPromoMessage( m_vendingCategory );
+        if ( promo && strlen( promo ) > 0 )
+        {
+            Say( promo );
         }
     }
 }

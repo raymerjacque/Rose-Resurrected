@@ -301,11 +301,11 @@
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-title">Overall Core Completion</div>
-      <div class="stat-value" style="color: var(--accent-blue);">94%</div>
+      <div class="stat-value" style="color: var(--accent-blue);">96%</div>
       <div class="progress-bar-container">
-        <div class="progress-bar" style="width: 94%;"></div>
+        <div class="progress-bar" style="width: 96%;"></div>
       </div>
-      <div class="stat-desc">Core play loop, combat, clans, PAT, quests & PvP arena complete</div>
+      <div class="stat-desc">Core play loop, combat, clans, PAT, quests, PvP arena & vending bots complete</div>
     </div>
     <div class="stat-card">
       <div class="stat-title">High-Priority Gaps</div>
@@ -319,8 +319,8 @@
     </div>
     <div class="stat-card">
       <div class="stat-title">Verified Working Systems</div>
-      <div class="stat-value" style="color: var(--accent-green);">30 Systems</div>
-      <div class="stat-desc">Bots, Buffs, Trade, Party, Quests, PAT, Refine +15, Clan Skills/Vault, PvP Modes, Arena, UW</div>
+      <div class="stat-value" style="color: var(--accent-green);">31 Systems</div>
+      <div class="stat-desc">Bots, Buffs, Vending Bots, Trade, Party, Quests, PAT, Refine +15, Clan Skills/Vault, PvP Modes, Arena, UW</div>
     </div>
   </div>
 
@@ -686,12 +686,30 @@
       </div>
     </div>
 
+    <!-- Autonomous Vending Bots System -->
+    <div class="task-card" data-cat="economy done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Autonomous Vending Bots System</div>
+          <span class="badge badge-done">Done (Verified)</span>
+        </div>
+        <div class="task-category">Economy & Bot AI</div>
+        <div class="task-body">
+          Deployed 18 permanent autonomous vending bots across Junon Polis (Map 2) and Canyon City of Zant (Map 1). Features 18 specialized stock catalogs covering weapons, armors, cut jewels T4-T7, refining catalysts (Grade 4-10 Talismans/Bindrunes, Planetary Runes, Arua Fate), crafting drops, consumables, ammo, jewelry, wings, and PAT parts. Wire-level shop sitting stance (<span class="code-ref">0x02</span>), overhead sign broadcasting (<span class="code-ref">0x7c2</span>), catalog browsing (<span class="code-ref">0x7c4</span>), and real-time purchase handling (<span class="code-ref">0x7c5</span>). Infinite restocking preserves stock indefinitely; MySQL DB bypass in <span class="code-ref">SaveSlot41</span> protects item tables; periodic promotional shouts broadcast via <span class="code-ref">0x783</span>.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Active & Verified</span>
+        <span class="code-ref">VendingCatalog.cpp &bull; PlayerBot.cpp:373</span>
+      </div>
+    </div>
+
   </div>
 
   <!-- Implementation Roadmap -->
   <div class="section-title">
     <span>Development Implementation Roadmap</span>
-    <span class="badge badge-done">Phase 4 Complete</span>
+    <span class="badge badge-done">Phase 6 Complete</span>
   </div>
 
   <div class="roadmap">
@@ -731,8 +749,15 @@
       </div>
     </div>
     <div class="phase-item">
+      <div class="phase-dot" style="border-color: var(--accent-green);"></div>
+      <div class="phase-header">Phase 6 &bull; Autonomous Vending Bots System (Complete & Verified)</div>
+      <div class="phase-desc">
+        18 permanent autonomous vending bots stationed across Junon Polis and Zant hotspots. Full 18-category catalog populator (<span class="code-ref">VendingCatalog.cpp</span>) covering weapons, armor, cut gems T4-T7, Grade 4-10 Talismans & Planetary Runes, craft drops, potions, ammunition, jewelry, wings, and PAT gear. Infinite auto-restocking in <span class="code-ref">pakBuyShop</span>, MySQL item table bypass in <span class="code-ref">SaveSlot41</span>, and periodic overhead promotional shouts (<span class="code-ref">0x783</span>).
+      </div>
+    </div>
+    <div class="phase-item">
       <div class="phase-dot" style="border-color: var(--accent-blue);"></div>
-      <div class="phase-header">Phase 6 &bull; Dynamic Dungeon Instancing & Polish (Next Target)</div>
+      <div class="phase-header">Phase 7 &bull; Dynamic Dungeon Instancing & Polish (Next Target)</div>
       <div class="phase-desc">
         Dynamic <span class="code-ref">CMap</span> instance cloning in <span class="code-ref">MapList</span> for private party cave instances (Goblin Cave, George's Cave). Dungeon countdown timers and party wipe auto-teleport mechanics. Mail system upgrades for individual deletion and Zuly/item attachments. Monster AIP scripting opcode completion.
       </div>

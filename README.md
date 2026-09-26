@@ -115,11 +115,18 @@ RosE Resurrected utilizes a distributed 3-tier server model communicating via TC
   - Lowered minimum player requirement threshold (`UWNbPlayers`) to 1 in `worldserver.cpp:390` so Union Wars launch cleanly.
   - Hooked Clan Field kills in `battle.cpp:UWKill` to award +5 Clan Contribution Points (CP) to the killer.
 
+### Milestone 6 — Autonomous Vending Bots System (Completed & Verified)
+- **18 Permanent Autonomous Market Bots**: Positioned in high-traffic hubs across Junon Polis (Map 2) and Canyon City of Zant (Map 1).
+- **18 Specialized Stock Catalogs (`VendingCatalog.cpp`)**: Covering Weapons (+4 to +7 refines), Class Armor Sets & Shields, Cut Jewels (T4–T7 Diamonds, Rubies, Sapphires), Refining Catalysts (Grade 4–10 Talismans/Bindrunes, Planetary Runes, Arua Fate), Crafting Drops & Spirit Stones, Consumables & Town Return Scrolls, Heavy Ammunition, Attribute Jewelry, Wings, and PAT Vehicle Parts.
+- **Wire-Level Shop Simulation**: Overhead shop banners streamed in `CreateSpawnPacket`, shop sitting stance (`0x02`), catalog browsing via `0x7c4` (`pakShowShop`), and direct item purchases via `0x7c5` (`pakBuyShop`).
+- **Infinite Auto-Restocking & Database Safety**: Auto-replenishment logic in `worldpackets.cpp` keeps stacks permanently at 999 and equipment at 1. Direct bypass in `CPlayer::SaveSlot41` (`if ( is_bot ) return;`) prevents bot virtual items from querying or modifying MySQL tables.
+- **Promotional Overhead Shouts**: Periodic advertising messages broadcast across the network via `CPlayerBot::Say()` (`0x783`) every 60–90 seconds.
+
 ---
 
 ## Roadmap & Pending Milestones
 
-### Milestone 6 — Dynamic Dungeon Instancing & Polish (Next Target)
+### Milestone 7 — Dynamic Dungeon Instancing & Polish (Next Target)
 - [ ] **Dynamic `CMap` Instancing**: Clone cave maps (e.g. Goblin Cave, George's Cave) into private party-specific instances with automatic teardown on party exit.
 - [ ] **Dungeon Wipe Timers**: Auto-teleport players to respawn towns on full party wipe or instance timeout.
 - [ ] **Mail System Attachments**: Support per-message deletion, Zuly attachments, and item parcel transfers.
@@ -339,6 +346,37 @@ Authorized Game Masters (Access Level $\ge 300$) can control bots using in-game 
 - `/bot buff`: Triggers immediate area buffing from nearby cleric bots.
 - `/bot kill [name]`: Despawns an active bot.
 - `/bot list`: Lists active bot instances and coordinates.
+
+### 6. Autonomous Market Vending Bots (`VendingCatalog.cpp` & `PlayerBot.cpp`)
+Stationed permanently in high-density player trade corridors in Junon Polis and Canyon City of Zant, 18 autonomous vendor bots provide an active, authentic economy:
+
+| # | Vendor Name | Zone / Map | Landmark Spot | Stall Signboard Title | Specialty Goods |
+|---|---|---|---|---|---|
+| 1 | `Merchant_Koji` | Junon Polis (2) | Spawn Point | `[Gems] T5-T7 Jewels & Diamonds` | Cut Diamonds, Rubies, Sapphires, Topazes (T5–T7) |
+| 2 | `Trader_Jin` | Junon Polis (2) | Spawn / Mildun | `[Weapons] Rare Swords & Bows` | Caliburn +6, Death Bringer +7, Infernal Bow +6, Piercing Gun +6 |
+| 3 | `Shop_Milo` | Junon Polis (2) | Near Mildun | `[Pots] HP/MP & Return Scrolls` | HP/MP Bottles, Return Scrolls (Zant, Junon, Eucar, Xita) |
+| 4 | `Refiner_Orin` | Junon Polis (2) | Next to Crune | `[Refine] Talismans & Runes` | Grade 4–10 Talismans/Bindrunes, Planetary Runes, Arua Fate |
+| 5 | `Artisan_Bax` | Junon Polis (2) | Crune & Storage | `[Crafting] Ores, Woods & Leathers` | Damascus, Mithril, Soft Leather, Spirit Stones, Heart/Feather drops |
+| 6 | `Armorer_Gale` | Junon Polis (2) | Near Saki | `[Armor] Class Sets & Shields` | Knight Plate +4 set, Holy Body +6 set, Plate Shield +5 |
+| 7 | `Mechanic_Torque`| Junon Polis (2) | Bridge / Mayor | `[PAT] Frames, Engines & Wheels` | Cart frames, high-output engines, durable wheels & cores |
+| 8 | `Jeweler_Serena` | Junon Polis (2) | Near Mayor | `[Jewelry] Stat Rings & Necklaces` | Attribute rings, necklaces, and earrings with stat bonuses |
+| 9 | `WingMaster_Aero`| Junon Polis (2) | Bridge Walkway | `[Wings] Angel, Devil & Fairies` | Angel, Devil, and Fairy wings with move speed bonuses |
+| 10 | `Quartermaster_Rook`| Junon Polis (2)| Valor Shops | `[Ammo] Elemental Arrows & Bullets`| Elemental arrows (Fire, Lightning, Storm), Silver/Gold bullets |
+| 11 | `Dealer_Vance` | Junon Polis (2) | Junon Order | `[Gear] Dual Weapons & Katars` | High-critical dual swords and assassin katars |
+| 12 | `Vendor_Pippin` | Zant (1) | South Ramp | `[Starter] HP/MP Pots & Scrolls` | Novice health/mana vials and Plains/Zant return scrolls |
+| 13 | `Scout_Robin` | Zant (1) | Ramp Walkway | `[Ammo] Hunting Arrows & Bullets` | Affordable wooden arrows and lead bullets |
+| 14 | `Peddler_Toby` | Zant (1) | Entrance Path | `[Materials] Monster Drops & Iron` | Iron, leathers, claws, and early crafting materials |
+| 15 | `Smith_Brant` | Zant (1) | Central Plaza | `[Weapons] Swords, Staffs & Guns` | Beginner weapons (Wooden Sword to Long Sword +4, Short Bows) |
+| 16 | `Tailor_Lydia` | Zant (1) | Near Judy | `[Armor] Novice & Leather Armor` | Beginner clothing and leather armor sets |
+| 17 | `GemTrader_Ruby`| Zant (1) | Near Raffle | `[Gems] Cut Jewels & Talismans` | Cut starter gems (T1–T3) and Grade 1–3 Talismans |
+| 18 | `Collector_Felix`| Zant (1) | Near Keenu | `[Accessories] Rings & Back Bags`| Basic stat rings and leather backpacks for carry weight |
+
+#### Architectural Highlights:
+- **Wire Stance & Banners**: On spawn, bots set `Shop->open = true` and `Status->Stance = 1`. Approaching clients receive the sitting shop posture (`0x02`) and overhead banner via `CreateSpawnPacket`.
+- **Live Trading**: Players interact via normal client UI (`pakShowShop` / `pakBuyShop`). Zulies transfer automatically.
+- **Infinite Auto-Restock**: Deductions in `pakBuyShop` are intercepted when `otherclient->is_bot` is true, immediately restoring stackables to 999 and gear to 1.
+- **Database Safety**: `SaveSlot41` skips MySQL queries for bots, keeping database tables clean and free of virtual bot items.
+- **Immunity & Permanence**: Bots are marked static (`isDynamic = false`) so they are never pruned, and their HP/MP is auto-restored each cycle.
 
 ---
 

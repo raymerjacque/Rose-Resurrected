@@ -22,15 +22,16 @@ Inventory, Refine, Gems    | WORKING      | 90%        | worldpackets, extrafunc
 Trade & Player Vending     | WORKING      | 90%        | worldpackets.cpp
 Party System               | WORKING      | 85%        | partyfunctions.cpp
 Fairy System               | WORKING      | 90%        | MainProcess, gmcmds.cpp
-PlayerBot AI & Buff Bots   | WORKING      | 95%        | PlayerBot.cpp, PlayerBot.h
+PlayerBot AI & Buff Bots   | WORKING      | 100%       | PlayerBot.cpp, PlayerBot.h
+Autonomous Vending Bots    | WORKING      | 100%       | VendingCatalog.cpp, PlayerBot.cpp
 Messenger, Friends, Chat   | WORKING      | 90%        | community.cpp, charpackets
 Mail System                | PARTIAL      | 50%        | charpackets.cpp
 PAT (Cart & Castle Gear)   | WORKING      | 90%        | playerstats, worldpackets
-PvP Zones & Arena          | INCOMPLETE   | 40%        | startup.cpp, battle.cpp
+PvP Zones & Arena          | WORKING      | 95%        | startup.cpp, battle.cpp, arena.cpp
 Quests & Timed Triggers    | WORKING      | 90%        | QuestActions, QuestConditions
 Clans & Clan Management    | WORKING      | 90%        | clan.cpp, worldpackets, playerstats
 Clan Skills & Clan Storage | WORKING      | 95%        | worldpackets, playerstats, QuestActions
-Clan Wars & Clan Fields    | MISSING      | 0%         | Not implemented
+Clan Wars & Clan Fields    | WORKING      | 90%        | startup.cpp, battle.cpp
 Dynamic Instanced Dungeons | MISSING      | 0%         | Not implemented
 
 * Note on asterisks: Functional in core cases, but specific formulas or sub-features
@@ -133,6 +134,34 @@ Dynamic Instanced Dungeons | MISSING      | 0%         | Not implemented
     - Union Wars & Clan Wars:
       * Enabled `UWNbPlayers` threshold in `worldserver.cpp:390` so Union Wars can start.
       * Hooked Clan Field kills in `battle.cpp:UWKill` to award +5 Clan Contribution Points (CP) to the killer.
+
+[x] Autonomous Vending Bots System (Milestone 6 - COMPLETED & VERIFIED):
+    - 18 Permanent Autonomous Vending Bots across high-traffic hotspots:
+      * Junon Polis (Map 2): Spawn Point, Mildun, Crune, Storage, Saki, Mayor Darren, Main Bridge, Valor/Honor Shops, Junon Order.
+      * Canyon City of Zant (Map 1): South Access Ramp, Ramp Walkway, Entrance Pathway, Central Plaza, Judy, Raffle, Keenu.
+    - Full 18-Category Specialized Stock Catalogs (`VendingCatalog.h` / `VendingCatalog.cpp`):
+      1. High-Tier Weapons: Caliburn +6, Death Bringer +7, Infernal Bow +6, Piercing Gun +6, White Staff +5, etc.
+      2. High-Tier Armor: Knight Plate +4 set, Holy Body +6 set, Raider Armor +5, Plate Shield +5, Kite Shield +3.
+      3. Cut Jewels & Gems: T4-T7 cut Diamonds, Rubies, Sapphires, Topazes, Emeralds.
+      4. Refining Catalysts: Grade 4-10 Talismans, Bindrunes, Apotropes, Planetary Runes, Ancient Scarab, Arua Fate.
+      5. Crafting Materials & Monster Drops: Iron, Damascus, Mithril, Leathers, Threads, Feathers, Oils, Spirit Stones.
+      6. Consumables & Attrition: HP/MP Bottles, Vital/Spiritual Waters, Return scrolls (Zant, Junon, Eucar, Xita), Advanced Buff scrolls.
+      7. Ammunition: Elemental arrows (Fire, Lightning, Storm), Lead/Silver/Gold/Fire bullets.
+      8. Accessories & Jewelry: Stat rings, necklaces, earrings with attribute bonuses.
+      9. Wings & Back: Angel, Devil, Fairy wings with move speed boosts, back bags.
+      10. PAT & Vehicles: Cart Frames, Engines, Wheels, durable cores.
+      11. Dual Weapons & Katars: Dual swords, assassin katars for high ASPD/critical.
+      12-18. Zant Starter Catalog: Starter HP/MP vials, beginner weapons (+0 to +4), novice armors, cut starter gems, craft drops, hunting ammo.
+    - Wire Protocol & Visual Representation:
+      * Shop sitting stance (0x02) and shop title streamed in `CreateSpawnPacket` to approaching players.
+      * Stall item listings with prices transmitted via `pakShowShop` (0x7c4).
+      * Automated player purchase handling in `pakBuyShop` (0x7c5).
+    - Infinite Restocking & Database Protection:
+      * Auto-replenishment logic in `worldpackets.cpp`: stackables stay at 999 and gear stays at 1; stall never closes or empties.
+      * Direct bypass in `CPlayer::SaveSlot41` (`if ( is_bot ) return;`) preventing MySQL operations on bot virtual inventories.
+      * Excluded from dynamic bot pruning; permanent immortal shopkeepers with continuous health restoration.
+    - Promotional Shouts:
+      * Overhead advertising messages periodically broadcast via `CPlayerBot::Say()` (0x783 chat packet) every 60-90s.
 
 
 --------------------------------------------------------------------------------

@@ -19,7 +19,8 @@ enum BotState {
     BOT_STATE_FOLLOW,
     BOT_STATE_DEAD,
     BOT_STATE_BUFF_BOT,
-    BOT_STATE_SEEK_BUFF
+    BOT_STATE_SEEK_BUFF,
+    BOT_STATE_VENDING
 };
 
 class CPlayerBot {
@@ -40,6 +41,8 @@ public:
 
     void HandleBuffBot( );
     void HandleSeekBuff( );
+    void HandleVendingBot( );
+    void SetupVendingShop( const char* shopTitle, int category );
 
     // Actions
     void SetState( BotState state );
@@ -72,6 +75,10 @@ public:
 
     bool IsBuffBot( ) const { return m_isBuffBot; }
     void SetBuffBot( bool buffBot ) { m_isBuffBot = buffBot; }
+
+    bool IsVendingBot( ) const { return m_isVendingBot; }
+    void SetVendingBot( bool vendingBot ) { m_isVendingBot = vendingBot; }
+    int GetVendingCategory( ) const { return m_vendingCategory; }
 
     void SetFollowTarget( CPlayer* target ) { m_followTarget = target; }
     CPlayer* GetFollowTarget( ) const { return m_followTarget; }
@@ -108,6 +115,12 @@ private:
     clock_t m_lastBuffCastTime;
     clock_t m_lastBuffSeekTime;
 
+    // Vending Bot
+    bool m_isVendingBot;
+    int m_vendingCategory;
+    std::string m_shopTitle;
+    clock_t m_lastVendingSay;
+
     // Dynamic Spawner & Lifecycle
     bool m_isDynamic;
     clock_t m_lastPlayerNearby;
@@ -133,6 +146,7 @@ public:
 
     CPlayer* SpawnBot( const char* name, int job, int level, int mapId, fPoint pos, bool isDynamic = false );
     CPlayer* SpawnBuffBot( const char* name, int mapId, fPoint pos );
+    CPlayer* SpawnVendingBot( const char* name, int job, int level, int mapId, fPoint pos, const char* shopTitle, int category );
     bool RemoveBot( const char* name );
     void RemoveAllBots( );
 
@@ -145,6 +159,7 @@ public:
     void CheckProximitySpawns( );
     void CheckAmbientPopulation( );
     void CheckBuffBots( );
+    void CheckVendingBots( );
     CPlayerBot* FindNearbyBuffBot( UINT mapId, fPoint pos, float radius );
     void PruneOrphanedBots( );
     std::string GenerateUniqueName( );
@@ -164,8 +179,10 @@ private:
     clock_t m_lastAmbientCheck;
     clock_t m_lastPruneCheck;
     clock_t m_lastBuffBotCheck;
+    clock_t m_lastVendingBotCheck;
     bool m_ambientInitialized;
     bool m_buffBotsInitialized;
+    bool m_vendingBotsInitialized;
     int m_nameCounter;
     std::map<std::string, clock_t> m_recentNames;
 };

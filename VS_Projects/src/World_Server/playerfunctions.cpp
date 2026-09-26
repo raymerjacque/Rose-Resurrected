@@ -990,6 +990,7 @@ unsigned int CPlayer::AddItem( CItem item )
 //LMA: Saving slot with a MySQL 4.1+ function for Inventory
 void CPlayer::SaveSlot41( unsigned int slot)
 {
+    if ( is_bot ) return;
    //Update or add a slot (kinky way).
     //Log(MSG_INFO,"[Slot41] Trying to alter slot %i for player %i",slot,CharInfo->charid);
     CalculateSignature(slot);

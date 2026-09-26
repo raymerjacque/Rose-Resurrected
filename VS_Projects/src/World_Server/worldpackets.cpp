@@ -6885,7 +6885,21 @@ bool CWorldServer::pakBuyShop( CPlayer* thisclient, CPacket* P )
                 return true;
             }
 
-            if(otherclient->items[invslot].itemtype > 9 && otherclient->items[invslot].itemtype < 14)
+            if(otherclient->is_bot)
+            {
+                // Vending Bot infinite restocking: keep items and stall slots permanently stocked
+                if(otherclient->items[invslot].itemtype > 9 && otherclient->items[invslot].itemtype < 14)
+                {
+                    otherclient->items[invslot].count = 999;
+                    otherclient->Shop->SellingList[slot].count = 999;
+                }
+                else
+                {
+                    otherclient->items[invslot].count = 1;
+                    otherclient->Shop->SellingList[slot].count = 1;
+                }
+            }
+            else if(otherclient->items[invslot].itemtype > 9 && otherclient->items[invslot].itemtype < 14)
             {
                 if(otherclient->items[invslot].count <= count)
                 {
