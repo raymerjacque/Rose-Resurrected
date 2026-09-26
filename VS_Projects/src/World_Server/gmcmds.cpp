@@ -440,6 +440,118 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
         return true;
     }
 
+    if (strcmp(command, "party") == 0)
+    {
+        char* subcmd = strtok(NULL, " ");
+        if (!subcmd)
+        {
+            SendPM(thisclient, "[Party Bot] Usage: /party bot <buff|follow|assist|info>");
+            return true;
+        }
+
+        if (strcmp(subcmd, "bot") == 0)
+        {
+            char* botAction = strtok(NULL, " ");
+            if (!botAction || strcmp(botAction, "help") == 0)
+            {
+                SendPM(thisclient, "=== Party Bot Commands ===");
+                SendPM(thisclient, "/party bot buff   - Order Cleric/Muse bots to refresh buffs");
+                SendPM(thisclient, "/party bot follow - Order all party bots into formation");
+                SendPM(thisclient, "/party bot assist - Order party bots to attack your target");
+                SendPM(thisclient, "/party bot info   - List party bots and roles");
+                return true;
+            }
+
+            if (!thisclient->Party || !thisclient->Party->party)
+            {
+                SendPM(thisclient, "[Party Bot] You are not in a party.");
+                return true;
+            }
+
+            CParty* party = thisclient->Party->party;
+            int botCount = 0;
+
+            if (strcmp(botAction, "buff") == 0)
+            {
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        m->bot_ai->ForcePartyBuff();
+                        botCount++;
+                    }
+                }
+                SendPM(thisclient, "[Party Bot] Ordered %d party bots to buff the group.", botCount);
+                return true;
+            }
+            else if (strcmp(botAction, "follow") == 0)
+            {
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        m->bot_ai->SetFollowTarget(thisclient);
+                        m->bot_ai->SetState(BOT_STATE_FOLLOW);
+                        botCount++;
+                    }
+                }
+                SendPM(thisclient, "[Party Bot] %d bots rallied into formation behind you.", botCount);
+                return true;
+            }
+            else if (strcmp(botAction, "assist") == 0)
+            {
+                if (thisclient->Battle->target == 0)
+                {
+                    SendPM(thisclient, "[Party Bot] You have no target selected to attack.");
+                    return true;
+                }
+                CMap* map = GServer->MapList.Index[thisclient->Position->Map];
+                if (!map) return true;
+                CMonster* mob = map->GetMonsterInMap(thisclient->Battle->target);
+                if (!mob || mob->IsDead() || mob->Stats->HP <= 0)
+                {
+                    SendPM(thisclient, "[Party Bot] Target is not a valid alive monster.");
+                    return true;
+                }
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        m->bot_ai->AttackTarget(mob);
+                        m->bot_ai->SetState(BOT_STATE_COMBAT);
+                        botCount++;
+                    }
+                }
+                SendPM(thisclient, "[Party Bot] %d bots ordered to attack target!", botCount);
+                return true;
+            }
+            else if (strcmp(botAction, "info") == 0)
+            {
+                SendPM(thisclient, "=== Party Bot Roster ===");
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        SendPM(thisclient, "Bot: %s (Lvl %d, Job %d, State: %s)",
+                            m->CharInfo->charname, m->Stats->Level, m->CharInfo->Job, m->bot_ai->GetStateString());
+                        botCount++;
+                    }
+                }
+                if (botCount == 0)
+                {
+                    SendPM(thisclient, "[Party Bot] No bots currently in party.");
+                }
+                return true;
+            }
+        }
+        SendPM(thisclient, "[Party Bot] Unknown command. Type '/party bot help'.");
+        return true;
+    }
+
 	if (strcmp(command, "bot") == 0)
     {
         if (thisclient->Session->accesslevel < 100 && !thisclient->CharInfo->isGM)
@@ -456,6 +568,7 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
             SendPM(thisclient, "/bot roam <name|all> - Autonomous roaming & grinding");
             SendPM(thisclient, "/bot stay <name|all> - Bot stops and stays");
             SendPM(thisclient, "/bot attack <name|all> - Attack your target");
+            SendPM(thisclient, "/bot party <buff|follow|assist|info> - Group command party bots");
             SendPM(thisclient, "/bot clear - Remove all bots");
             return true;
         }

@@ -540,13 +540,11 @@ bool CCharacter::stopMoving( bool send_packet )
      {
          if ( IsPlayer() )
          {
-             BEGINPACKET( pak, 0x79a );
+             BEGINPACKET( pak, 0x770 );
              ADDWORD    ( pak, clientid );
-             ADDWORD    ( pak, 0 );
-             ADDWORD    ( pak, 0 );
              ADDFLOAT   ( pak, Position->current.x * 100 );
              ADDFLOAT   ( pak, Position->current.y * 100 );
-             ADDWORD    ( pak, 0 );
+             ADDWORD    ( pak, (WORD)( Position->current.z * 100 ) );
              GServer->SendToVisible( &pak, this );
          }
          else if ( IsMonster() )

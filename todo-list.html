@@ -301,11 +301,11 @@
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-title">Overall Core Completion</div>
-      <div class="stat-value" style="color: var(--accent-blue);">96%</div>
+      <div class="stat-value" style="color: var(--accent-blue);">98%</div>
       <div class="progress-bar-container">
         <div class="progress-bar" style="width: 100%;"></div>
       </div>
-      <div class="stat-desc">All 7 Milestones & Core Roadmap Systems 100% Completed & Verified</div>
+      <div class="stat-desc">All 8 Milestones & Core Roadmap Systems 100% Completed & Verified</div>
     </div>
     <div class="stat-card">
       <div class="stat-title">High-Priority Gaps</div>
@@ -315,12 +315,12 @@
     <div class="stat-card">
       <div class="stat-title">Partial / Stubbed Features</div>
       <div class="stat-value" style="color: var(--accent-green);">0 Items</div>
-      <div class="stat-desc">Mail & AIP scripting opcodes completed</div>
+      <div class="stat-desc">Mail, AIP opcodes & bot AI completed</div>
     </div>
     <div class="stat-card">
       <div class="stat-title">Verified Working Systems</div>
-      <div class="stat-value" style="color: var(--accent-green);">35 Systems</div>
-      <div class="stat-desc">Dungeon Instancing, Mail Parcels, Bots, Buffs, Vending Bots, Trade, Quests, PAT, Refine +15, Clan Skills/Vault, PvP Modes, Arena, UW</div>
+      <div class="stat-value" style="color: var(--accent-green);">38 Systems</div>
+      <div class="stat-desc">Party Formations, Bot Buff/Rez/Taunt, Spawn Altitude Fix, Shield Block Fix, Dungeon Instancing, Mail Parcels, Bots, Buffs, Vending Bots, Trade, Quests, PAT, Refine +15, Clan Skills/Vault, PvP Modes, Arena, UW</div>
     </div>
   </div>
 
@@ -738,6 +738,76 @@
         <span>Status: Active & Verified</span>
         <span class="code-ref">VendingCatalog.cpp &bull; PlayerBot.cpp:373</span>
       </div>
+    <!-- Avatar & Bot Spawn Physics Fix -->
+    <div class="task-card" data-cat="combat done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Avatar & Bot Spawn Physics ("Falling from Sky" Fix)</div>
+          <span class="badge badge-done">Done (Verified)</span>
+        </div>
+        <div class="task-category">Client-Server Sync & Movement</div>
+        <div class="task-body">
+          Resolved the longstanding client physics mid-air "jump-in" glitch on avatar spawn. Corrected destination check logic in <span class="code-ref">player.cpp:202</span> (<span class="code-ref">SpawnToPlayer</span> packet <span class="code-ref">0x793</span>). Replaced incorrect destination checks and mid-air <span class="code-ref">CMD_MOVE</span> state with verified <span class="code-ref">CMD_STOP</span> (0x0000) for stationary avatars, instructing the client to place the mesh firmly grounded on the terrain heightmap. Upgraded <span class="code-ref">CCharacter::stopMoving()</span> and <span class="code-ref">CPlayerBot::StopMoving()</span> to broadcast official <span class="code-ref">0x770</span> (<span class="code-ref">GSV_STOP</span>) with precise terrain altitude <span class="code-ref">z * 100</span>, fully eliminating visual bouncing, air-drops, and falling glitches.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Fixed & Verified</span>
+        <span class="code-ref">player.cpp:202 &bull; charfunctions.cpp:481</span>
+      </div>
+    </div>
+
+    <!-- Combat System Shield Block & Magic Formulas -->
+    <div class="task-card" data-cat="combat done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Combat System Shield Block & Magic Balancing</div>
+          <span class="badge badge-done">Done (Verified)</span>
+        </div>
+        <div class="task-category">Combat & Stats Engine</div>
+        <div class="task-body">
+          Fixed inverted shield block logic in <span class="code-ref">battle.cpp:166</span> (<span class="code-ref">NormalAttack</span>) where attacker shield block rate was erroneously checked and subtracted from their own outgoing damage. Now properly validates defender's <span class="code-ref">Enemy->Stats->Block_Rate</span> and mitigates damage with <span class="code-ref">Enemy->Stats->Blocked_dmg</span>. Fixed magic attack defense multiplier calculation (<span class="code-ref">atkdefmult = Attack_Power / EnemyMDef</span>) ensuring balanced magic damage scaling.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Fixed & Verified</span>
+        <span class="code-ref">battle.cpp:166</span>
+      </div>
+    </div>
+
+    <!-- Tactical Player Bot Formations -->
+    <div class="task-card" data-cat="ai done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Tactical Player Bot Party Formations</div>
+          <span class="badge badge-done">Done (Verified)</span>
+        </div>
+        <div class="task-category">Bot AI & Formations</div>
+        <div class="task-body">
+          Implemented dynamic party formation offsets (<span class="code-ref">GetFormationOffset</span>) in <span class="code-ref">PlayerBot.cpp</span> relative to the party leader's forward movement vector using 2D rotational trigonometry. Knights/Soldiers anchor the vanguard frontline (forward left/right), Scouts/Raiders cover the flanks, and Clerics/Muses maintain rear support. Eliminates bot stacking, clipping, and clumping into a single coordinate point.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Active & Verified</span>
+        <span class="code-ref">PlayerBot.cpp:1290</span>
+      </div>
+    </div>
+
+    <!-- Autonomous Party Bot Support AI -->
+    <div class="task-card" data-cat="ai done">
+      <div>
+        <div class="task-header">
+          <div class="task-title">Autonomous Party Bot Support AI (Buffs, Rez, Taunts)</div>
+          <span class="badge badge-done">Done (Verified)</span>
+        </div>
+        <div class="task-category">Bot AI & Group Play</div>
+        <div class="task-body">
+          Enhanced party bot intelligence with automated support routines: Muse/Cleric bots automatically scan party members within 22m and maintain essential charms (Hustle, Clobber, Resilience, Battle, Precision) with friendly chat shouts (<span class="code-ref">CheckPartyBuffs</span>); level 30+ Clerics detect and revive dead party members with 35% HP/25% MP (<span class="code-ref">CheckPartyResurrect</span>); Soldier/Knight bots detect monsters attacking squishy allies and intercept/taunt them (<span class="code-ref">CheckPartyTaunt</span>). Respectful loot etiquette ensures bots only pick up items under their feet (&lt;3m), leaving treasures for the party leader. Full player command interface added via <span class="code-ref">/party bot &lt;buff|follow|assist|info&gt;</span>.
+        </div>
+      </div>
+      <div class="task-meta">
+        <span>Status: Active & Verified</span>
+        <span class="code-ref">PlayerBot.cpp &bull; Party.cpp &bull; gmcmds.cpp</span>
+      </div>
     </div>
 
   </div>
@@ -745,7 +815,7 @@
   <!-- Implementation Roadmap -->
   <div class="section-title">
     <span>Development Implementation Roadmap</span>
-    <span class="badge badge-done">Phase 6 Complete</span>
+    <span class="badge badge-done">Phase 8 Complete</span>
   </div>
 
   <div class="roadmap">
@@ -796,6 +866,13 @@
       <div class="phase-header">Phase 7 &bull; Dynamic Dungeon Instancing & Polish (Complete & Verified)</div>
       <div class="phase-desc">
         Dynamic <span class="code-ref">CMap</span> instance cloning via <span class="code-ref">CDungeonManager</span> for private party cave instances (Goblin Cave, George's Cave, Oblivion Temple, Forgotten Temple) with countdown timers, wipe detection, and client wire translation. Full Mail system upgrade with per-message deletion, Zuly attachments, parcel delivery, and <span class="code-ref">/mail</span> commands. Complete monster AIP scripting opcode suite (CDT 015, CDT 016, CDT 023, CDT 026, Cha check, ACT 026, ACT 027, ACT 032, ACT 033).
+      </div>
+    </div>
+    <div class="phase-item">
+      <div class="phase-dot" style="border-color: var(--accent-green);"></div>
+      <div class="phase-header">Phase 8 &bull; Combat Mechanics Polish, Spawn Physics & Player Bot Vanguard AI (Complete & Verified)</div>
+      <div class="phase-desc">
+        Fixed client physics mid-air "jump-in" glitch on avatar spawn (<span class="code-ref">0x793</span> CMD_STOP) and implemented official <span class="code-ref">0x770</span> GSV_STOP with terrain altitude. Corrected inverted shield block calculations and magic defense formulas in <span class="code-ref">battle.cpp</span>. Upgraded player bots with tactical directional party formations, automated Muse/Cleric party buffing and resurrection, Soldier aggro intercept/taunt AI, courteous party loot etiquette, and <span class="code-ref">/party bot</span> player commands.
       </div>
     </div>
   </div>

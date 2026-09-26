@@ -121,7 +121,8 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                 {
                     otherclient->bot_ai->SetFollowTarget( thisclient );
                     otherclient->bot_ai->SetState( BOT_STATE_FOLLOW );
-                    otherclient->bot_ai->Say( "I'm with you! Let's hunt together!" );
+                    otherclient->bot_ai->Say( "I'm with you! Taking formation, let's hunt together!" );
+                    otherclient->bot_ai->ForcePartyBuff( );
                 }
                 return true;
             }

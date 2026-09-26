@@ -346,6 +346,52 @@ F. ECONOMY, SERVICES & POLISH (Medium-Low Priority)
 
 
 --------------------------------------------------------------------------------
+G. COMBAT MECHANICS, SPAWN PHYSICS & PLAYER BOT AI (Completed & Verified)
+--------------------------------------------------------------------------------
+[x] Avatar & Bot Area Spawn "Falling from Sky" Glitch:
+    - FIXED: In `player.cpp:202` (`SpawnToPlayer` packet 0x793), corrected destination check
+      logic (previously had typo `Position->destiny.x != Position->current.y`). Now checks
+      active movement and combat state (`IsMoving() && IsOnBattle()`). Stationary avatars
+      now send `destiny = current` with `CMD_STOP` (0x0000), preventing the client physics
+      engine from spawning characters in mid-air and dropping them to the terrain.
+    - FIXED: In `charfunctions.cpp:481` (`CCharacter::stopMoving()`) and `PlayerBot.cpp`
+      (`CPlayerBot::StopMoving()`), replaced legacy 0x79a (`GSV_MOVE`) packets with official
+      0x770 (`GSV_STOP`), passing accurate terrain altitude (z * 100). Idle bots spawn in
+      WALKING stance rather than mid-air RUNNING.
+
+[x] Combat System Shield Block & Magic Formulas:
+    - FIXED: In `battle.cpp:166` (`NormalAttack`), corrected inverted shield block calculation
+      which previously evaluated the attacker's `Stats->Block_Rate` and reduced attacker damage.
+      Now properly checks the defender's `Enemy->Stats->Block_Rate` and subtracts `Enemy->Stats->Blocked_dmg`.
+    - FIXED: In `battle.cpp:241` (`NormalAttack`), ensured `atkdefmult = (float)Stats->Attack_Power / EnemyMDef;`
+      is cleanly computed for magic attacks, balancing magic vs magic defense scaling.
+
+[x] Player Bot Tactical Formations & Role Positioning:
+    - FIXED: In `PlayerBot.h` and `PlayerBot.cpp`, implemented `GetFormationOffset(slot, leaderCurrent, leaderDest)`
+      using directional trigonometric rotation relative to the party leader's heading:
+      * Slot 0: Vanguard Tank (Soldier/Knight) positioned 2.6m ahead, 1.2m right.
+      * Slot 1: Vanguard Off-Tank / Flanker positioned 2.6m ahead, 1.2m left.
+      * Slot 2: Right Flanker (Hawker/Scout/Dealer) positioned 1.8m back, 3.2m right.
+      * Slot 3: Left Flanker positioned 1.8m back, 3.2m left.
+      * Slot 4 & 5: Rearguard Healers/Buffers (Muse/Cleric) positioned 3.8m directly behind.
+      * Eliminates player and bot coordinate stacking and clumping.
+
+[x] Autonomous Party Bot Support & Etiquette:
+    - FIXED: In `PlayerBot.cpp`:
+      * Active Party Buffing (`CheckPartyBuffs`): Muse/Cleric bots automatically scan party members within 22m,
+        detecting missing or expired buffs and refreshing Hustle Charm (930), Clobber Charm (1270),
+        Resilience Charm (1004), Battle Charm (1254), and Precision Charm (1019) with friendly party shouts.
+      * Automated Party Resurrection (`CheckPartyResurrect`): Cleric bots (Lvl >= 30) automatically revive
+        dead party members within 20m, reviving them with 35% HP / 25% MP and casting party buffs.
+      * Vanguard Aggro Intercept & Taunting (`CheckPartyTaunt`): Soldier/Knight bots detect monsters attacking
+        squishy party members, intercepting the target and taunting them.
+      * Respectful Party Looting: Party bots only loot items directly beneath their feet (< 3m), leaving drops
+        for the party leader and immediately returning to formation.
+      * Player Party Bot Commands: Implemented `/party bot buff`, `/party bot follow`, `/party bot assist`,
+        and `/party bot info` in `gmcmds.cpp` and `Party.cpp`.
+
+
+--------------------------------------------------------------------------------
 4. SUGGESTED IMPLEMENTATION ROADMAP (MILESTONES)
 --------------------------------------------------------------------------------
 
@@ -387,4 +433,15 @@ MILESTONE 6 — Dynamic Dungeon Instancing & Polish (COMPLETED & VERIFIED)
 [x] Upgrade Mail system for per-message deletion, Zuly attachments, item parcel delivery, and /mail commands.
 [x] Implement complete AIP monster scripting opcodes (CDT 015, CDT 016, CDT 023, CDT 026, Cha in AI_GetAbility, ACT 026, ACT 027, ACT 032, ACT 033).
 
+MILESTONE 7 — Combat Mechanics Polish, Spawn Physics & Player Bot Vanguard AI (COMPLETED & VERIFIED)
+[x] Fix "falling from the sky" spawn physics glitch in `player.cpp` and implement `0x770` GSV_STOP with altitude.
+[x] Fix inverted shield block check and magic attack formula in `battle.cpp`.
+[x] Implement dynamic party bot formation offsets relative to leader movement vector in `PlayerBot.cpp`.
+[x] Implement automated party buffing (Hustle, Clobber, Resilience, Battle, Precision) with party shouts.
+[x] Implement automated Cleric party resurrection (35% HP / 25% MP) with state restoration.
+[x] Implement Soldier/Knight aggro taunting and monster intercept for squishy party members.
+[x] Add polite party bot loot etiquette (leaving spoils to party leader).
+[x] Add player `/party bot <buff|follow|assist|info>` and `/bot party` chat commands.
+
 ================================================================================
+

@@ -414,6 +414,31 @@ All stubbed monster artificial intelligence opcodes are fully implemented:
 - **Conditions**: `AICOND(015)` (WorldVar check), `AICOND(016)` (EconomyVar check), `AICOND(023)` (Game Map Time / daylight window check), `AICOND(026)` (Server Channel range check).
 - **Actions**: `AIACT(026)` (Set WorldVar), `AIACT(027)` (Set EconomyVar), `AIACT(032)` (Set Zone PvP mode and broadcast packet `0x70f`), `AIACT(033)` (Set Zone Regen rate).
 
+### 10. Combat Balancing, Spawn Physics & Player Bot Vanguard AI (`battle.cpp`, `player.cpp`, `PlayerBot.cpp`)
+Comprehensive upgrades to combat mechanics, avatar terrain grounding, and group/party bot artificial intelligence:
+- **Spawn "Falling from the Sky" Glitch Resolution**:
+  - In `player.cpp:202` (`SpawnToPlayer` packet `0x793`), fixed coordinate validation and removed erroneous `CMD_MOVE` fallbacks. Stationary avatars and bots now emit matching origin/destination coordinates with `CMD_STOP` (`0x0000`), instructing the ROSE client physics engine to place models firmly on the terrain heightmap rather than dropping them from mid-air.
+  - In `charfunctions.cpp:481` (`CCharacter::stopMoving()`) and `PlayerBot.cpp` (`CPlayerBot::StopMoving()`), replaced legacy `0x79a` (`GSV_MOVE`) packets with official `0x770` (`GSV_STOP`), including precise terrain altitude (`z * 100`).
+  - Newly instantiated bots start in `WALKING` stance instead of `RUNNING` to eliminate initial visual bounce.
+- **Combat Shield Block & Defense Scaling Fixes**:
+  - In `battle.cpp:166` (`NormalAttack`), corrected inverted shield block calculation where the attacker's block rate was tested and subtracted from outgoing damage. The formula now checks the defender's `Enemy->Stats->Block_Rate` and mitigates incoming physical damage using `Enemy->Stats->Blocked_dmg`.
+  - In `battle.cpp:241`, verified magic defense scaling to properly evaluate `atkdefmult = (float)Stats->Attack_Power / EnemyMDef;`.
+- **Dynamic Party Bot Formations (`GetFormationOffset`)**:
+  - Party bots follow leaders using dynamic 2D trigonometric rotation relative to the leader's current heading angle, completely eliminating coordinate stacking and clumping:
+    - **Slot 0 & 1 (Vanguard Frontline)**: Soldier/Knight bots maintain forward flank positions (2.6m forward, 1.2m left/right) to intercept aggressive monsters.
+    - **Slot 2 & 3 (Ranged Flanks)**: Hawker/Scout/Dealer bots flank rearward (1.8m back, 3.2m left/right).
+    - **Slot 4 & 5 (Rear Support)**: Muse/Cleric bots trail in the backline (3.8m directly behind).
+- **Autonomous Support, Healing & Resurrection**:
+  - **Party Buffing (`CheckPartyBuffs`)**: Muse/Cleric bots automatically scan party members within 22m and maintain essential charms (Hustle Charm 930, Clobber Charm 1270, Resilience Charm 1004, Battle Charm 1254, Precision Charm 1019) with friendly in-game shouts.
+  - **Party Resurrection (`CheckPartyResurrect`)**: Cleric bots (Level $\ge 30$) detect dead party members within 20m, revive them with 35% HP and 25% MP, refresh active buffs, dispatch `0x79f` packets, and restore bot state to `BOT_STATE_FOLLOW`.
+  - **Vanguard Aggro Intercept & Taunt (`CheckPartyTaunt`)**: Soldier/Knight bots identify monsters targeting squishy party members, intercept the mob, taunt them, and maintain threat.
+  - **Courteous Looting Etiquette**: Party bots only loot items directly under their feet ($<3$m), reserving dropped gear and gold for the party leader and immediately snapping back into formation.
+- **Player Bot Party Commands**:
+  - `/party bot buff`: Forces all Muse/Cleric party bots to refresh full buffs immediately.
+  - `/party bot follow`: Commands all party bots to drop current engagements and return to formation.
+  - `/party bot assist`: Orders party bots to focus-fire on the leader's current combat target.
+  - `/party bot info`: Displays active formation slots, bot roles, HP, and MP stats.
+
 ---
 
 ## Maintenance & Git Synchronization Workflow

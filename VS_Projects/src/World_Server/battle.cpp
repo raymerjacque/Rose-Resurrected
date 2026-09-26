@@ -594,6 +594,7 @@ void CCharacter::NormalAttack( CCharacter* Enemy )
 		if (Stats->MagicAttack == 1)
 		{
 			hitpower = (long int)floor(((float)Stats->Attack_Power * ((float)Stats->Attack_Power / EnemyMDef) * 50.0f / 100.0f) * constant);
+			atkdefmult = (float)Stats->Attack_Power / EnemyMDef;
 		}
 		else
 		{
@@ -665,11 +666,10 @@ void CCharacter::NormalAttack( CCharacter* Enemy )
         Enemy->damagecounter += (long long) hitpower;				// is for AIP
     }
 
-    //Block
-    if(GServer->RandNumber(0, 100) < Stats->Block_Rate && hitpower > 0){
-        hitpower -= Stats->Blocked_dmg;
-        //Log(MSG_DEBUG, "%i Damage has been blocked", Stats->Blocked_dmg);
-        if(hitpower <=0){
+    //Block by defender's shield
+    if(Enemy->Stats && GServer->RandNumber(0, 100) < Enemy->Stats->Block_Rate && hitpower > 0){
+        hitpower -= Enemy->Stats->Blocked_dmg;
+        if(hitpower <= 0){
             hitpower = 1;
         }
     }

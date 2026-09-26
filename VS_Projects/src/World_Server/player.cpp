@@ -448,8 +448,10 @@ bool CPlayer::SpawnToPlayer( CPlayer* player, CPlayer* otherclient )
 	ADDWORD( pak, clientid);				// USER ID ANYONE?
     ADDFLOAT( pak, Position->current.x*100 );			// POS X
 	ADDFLOAT( pak, Position->current.y*100 );			// POS Y
-    ADDFLOAT( pak, Position->destiny.x*100 );			// GOING TO X
-    ADDFLOAT( pak, Position->destiny.y*100 );			// GOINT TO Y
+    float destX = IsMoving() ? Position->destiny.x : Position->current.x;
+    float destY = IsMoving() ? Position->destiny.y : Position->current.y;
+    ADDFLOAT( pak, destX * 100 );			// GOING TO X
+    ADDFLOAT( pak, destY * 100 );			// GOING TO Y
     if(Status->Stance == 0x01)
     {
         ADDWORD( pak, 0x000a );
@@ -462,20 +464,21 @@ bool CPlayer::SpawnToPlayer( CPlayer* player, CPlayer* otherclient )
         ADDWORD( pak, 0x0000 );
     }
     else
-    if(Position->destiny.x != Position->current.y || Position->destiny.y != Position->current.y)
+    if(IsOnBattle() || Battle->atktarget != 0 || Battle->target != 0)
     {
-        ADDWORD( pak, 0x0001 );
-        ADDWORD( pak, Battle->atktarget );
-    }
-    else
-    if(Battle->atktarget!=0)
-    {
+        UINT tid = Battle->atktarget ? Battle->atktarget : Battle->target;
         ADDWORD( pak, 0x0002 );
-        ADDWORD( pak, Battle->atktarget );
+        ADDWORD( pak, tid );
+    }
+    else
+    if(IsMoving())
+    {
+        ADDWORD( pak, 0x0001 );
+        ADDWORD( pak, 0x0000 );
     }
     else
     {
-        ADDWORD( pak, 0x0001 );
+        ADDWORD( pak, 0x0000 );
         ADDWORD( pak, 0x0000 );
     }
     switch (Status->Stance)

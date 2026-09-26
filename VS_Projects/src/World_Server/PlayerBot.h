@@ -60,6 +60,12 @@ public:
     void UpdateSkills( );
     bool CastCombatSkill( CCharacter* target );
     bool CheckPartyHeal( );
+    bool CheckPartyBuffs( );
+    bool CheckPartyResurrect( );
+    bool CheckPartyTaunt( );
+    fPoint GetFormationOffset( int slotIndex, fPoint leaderCurrent, fPoint leaderDest );
+    int GetPartySlotIndex( ) const;
+    void ForcePartyBuff( );
     void CheckProgression( );
     bool NeedsBuffs( );
 
@@ -136,6 +142,11 @@ private:
     // Current Targets
     UINT m_targetMobCid;
     UINT m_targetDropCid;
+
+    // Party Group Cooldown Timers
+    clock_t m_lastPartyBuffTime;
+    clock_t m_lastResurrectTime;
+    clock_t m_lastTauntTime;
 };
 
 class CBotManager {

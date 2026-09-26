@@ -786,7 +786,7 @@ CPlayer* CBotManager::SpawnBot( const char* name, int job, int level, int mapId,
     bot->SetStats( );
     bot->Stats->HP = bot->Stats->MaxHP;
     bot->Stats->MP = bot->Stats->MaxMP;
-    bot->Status->Stance = RUNNING;
+    bot->Status->Stance = WALKING;
     bot->Status->CanMove = true;
     bot->Status->CanAttack = true;
     bot->Status->CanCastSkill = true;
@@ -995,7 +995,10 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_vendingCategory( 0 ),
       m_lastVendingSay( 0 ),
       m_isDynamic( false ),
-      m_lastKnownLevel( 1 )
+      m_lastKnownLevel( 1 ),
+      m_lastPartyBuffTime( 0 ),
+      m_lastResurrectTime( 0 ),
+      m_lastTauntTime( 0 )
 {
     m_lastAiTick = clock( );
     m_stateTimer = clock( );
@@ -1098,16 +1101,15 @@ void CPlayerBot::StopMoving( )
     if ( !m_player->IsMoving( ) ) return;
 
     m_player->Position->destiny = m_player->Position->current;
+    m_player->Status->Stance = WALKING;
 
     if ( !m_player->IsOnBattle( ) )
     {
-        BEGINPACKET( pak, 0x79a );
+        BEGINPACKET( pak, 0x770 );
         ADDWORD    ( pak, m_player->clientid );
-        ADDWORD    ( pak, 0 );
-        ADDWORD    ( pak, 0 );
         ADDFLOAT   ( pak, m_player->Position->current.x * 100 );
         ADDFLOAT   ( pak, m_player->Position->current.y * 100 );
-        ADDWORD    ( pak, 0 );
+        ADDWORD    ( pak, (WORD)( m_player->Position->current.z * 100 ) );
         GServer->SendToVisible( &pak, m_player );
     }
 }
@@ -1585,6 +1587,248 @@ bool CPlayerBot::CheckPartyHeal( )
     return false;
 }
 
+bool CPlayerBot::CheckPartyBuffs( )
+{
+    if ( !m_player || !m_player->Party || !m_player->Party->party ) return false;
+    if ( !m_player->Status->CanCastSkill || m_player->Stats->MP < 30 ) return false;
+
+    int job = m_player->CharInfo->Job;
+    if ( job != 211 && job != 221 && job != 222 ) return false; // Muse / Mage / Cleric only
+
+    clock_t now = clock( );
+    if ( ( now - m_lastPartyBuffTime ) < (clock_t)( 3.5f * CLOCKS_PER_SEC ) ) return false;
+
+    CParty* party = m_player->Party->party;
+    CPlayer* targetToBuff = NULL;
+    UINT skillToCast = 0;
+    const char* buffName = NULL;
+
+    for ( UINT i = 0; i < party->Members.size( ); i++ )
+    {
+        CPlayer* member = party->Members[i];
+        if ( !member || member->IsDead( ) || member->Position->Map != m_player->Position->Map ) continue;
+        if ( GServer->distance( m_player->Position->current, member->Position->current ) > 22.0f ) continue;
+
+        // Check for missing buffs in priority order
+        if ( member->Status->Dash_up == 0xff )
+        {
+            targetToBuff = member;
+            skillToCast = 930; // Hustle Charm Lv 5 (Move speed)
+            buffName = "Hustle";
+            break;
+        }
+        else if ( member->Status->Attack_up == 0xff )
+        {
+            targetToBuff = member;
+            skillToCast = 1270; // Clobber Charm Lv 5 (Attack power)
+            buffName = "Clobber Charm";
+            break;
+        }
+        else if ( member->Status->Defense_up == 0xff )
+        {
+            targetToBuff = member;
+            skillToCast = 1004; // Resilience Charm Lv 9 (Defense)
+            buffName = "Resilience";
+            break;
+        }
+        else if ( member->Status->Haste_up == 0xff )
+        {
+            targetToBuff = member;
+            skillToCast = 1254; // Battle Charm Lv 9 (Attack speed)
+            buffName = "Battle Charm";
+            break;
+        }
+        else if ( member->Status->Accuracy_up == 0xff )
+        {
+            targetToBuff = member;
+            skillToCast = 1019; // Precision Charm Lv 9 (Accuracy)
+            buffName = "Precision";
+            break;
+        }
+    }
+
+    if ( targetToBuff && skillToCast > 0 )
+    {
+        CSkills* sk = GServer->GetSkillByID( skillToCast );
+        if ( sk )
+        {
+            m_player->StartAction( targetToBuff, SKILL_BUFF, skillToCast );
+            m_lastPartyBuffTime = now;
+            m_lastSkillCastTime = now;
+
+            char buffMsg[64];
+            if ( targetToBuff == m_player )
+            {
+                snprintf( buffMsg, sizeof(buffMsg), "Buffing myself with %s!", buffName );
+            }
+            else
+            {
+                snprintf( buffMsg, sizeof(buffMsg), "%s for %s!", buffName, targetToBuff->CharInfo->charname );
+            }
+            Say( buffMsg );
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void CPlayerBot::ForcePartyBuff( )
+{
+    m_lastPartyBuffTime = 0;
+    CheckPartyBuffs( );
+}
+
+bool CPlayerBot::CheckPartyResurrect( )
+{
+    if ( !m_player || !m_player->Party || !m_player->Party->party ) return false;
+    if ( !m_player->Status->CanCastSkill || m_player->Stats->MP < 60 ) return false;
+
+    int job = m_player->CharInfo->Job;
+    if ( job != 211 && job != 221 && job != 222 ) return false; // Muse / Mage / Cleric
+    if ( m_player->Stats->Level < 30 ) return false;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastResurrectTime ) < (clock_t)( 6.0f * CLOCKS_PER_SEC ) ) return false;
+
+    CParty* party = m_player->Party->party;
+    for ( UINT i = 0; i < party->Members.size( ); i++ )
+    {
+        CPlayer* member = party->Members[i];
+        if ( !member || !member->IsDead( ) ) continue;
+        if ( member->Position->Map != m_player->Position->Map ) continue;
+
+        float dist = GServer->distance( m_player->Position->current, member->Position->current );
+        if ( dist <= 20.0f )
+        {
+            m_lastResurrectTime = now;
+            m_lastSkillCastTime = now;
+
+            // Revive ally with 35% HP and 25% MP
+            member->Stats->HP = member->Stats->MaxHP * 35 / 100;
+            member->Stats->MP = member->Stats->MaxMP * 25 / 100;
+            member->RefreshBuff( );
+            member->SetStats( );
+
+            // Broadcast HP packet (0x79f)
+            BEGINPACKET( pak, 0x79f );
+            ADDWORD    ( pak, member->clientid );
+            ADDDWORD   ( pak, (DWORD)member->Stats->HP );
+            GServer->SendToVisible( &pak, member );
+
+            // If reviving a bot, restore its AI state to follow
+            if ( member->is_bot && member->bot_ai )
+            {
+                member->bot_ai->SetFollowTarget( m_followTarget ? m_followTarget : m_player );
+                member->bot_ai->SetState( BOT_STATE_FOLLOW );
+                member->bot_ai->Say( "Thank you for the revive!" );
+            }
+
+            char rezMsg[64];
+            snprintf( rezMsg, sizeof(rezMsg), "Arise, %s! You are revived!", member->CharInfo->charname );
+            Say( rezMsg );
+            return true;
+        }
+    }
+    return false;
+}
+
+bool CPlayerBot::CheckPartyTaunt( )
+{
+    if ( !m_player || !m_player->Party || !m_player->Party->party ) return false;
+    int job = m_player->CharInfo->Job;
+    if ( job != 111 && job != 121 && job != 122 ) return false; // Soldier / Knight / Champion only
+
+    clock_t now = clock( );
+    if ( ( now - m_lastTauntTime ) < (clock_t)( 4.0f * CLOCKS_PER_SEC ) ) return false;
+
+    CMap* map = GetMap( );
+    if ( !map ) return false;
+
+    CParty* party = m_player->Party->party;
+    for ( UINT i = 0; i < map->MonsterList.size( ); i++ )
+    {
+        CMonster* mob = map->MonsterList[i];
+        if ( !mob || mob->IsDead( ) || mob->Stats->HP <= 0 || mob->IsBonfire( ) ) continue;
+        if ( !mob->Battle || mob->Battle->target == 0 || mob->Battle->target == m_player->clientid ) continue;
+
+        // Check if mob is targeting a party member
+        for ( UINT p = 0; p < party->Members.size( ); p++ )
+        {
+            CPlayer* member = party->Members[p];
+            if ( member && member != m_player && member->clientid == mob->Battle->target )
+            {
+                float dist = GServer->distance( m_player->Position->current, mob->Position->current );
+                if ( dist <= 20.0f )
+                {
+                    m_lastTauntTime = now;
+                    AttackTarget( mob );
+                    SetState( BOT_STATE_COMBAT );
+
+                    if ( m_player->Stats->Level >= 20 && m_player->Stats->MP >= 20 )
+                    {
+                        m_player->StartAction( mob, SKILL_ATTACK, 261 );
+                    }
+
+                    char tauntMsg[64];
+                    snprintf( tauntMsg, sizeof(tauntMsg), "Back off! Focus on me, monster!" );
+                    Say( tauntMsg );
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+
+int CPlayerBot::GetPartySlotIndex( ) const
+{
+    if ( !m_player || !m_player->Party || !m_player->Party->party ) return 0;
+    CParty* party = m_player->Party->party;
+    int slot = 0;
+    for ( UINT i = 0; i < party->Members.size( ); i++ )
+    {
+        if ( party->Members[i] == m_player ) return slot;
+        if ( party->Members[i] != m_followTarget )
+        {
+            slot++;
+        }
+    }
+    return slot;
+}
+
+fPoint CPlayerBot::GetFormationOffset( int slotIndex, fPoint leaderCurrent, fPoint leaderDest )
+{
+    float baseAngle = 0.0f;
+    float dx = leaderDest.x - leaderCurrent.x;
+    float dy = leaderDest.y - leaderCurrent.y;
+    float len = sqrt( dx * dx + dy * dy );
+    if ( len > 0.5f )
+    {
+        baseAngle = atan2( dy, dx );
+    }
+
+    float relAngle = 3.14159265f;
+    float dist = 3.2f;
+
+    switch ( slotIndex % 6 )
+    {
+        case 0: relAngle = 3.14159265f + 0.65f; dist = 3.0f; break; // Behind-Right
+        case 1: relAngle = 3.14159265f - 0.65f; dist = 3.0f; break; // Behind-Left
+        case 2: relAngle = 3.14159265f;         dist = 4.5f; break; // Behind-Center
+        case 3: relAngle = 1.5707963f;          dist = 2.8f; break; // Right-Flank
+        case 4: relAngle = -1.5707963f;         dist = 2.8f; break; // Left-Flank
+        default: relAngle = 3.14159265f + 0.35f; dist = 3.5f; break;
+    }
+
+    float finalAngle = baseAngle + relAngle;
+    fPoint target;
+    target.x = leaderCurrent.x + cos( finalAngle ) * dist;
+    target.y = leaderCurrent.y + sin( finalAngle ) * dist;
+    target.z = leaderCurrent.z;
+    return target;
+}
+
 void CPlayerBot::CheckProgression( )
 {
     if ( !m_player ) return;
@@ -1930,8 +2174,10 @@ void CPlayerBot::HandleCombat( )
         return;
     }
 
-    // Check party heal during combat
+    // Check party support during combat
     CheckPartyHeal( );
+    CheckPartyResurrect( );
+    CheckPartyBuffs( );
 
     CMonster* mob = map->GetMonsterInMap( m_targetMobCid );
     if ( !mob || mob->IsDead( ) || mob->Stats->HP <= 0 || mob->IsBonfire( ) )
@@ -1939,7 +2185,22 @@ void CPlayerBot::HandleCombat( )
         ClearBattle( m_player->Battle );
         m_targetMobCid = 0;
 
-        // Check for loot right away
+        // In a party, respect leader's loot: only grab drops right under feet (< 3.0m)
+        if ( m_followTarget )
+        {
+            CDrop* drop = FindNearbyDrop( 3.0f );
+            if ( drop )
+            {
+                m_targetDropCid = drop->clientid;
+                MoveTo( drop->pos );
+                SetState( BOT_STATE_LOOT );
+                return;
+            }
+            SetState( BOT_STATE_FOLLOW );
+            return;
+        }
+
+        // Solo bot: check for loot within 25m
         CDrop* drop = FindNearbyDrop( 25.0f );
         if ( drop )
         {
@@ -1955,12 +2216,6 @@ void CPlayerBot::HandleCombat( )
         {
             SitDown( );
             SetState( BOT_STATE_REST );
-            return;
-        }
-
-        if ( m_followTarget )
-        {
-            SetState( BOT_STATE_FOLLOW );
             return;
         }
 
@@ -2097,7 +2352,16 @@ void CPlayerBot::HandleFollow( )
     // 1. Check if party members need healing
     if ( CheckPartyHeal( ) ) return;
 
-    // 2. Assist leader: check if leader is attacking a monster
+    // 2. Check if party members need resurrecting
+    if ( CheckPartyResurrect( ) ) return;
+
+    // 3. Check if party members need buffing
+    if ( CheckPartyBuffs( ) ) return;
+
+    // 4. Tank aggro defense
+    if ( CheckPartyTaunt( ) ) return;
+
+    // 5. Assist leader: check if leader is attacking a monster
     if ( m_followTarget->IsOnBattle( ) && m_followTarget->Battle->target != 0 )
     {
         CMonster* leaderMob = map->GetMonsterInMap( m_followTarget->Battle->target );
@@ -2109,7 +2373,7 @@ void CPlayerBot::HandleFollow( )
         }
     }
 
-    // 3. Defend leader: check if any monster is attacking leader
+    // 6. Defend leader: check if any monster is attacking leader
     for ( UINT i = 0; i < map->MonsterList.size( ); i++ )
     {
         CMonster* mob = map->MonsterList[i];
@@ -2124,15 +2388,18 @@ void CPlayerBot::HandleFollow( )
         }
     }
 
-    // 4. Follow leader movement
-    float dist = GServer->distance( m_player->Position->current, m_followTarget->Position->current );
-    if ( dist > 50.0f )
+    // 7. Tactical formation follow
+    int slot = GetPartySlotIndex( );
+    fPoint destPos = GetFormationOffset( slot, m_followTarget->Position->current, m_followTarget->Position->destiny );
+
+    float dist = GServer->distance( m_player->Position->current, destPos );
+    if ( dist > 55.0f )
     {
-        map->TeleportPlayer( m_player, m_followTarget->Position->current, false );
+        map->TeleportPlayer( m_player, destPos, false );
     }
-    else if ( dist > 3.5f )
+    else if ( dist > 2.0f )
     {
-        MoveTo( m_followTarget->Position->current );
+        MoveTo( destPos );
     }
     else
     {
