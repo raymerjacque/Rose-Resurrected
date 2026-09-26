@@ -362,89 +362,81 @@ long int CPlayer::ReturnPvp( CPlayer* player, CPlayer* otherclient )
         map = GServer->MapList.Index[otherclient->Position->Map];
     }
 
-    //everyone should be friend
-    if (map->allowpvp!=1)
+    // Safe zone: everyone is an ally
+    if (map == NULL || map->allowpvp != 1 || map->pvp_mode == PVP_MODE_OFF)
     {
-        //should be 2, set by QSDzone from maps at warp most of the time.
-        if(pvp_id==-1)
-        {
-            Log(MSG_WARNING,"%s, pvp map (%i), pvp_id shouldn't be -1! Forced to 2.",CharInfo->charname,map->id);
-            pvp_id=2;
-        }
-
-        //Log(MSG_WARNING,"%s, not pvp map (%i), we send pvp_id==%i",CharInfo->charname,map->id,pvp_id);
-        return pvp_id;
+        return 2;
     }
 
-    //map is pvp
-    //depends on pvp status now...
-    switch (pvp_status)
+    // Explicit pvp_status override from quest triggers (if set)
+    if (pvp_status == 0) // Explicit FFA
     {
-        case -1:
-        {
-            //We rely on pvp_id
-            if(pvp_id==-1)
-            {
-                Log(MSG_WARNING,"%s, pvp map (%i), pvp_id shouldn't be -1 (2)! Forced to pvp.",CharInfo->charname,map->id);
-                return (clientid + 0x100);
-            }
+        return (clientid + 0x100);
+    }
+    else if (pvp_status == 1) // Explicit Clan
+    {
+        if (Clan != NULL && Clan->clanid != 0)
+            return (Clan->clanid + 0x1000);
+        return (clientid + 0x100);
+    }
+    else if (pvp_status == 2) // Explicit Party
+    {
+        if (Party->party != NULL)
+            return (Party->party->PartyId + 0x100);
+        return (clientid + 0x100);
+    }
 
-            //Log(MSG_WARNING,"%s, pvp map (%i), we send pvp_id==%i (pvp_id)",CharInfo->charname,map->id,pvp_id);
-            return pvp_id;
-        }
-        break;
-        case 0:
+    // Default by Map PvP Mode:
+    switch (map->pvp_mode)
+    {
+        case PVP_MODE_FFA:
         {
-            //everyone is an enemy
-            //Log(MSG_WARNING,"%s, pvp map (%i), we send pvp_id==%i (everyone)",CharInfo->charname,map->id,clientid + 0x100);
+            // In FFA, party members are allies
+            if (Party->party != NULL)
+                return (Party->party->PartyId + 0x100);
             return (clientid + 0x100);
         }
         break;
 
-        case 1:
+        case PVP_MODE_TEAM:
         {
-            //clan is friendly
-            //Log(MSG_WARNING,"%s, pvp map (%i), we send pvp_id==%i (clan)",CharInfo->charname,map->id,Clan->clanid);
-            //return Clan->clanid;
-            //LMA: adding an extra offset just to be sure.
-            return (Clan->clanid+ 0x100);
-        }
-
-        case 2:
-        {
-            //party is friendly
-            /*Log(MSG_WARNING,"%s, pvp map (%i), we send pvp_id==%i (party)",CharInfo->charname,map->id,otherclient->Party->party);
-            return otherclient->Party->party;*/
-
-            //LMA: for the moment, party have no ID :(
-            //Log(MSG_WARNING,"PVP: we don't have an ID for party...");
-            //return 0x00;
-
-            //LMA: party have Ids now ;)
-            if(Party->party!=NULL)
-            {
+            // In Team/Arena PvP, check if player has assigned team pvp_id (1 or 2)
+            if (pvp_id > 0)
+                return pvp_id;
+            if (Party->party != NULL)
                 return (Party->party->PartyId + 0x100);
-            }
-            else
-            {
-                Log(MSG_WARNING,"Player %s should send a party pvp but isn't in any party...",CharInfo->charname);
-                return (clientid + 0x100);
-            }
-
-        }
-
-        default:
-        {
-            Log(MSG_WARNING,"Impossible pvp_status case (%i)",pvp_status);
+            return (clientid + 0x100);
         }
         break;
 
+        case PVP_MODE_CLAN:
+        {
+            // In Clan Fields, clan members are allies
+            if (Clan != NULL && Clan->clanid != 0)
+                return (Clan->clanid + 0x1000);
+            return (clientid + 0x100);
+        }
+        break;
+
+        case PVP_MODE_UNION:
+        {
+            // In Union Wars, union members are allies
+            if (CharInfo->unionid != 0)
+                return (CharInfo->unionid + 0x2000);
+            return (clientid + 0x100);
+        }
+        break;
+
+        default:
+        {
+            if (pvp_id > 0)
+                return pvp_id;
+            return (clientid + 0x100);
+        }
+        break;
     }
 
-    Log(MSG_WARNING,"ReturnPvp, we shouldn't be here");
-
-
-    return 0x00;
+    return 2;
 }
 
 

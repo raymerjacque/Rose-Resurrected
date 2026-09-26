@@ -22,6 +22,7 @@
 #include "player.h"
 #include "datatypes.h"
 #include "PlayerBot.h"
+#include "Arena.h"
 
 // Parse our commands to their appropriate function
 bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
@@ -30,6 +31,71 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
 	char* tmp;
 	char* command = strtok( (char*)&(*P).Buffer[1] , " ");
 	if (command==NULL) return true;
+
+	if (strcmp(command, "arena") == 0)
+    {
+        char* subcmd = strtok(NULL, " ");
+        if (subcmd == NULL || strcmp(subcmd, "help") == 0)
+        {
+            SendPM(thisclient, "=== Akram Arena / Colosseum Commands ===");
+            SendPM(thisclient, "/arena join - Enter Akram Arena (Red vs Blue)");
+            SendPM(thisclient, "/arena leave - Exit Akram Arena back to Junon");
+            SendPM(thisclient, "/arena score - View current match score");
+            SendPM(thisclient, "/arena status - View arena match status");
+            if (thisclient->Session->accesslevel >= 100 || thisclient->CharInfo->isGM)
+            {
+                SendPM(thisclient, "/arena start - (GM) Force start arena match");
+                SendPM(thisclient, "/arena stop - (GM) Force end arena match");
+            }
+            return true;
+        }
+
+        if (strcmp(subcmd, "join") == 0)
+        {
+            CArenaManager::GetInstance()->JoinArena(thisclient);
+            return true;
+        }
+        else if (strcmp(subcmd, "leave") == 0)
+        {
+            CArenaManager::GetInstance()->LeaveArena(thisclient);
+            return true;
+        }
+        else if (strcmp(subcmd, "score") == 0 || strcmp(subcmd, "status") == 0)
+        {
+            eArenaState state = CArenaManager::GetInstance()->GetState();
+            const char* stateStr = "IDLE";
+            if (state == ARENA_STATE_COUNTDOWN) stateStr = "COUNTDOWN";
+            else if (state == ARENA_STATE_ACTIVE) stateStr = "ACTIVE";
+            else if (state == ARENA_STATE_ENDED) stateStr = "INTERMISSION";
+
+            int redScore = CArenaManager::GetInstance()->GetScore(1);
+            int blueScore = CArenaManager::GetInstance()->GetScore(2);
+            int rem = CArenaManager::GetInstance()->GetRemainingTime();
+
+            SendPM(thisclient, "[Akram Arena] Status: %s | Time Left: %ds | Score — Red: %d | Blue: %d",
+                stateStr, rem, redScore, blueScore);
+            return true;
+        }
+        else if (strcmp(subcmd, "start") == 0)
+        {
+            if (thisclient->Session->accesslevel < 100 && !thisclient->CharInfo->isGM)
+                return true;
+            CArenaManager::GetInstance()->StartMatch();
+            SendPM(thisclient, "[Akram Arena] Match forcibly started.");
+            return true;
+        }
+        else if (strcmp(subcmd, "stop") == 0)
+        {
+            if (thisclient->Session->accesslevel < 100 && !thisclient->CharInfo->isGM)
+                return true;
+            CArenaManager::GetInstance()->EndMatch(0);
+            SendPM(thisclient, "[Akram Arena] Match forcibly ended.");
+            return true;
+        }
+
+        SendPM(thisclient, "[Akram Arena] Unknown subcommand '%s'. Type '/arena help' for info.", subcmd);
+        return true;
+    }
 
 	if (strcmp(command, "bot") == 0)
     {

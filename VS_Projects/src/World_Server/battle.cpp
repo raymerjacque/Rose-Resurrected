@@ -20,6 +20,7 @@
 */
 #include "character.h"
 #include "worldserver.h"
+#include "Arena.h"
 //#define USE_PERCENT_METHOD
 
 void CCharacter::DoAttack( )
@@ -1348,8 +1349,8 @@ bool CCharacter::AoeSkill( CSkills* skill, CCharacter* Enemy )
 						continue;
 					}
 
-					//not attacking allies.
-					if(thisplayer->pvp_id==plattacker->pvp_id)
+					// Check hostile eligibility using centralized PvP rules
+					if(!plattacker->CanAttackCharacter(thisplayer))
 					{
 						continue;
 					}
@@ -1683,7 +1684,8 @@ bool CCharacter::AoeDebuff( CSkills* skill, CCharacter* Enemy )
         for(UINT i=0;i<map->PlayerList.size();i++)
         {
             CPlayer* player = map->PlayerList.at(i);
-            if(player->clientid==clientid) continue;
+            if(player == NULL || player->clientid == clientid) continue;
+            if(!CanAttackCharacter(player)) continue;
             if(GServer->IsMonInCircle( Position->current,player->Position->current,(float)skill->aoeradius+1))
             {
                 if(GServer->ServerDebug)
@@ -2245,8 +2247,9 @@ bool CCharacter::TakeExp( CCharacter *Target )
         return true;
     }
 
-    //no need to take exp from UW.
-    if(Position->Map==9)
+    // No EXP loss in Akram Arena or any PvP maps
+    CMap* thisMap = GServer->MapList.Index[Position->Map];
+    if(Position->Map == 9 || (thisMap && thisMap->allowpvp != 0))
     {
         return true;
     }
@@ -2345,6 +2348,25 @@ void CCharacter::UWKill(CCharacter* Enemy)
     if(plkilled==NULL)
     {
         killed_level=killer_level;
+    }
+
+    // Akram Arena Kill Scoring
+    if (Position->Map == 9)
+    {
+        CArenaManager::GetInstance()->OnPlayerKill(plkiller, plkilled);
+    }
+
+    // Clan Field Kill Scoring (Award Clan Contribution Points)
+    CMap* thisMap = GServer->MapList.Index[Position->Map];
+    if (thisMap != NULL && thisMap->pvp_mode == PVP_MODE_CLAN)
+    {
+        if (plkiller->Clan != NULL && plkiller->Clan->clanid != 0 &&
+            plkilled->Clan != NULL && plkilled->Clan->clanid != 0)
+        {
+            plkiller->GiveCP(5);
+            GServer->SendPM(plkiller, "[Clan Field] Victory! You earned 5 Clan Contribution Points (CP)!");
+            GServer->SendPM(plkilled, "[Clan Field] You were defeated by %s of clan %s.", plkiller->CharInfo->charname, plkiller->Clan->clanname);
+        }
     }
 
     UINT bonus_exp=GServer->GetColorExp(killer_level,killed_level,7000);

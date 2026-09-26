@@ -30,6 +30,7 @@ CMap::CMap( )
     eveningtime = 0;
     nighttime = 0;
     allowpvp = 0;
+    pvp_mode = PVP_MODE_OFF;
     allowpat = 0;
     MapTime = 0;
     LastUpdate = clock( );

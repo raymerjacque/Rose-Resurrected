@@ -2552,6 +2552,7 @@ bool CWorldServer::LoadZoneData( )
         newzone->eveningtime = 0;
         newzone->nighttime = 0;
         newzone->allowpvp = 0;
+        newzone->pvp_mode = PVP_MODE_OFF;
         newzone->allowpat = 0;
         newzone->MapTime = 0;
         newzone->LastUpdate = 0;
@@ -2569,6 +2570,7 @@ bool CWorldServer::LoadZoneData( )
             newzone->eveningtime = 0;
             newzone->nighttime = 0;
             newzone->allowpvp = 0;
+            newzone->pvp_mode = PVP_MODE_OFF;
             newzone->allowpat = false;
             newzone->STLID=0;
 
@@ -2624,24 +2626,39 @@ bool CWorldServer::LoadZoneData( )
         newzone->MonsterSpawnList.clear();
         newzone->MobGroupList.clear();
 
-        //LMA: Forcing some map to pvp group.
-        //TODO: perhaps the STB[20] value (Zone Type, ZT) tells the real pvp type.
-        //Pvp gives 1,2,11 (seems like on / off), ZT gives 2 (all?), 3 (clan?), 4 (union?)
-        /*
-        if(newzone->id==9||(newzone->id>=74&&newzone->id<=120))
-        {
-            newzone->allowpvp = 2;
-        }
-        */
+        // PvP Zone Type Classification
+        UINT raw_pvp = ZoneData.rows[i][18];
+        UINT raw_zt = ZoneData.rows[i][20];
 
-        //LMA: new way, we use pvp_status and pvp_id from character now.
-        if (newzone->allowpvp >=1&&newzone->allowpvp <=2)
+        if (raw_pvp == 0 || raw_pvp == 12)
         {
+            // Mode 0: Safe PvE zone / Agits
+            newzone->allowpvp = 0;
+            newzone->pvp_mode = PVP_MODE_OFF;
+        }
+        else if (raw_pvp == 2 || newzone->id == 5)
+        {
+            // Mode 4: Union War / Cartel (Junon Cartel, Union battles)
             newzone->allowpvp = 1;
+            newzone->pvp_mode = PVP_MODE_UNION;
+        }
+        else if (newzone->id == 9)
+        {
+            // Mode 2: Team / Arena PvP (Akram Arena)
+            newzone->allowpvp = 1;
+            newzone->pvp_mode = PVP_MODE_TEAM;
+        }
+        else if (newzone->id == 8 || (newzone->id >= 11 && newzone->id <= 13) || newzone->id == 59 || (newzone->id >= 101 && newzone->id <= 120))
+        {
+            // Mode 3: Clan Fields (Lion's Plains, Junon Clan Fields, Luna Clan Field, Pedion)
+            newzone->allowpvp = 1;
+            newzone->pvp_mode = PVP_MODE_CLAN;
         }
         else
         {
-            newzone->allowpvp = 0;
+            // Mode 1: Free-For-All (Training Grounds, Desert of Dead, Sikuku Ruins, etc.)
+            newzone->allowpvp = 1;
+            newzone->pvp_mode = PVP_MODE_FFA;
         }
 
         nb_active++;

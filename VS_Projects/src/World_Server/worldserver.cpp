@@ -385,11 +385,9 @@ bool CWorldServer::OnServerReady( )
     LoadWayPoints( );
 	LoadGoList ( );
 
-    //LMA: Forcing Union Wars.
-    UWForceFrom=0;  //deactivated.
-    UWNbPlayers=0;  //deactivated
-    //In t + 5 minutes (deactivated, use gm command instead).
-    //pakGMForceUW(NULL,5);
+    // Union Wars activation
+    UWForceFrom = 0;
+    if (UWNbPlayers <= 0) UWNbPlayers = 1; // Active: 1 player per side required
 
     //LMA: forcing gem quets
     GemQuestForce=0;

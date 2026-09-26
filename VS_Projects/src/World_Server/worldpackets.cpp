@@ -1618,17 +1618,11 @@ bool CWorldServer::pakStartAttack( CPlayer* thisclient, CPacket* P )
 	   ADDDWORD   ( pak, character->Stats->HP );
 	   thisclient->client->SendPacket( &pak );
     }
-    else if(character->IsPlayer())
+    
+    if(!thisclient->CanAttackCharacter(character))
     {
-        if(map->allowpvp == 0)
-        {
-            return true;
-        }
-        CPlayer* targetPlayer = reinterpret_cast<CPlayer*>( character );
-        if(thisclient->pvp_id != 0 && thisclient->pvp_id == targetPlayer->pvp_id)
-        {
-            return true; // Friendly fire blocked
-        }
+        ClearBattle(thisclient->Battle);
+        return true;
     }
     thisclient->StartAction( character, NORMAL_ATTACK, 0 );
     thisclient->Battle->contatk = true;
@@ -3483,24 +3477,26 @@ bool CWorldServer::pakStartSkill ( CPlayer* thisclient, CPacket* P )
         }
     }
 
-	if((character->IsPlayer() || character->IsSummon()) && thisskill->skilltype == 19)
+    if(!isSkillTargetFriendly(thisskill))
     {
-        if(map->allowpvp != 1 || character->clientid == thisclient->clientid)
+        if(!thisclient->CanAttackCharacter(character))
         {
-            Log(MSG_WARNING,"%s tried to attack friendly!", thisclient->CharInfo->charname);
+            Log(MSG_WARNING,"%s tried to attack non-hostile target %u!", thisclient->CharInfo->charname, character->clientid);
             ClearBattle( thisclient->Battle );
             return true;
         }
     }
-
-    if((character->IsMonster() || character->IsSummon()) && thisskill->skilltype == 19)
+    else
     {
-        CMonster* monster = GetMonsterByID( targetid, thisclient->Position->Map );
-        if(monster->team == thisclient->pvp_id)
+        // Friendly buff/heal skill: cannot cast on hostile enemy players in PvP maps
+        if(character->IsPlayer() && character != thisclient)
         {
-            Log(MSG_WARNING,"%s tried to attack friendly!", thisclient->CharInfo->charname);
-            ClearBattle( thisclient->Battle );
-            return true;
+            if(thisclient->CanAttackCharacter(character))
+            {
+                Log(MSG_WARNING,"%s tried to buff hostile enemy %u in PvP!", thisclient->CharInfo->charname, character->clientid);
+                ClearBattle( thisclient->Battle );
+                return true;
+            }
         }
     }
 

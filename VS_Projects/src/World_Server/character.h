@@ -112,6 +112,7 @@ class CCharacter
         void StartAction( CCharacter* Target, BYTE action, UINT skillid=0, bool restart=false, CCharacter* receiver=NULL);
         bool IsTargetReached( CCharacter* , CSkills* skill=NULL );
         bool CanAttack( );
+        bool CanAttackCharacter( CCharacter* target );
         bool IsMoving( );
         bool stopMoving( bool send_packet=true );
         fPoint GetCombatPosition( CCharacter* target, float combatDist = 0.0f );

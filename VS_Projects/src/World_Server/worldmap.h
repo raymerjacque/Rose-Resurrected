@@ -29,6 +29,14 @@
 //LMATEST
 class CMonster;
 
+enum ePvpMode {
+    PVP_MODE_OFF    = 0, // Safe PvE zone (Towns, normal adventure maps)
+    PVP_MODE_FFA    = 1, // Free-For-All (Party friendly)
+    PVP_MODE_TEAM   = 2, // Team / Arena PvP (Map 9)
+    PVP_MODE_CLAN   = 3, // Clan Field PvP (Maps 8, 11-13, 59, 101-120)
+    PVP_MODE_UNION  = 4  // Union War / Cartel (Map 5, Union battlefields)
+};
+
 class CMap
 {
     public:
@@ -78,6 +86,7 @@ class CMap
     UINT ZoneTime;     // how many 6 minute segments since start of the day
     //UINT ghost;        // ghosttime?
     BYTE allowpvp;     // pvp allowed?
+    BYTE pvp_mode;     // PvP mode: 0=Off, 1=FFA, 2=Team, 3=Clan, 4=Union
     bool allowpat;     // pat allowed?
     UINT STLID;         //LMA: Stl ID.
     unsigned long QSDzone;      //LMA: Zone transfer trigger

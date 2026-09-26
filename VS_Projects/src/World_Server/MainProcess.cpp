@@ -20,6 +20,7 @@
 */
 #include "worldserver.h"
 #include "PlayerBot.h"
+#include "Arena.h"
 
 // Map Process
 PVOID MapProcess( PVOID TS )
@@ -942,6 +943,7 @@ PVOID VisibilityProcess(PVOID TS)
         }
 
         CBotManager::GetInstance()->Update();
+        CArenaManager::GetInstance()->Update();
 
         pthread_mutex_unlock( &GServer->MapMutex );
         pthread_mutex_unlock( &GServer->PlayerMutex );

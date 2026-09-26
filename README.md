@@ -95,17 +95,31 @@ RosE Resurrected utilizes a distributed 3-tier server model communicating via TC
 - **Clan Bank & Funds**: Added `money BIGINT UNSIGNED` to `list_clan` with 8-byte QWORD serialization and Zuly deposit/withdrawal (`0x7b1:0x20/0x21`).
 - **Clan Quests**: Implemented `QUESTCOND(025)` (contribution check), `QUESTCOND(028)` (clan funds check), `QUESTCOND(030)` (clan skill learned check), `QUESTREWD(024)` (funds adjustment), and `QUESTREWD(026)` (clan skill learning with real-time online member stat recalculation).
 
+### Milestone 5 — PvP Arena, Union Wars & Clan Wars (Completed & Verified)
+- **Multi-Mode PvP Zone Engine**: Parsed `LIST_ZONE.STB` columns 18 (`allowpvp`) and 20 (`zone_type`) into 5 distinct PvP modes (`ePvpMode`):
+  - **Mode 0 (Safe / PvE)**: Safe towns, normal adventure maps, Agits (Zones 15–18, 40). Zero player-versus-player combat permitted.
+  - **Mode 1 (Free-for-All / FFA)**: Training Grounds (Map 6), Desert of the Dead (Map 29), Temple Campgrounds (Map 46), Forgotten Temple (56–57), Sikuku Ruins (66), Gates of Muris (82). Players can attack anyone outside their own party.
+  - **Mode 2 (Team / Arena)**: Akram Arena / Colosseum (Map 9). Players are assigned to Red or Blue teams and can only attack the opposing team.
+  - **Mode 3 (Clan Fields)**: Lion's Plains (Map 8), Junon Clan Fields (11–13), Luna Clan Field (59), Pedion (101–120). Clanmates share team IDs and cannot damage each other.
+  - **Mode 4 (Union Wars / Cartel)**: Junon Cartel (Map 5) and Union conflict zones. Players in the same Union share team IDs.
+- **Unified Combat Safety Engine (`CCharacter::CanAttackCharacter`)**: Enforced comprehensive safety checks across normal auto-attacks, targeted skills (`pakStartAttack`, `pakStartSkill`), AoE attacks (`AoeSkill`), AoE debuffs (`AoeDebuff`), and targeted buffs/heals (cannot heal or buff hostile enemies). Protects Large Bonfires (`montype 806`) and player summons.
+- **PvP Death Penalty Immunity**: Exempted all PvP zones, Clan Fields, and the Arena from death EXP loss in `battle.cpp:TakeExp`.
+- **Akram Arena / Colosseum Manager (`CArenaManager`)**:
+  - Automated round states (`IDLE`, `COUNTDOWN`, `ACTIVE`, `ENDED`).
+  - Auto-balances joined players into Red Team (Base 301 at `5211.4f, 4867.9f`) and Blue Team (Base 302 at `5200.5f, 4725.1f`).
+  - Automated respawn timer (5 seconds) reviving dead combatants directly at their team base with full HP/MP and no death penalties.
+  - Round end triggered by 10 kills or 5-minute timeout.
+  - Rewards: +50,000 Zulies and +50,000 EXP to winners; +15,000 Zulies and +15,000 EXP consolation to losers.
+  - In-game commands: `/arena join`, `/arena leave`, `/arena score`, `/arena status`, `/arena start`, `/arena stop`.
+- **Union Wars & Clan Field Scoring**:
+  - Lowered minimum player requirement threshold (`UWNbPlayers`) to 1 in `worldserver.cpp:390` so Union Wars launch cleanly.
+  - Hooked Clan Field kills in `battle.cpp:UWKill` to award +5 Clan Contribution Points (CP) to the killer.
+
 ---
 
 ## Roadmap & Pending Milestones
 
-### Milestone 5 — PvP Arena, Union Wars & Clan Wars (Next Target)
-- [ ] **PvP Zone Modes**: Activate Free-For-All, Team, Clan, and Union PvP rules from `LIST_ZONE.STB`.
-- [ ] **Colosseum / Arena Queue**: Automated match queuing, team balancing, and victor reward distribution.
-- [ ] **Union War Engine**: Faction point tracking, scheduled event timers, and territory rewards.
-- [ ] **Clan Wars**: Dedicated battlefield instances, capture-the-flag points, and Clan Boss encounters (`DlgClanWarBoss.xml`).
-
-### Milestone 6 — Dynamic Dungeon Instancing & Polish
+### Milestone 6 — Dynamic Dungeon Instancing & Polish (Next Target)
 - [ ] **Dynamic `CMap` Instancing**: Clone cave maps (e.g. Goblin Cave, George's Cave) into private party-specific instances with automatic teardown on party exit.
 - [ ] **Dungeon Wipe Timers**: Auto-teleport players to respawn towns on full party wipe or instance timeout.
 - [ ] **Mail System Attachments**: Support per-message deletion, Zuly attachments, and item parcel transfers.

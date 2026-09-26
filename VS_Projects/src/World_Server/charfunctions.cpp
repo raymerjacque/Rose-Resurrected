@@ -120,20 +120,10 @@ void CCharacter::StartAction( CCharacter* Target, BYTE action, UINT skillid, boo
             // PvP Safety Check: do not allow hostile action against player if map PvP is disabled
             if(action == NORMAL_ATTACK || action == SKILL_ATTACK)
             {
-                CMap* map = GServer->MapList.Index[Position->Map];
-                if(map && map->allowpvp == 0)
+                if(!CanAttackCharacter(Target))
                 {
                     ClearBattle(Battle);
                     return;
-                }
-                if(IsPlayer())
-                {
-                    CPlayer* plAttacker = reinterpret_cast<CPlayer*>(this);
-                    if(plAttacker->pvp_id != 0 && plAttacker->pvp_id == thisplayer->pvp_id)
-                    {
-                        ClearBattle(Battle);
-                        return; // Friendly fire blocked in team PvP
-                    }
                 }
             }
         }

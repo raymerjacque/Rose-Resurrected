@@ -20,6 +20,8 @@
 */
 #include "character.h"
 #include "worldserver.h"
+#include "WorldMonster.h"
+#include "player.h"
 
 //constructor
 CCharacter::CCharacter( )
@@ -416,3 +418,126 @@ void CCharacter::UpdatePosition( bool monster_stay_still )
 	//last_coords = new_coords;
 	return;
 }
+
+// Unified PvP and combat safety check
+bool CCharacter::CanAttackCharacter( CCharacter* target )
+{
+    if(target == NULL || target == this)
+        return false;
+
+    if(target->IsDead())
+        return false;
+
+    // Check if target is a Large Bonfire (montype 806 is immune to all attacks)
+    if(target->IsMonster())
+    {
+        CMonster* mon = reinterpret_cast<CMonster*>(target);
+        if(mon->montype == 806)
+            return false;
+    }
+
+    // If attacker is a Monster / NPC
+    if(IsMonster())
+    {
+        if(target->IsPlayer())
+            return true;
+        if(target->IsSummon())
+        {
+            CMonster* summon = reinterpret_cast<CMonster*>(target);
+            CMonster* thisMon = reinterpret_cast<CMonster*>(this);
+            if(summon->team != 0 && summon->team == thisMon->team)
+                return false;
+            return true;
+        }
+        return false;
+    }
+
+    // Attacker is a Player (or Player Summon)
+    CPlayer* plAttacker = NULL;
+    if(IsPlayer())
+    {
+        plAttacker = reinterpret_cast<CPlayer*>(this);
+    }
+    else if(IsSummon())
+    {
+        CMonster* thisSummon = reinterpret_cast<CMonster*>(this);
+        plAttacker = GServer->GetClientByID(thisSummon->owner, Position->Map);
+    }
+
+    if(plAttacker == NULL)
+        return false;
+
+    // Target is a Monster
+    if(target->IsMonster())
+    {
+        CMonster* targetMon = reinterpret_cast<CMonster*>(target);
+        // Non-summon monsters are always attackable by players
+        if(!targetMon->IsSummon())
+            return true;
+
+        // Summon: cannot attack own summon
+        if(targetMon->owner == plAttacker->clientid)
+            return false;
+
+        CMap* map = GServer->MapList.Index[Position->Map];
+        if(map == NULL || map->allowpvp == 0)
+            return false; // Cannot attack player summons in safe maps
+
+        // Check if summon's owner is an ally
+        CPlayer* ownerPlayer = GServer->GetClientByID(targetMon->owner, Position->Map);
+        if(ownerPlayer != NULL)
+        {
+            return plAttacker->CanAttackCharacter(ownerPlayer);
+        }
+        return true;
+    }
+
+    // Target is a Player: PvP Rules
+    if(target->IsPlayer())
+    {
+        CPlayer* plTarget = reinterpret_cast<CPlayer*>(target);
+        if(!plTarget->Session->inGame)
+            return false;
+
+        CMap* map = GServer->MapList.Index[Position->Map];
+        if(map == NULL || map->allowpvp == 0 || map->pvp_mode == PVP_MODE_OFF)
+            return false;
+
+        // Friendly fire protection: allies in same party can never attack each other in any mode
+        if(plAttacker->Party->party != NULL && plAttacker->Party->party == plTarget->Party->party)
+            return false;
+
+        switch(map->pvp_mode)
+        {
+            case PVP_MODE_FFA:
+                // Free-For-All (Training Grounds, Desert of Dead, etc.): anyone can attack anyone except party members
+                return true;
+
+            case PVP_MODE_TEAM:
+                // Team / Arena PvP: players sharing the same positive pvp_id are allies
+                if(plAttacker->pvp_id > 0 && plAttacker->pvp_id == plTarget->pvp_id)
+                    return false;
+                return true;
+
+            case PVP_MODE_CLAN:
+                // Clan Field: players in the same clan cannot attack each other
+                if(plAttacker->Clan->clanid != 0 && plAttacker->Clan->clanid == plTarget->Clan->clanid)
+                    return false;
+                return true;
+
+            case PVP_MODE_UNION:
+                // Union War: players in the same union cannot attack each other
+                if(plAttacker->CharInfo->unionid != 0 && plAttacker->CharInfo->unionid == plTarget->CharInfo->unionid)
+                    return false;
+                return true;
+
+            default:
+                if(plAttacker->pvp_id > 0 && plAttacker->pvp_id == plTarget->pvp_id)
+                    return false;
+                return true;
+        }
+    }
+
+    return true;
+}
+
