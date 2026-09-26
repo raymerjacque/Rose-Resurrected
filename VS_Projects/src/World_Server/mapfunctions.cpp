@@ -97,7 +97,7 @@ bool CMap::TeleportPlayer( CPlayer* player, fPoint coordold, bool TelePassenger 
     AddPlayer( player );
 	BEGINPACKET( pak, 0x07a8 );
 	ADDWORD    ( pak, player->clientid );
-	ADDWORD    ( pak, player->Position->Map );
+	ADDWORD    ( pak, (base_zone != 0 ? base_zone : player->Position->Map) );
 	ADDFLOAT   ( pak, player->Position->current.x*100 );
 	ADDFLOAT   ( pak, player->Position->current.y*100 );
     ADDWORD    ( pak, (player->Status->Stance==0x04?0x0201:0x0001) );

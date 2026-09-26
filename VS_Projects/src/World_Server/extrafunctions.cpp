@@ -2298,8 +2298,15 @@ UINT CWorldServer::GetGridNumber(int mapid, int posx, int posy)
 
     if(mapid>=NB_MAPS)
     {
-        Log(MSG_WARNING,"Wrong map in GetGridNumber, %i>=%u",mapid,NB_MAPS);
-        return 0;
+        if(mapid < MapList.max && MapList.Index[mapid] && MapList.Index[mapid]->is_instance)
+        {
+            mapid = MapList.Index[mapid]->base_zone;
+        }
+        else
+        {
+            Log(MSG_WARNING,"Wrong map in GetGridNumber, %i>=%u",mapid,NB_MAPS);
+            return 0;
+        }
     }
 
    grid_id=allmaps[mapid].grid_id;
@@ -2339,8 +2346,15 @@ UINT CWorldServer::GetGridNumber(int mapid, int posx, int posy,CMonster* thismon
 
     if(mapid>=NB_MAPS)
     {
-        Log(MSG_WARNING,"Wrong map in GetGridNumber, %i>=%u",mapid,NB_MAPS);
-        return 0;
+        if(mapid < MapList.max && MapList.Index[mapid] && MapList.Index[mapid]->is_instance)
+        {
+            mapid = MapList.Index[mapid]->base_zone;
+        }
+        else
+        {
+            Log(MSG_WARNING,"Wrong map in GetGridNumber, %i>=%u",mapid,NB_MAPS);
+            return 0;
+        }
     }
 
    grid_id=allmaps[mapid].grid_id;

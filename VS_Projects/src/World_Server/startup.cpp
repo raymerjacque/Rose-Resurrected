@@ -325,8 +325,8 @@ bool CWorldServer::InitDefaultValues()
     UseList.max			= STB_ITEM[9].rowcount;
 
     //Real amount.
-    MapList.Index		= new CMap*[ZoneData.rowcount];
-    MapList.max			= ZoneData.rowcount;
+    MapList.Index		= new CMap*[MAX_ZONE_INSTANCES];
+    MapList.max			= MAX_ZONE_INSTANCES;
     maxZone				= ZoneData.rowcount;
 
     //LMA: adding questItems too

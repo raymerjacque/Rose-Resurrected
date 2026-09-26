@@ -581,6 +581,12 @@ class CWorldServer : public CServerSocket
 
         //int ObjVar[4000][20];  //NPC variables used in AI
         int ObjVar[MAX_NPC][20];  //NPC variables used in AI
+        int WorldVar[256];        //World variables used in AI/Quests
+        int EconomyVar[256];      //Economy variables used in AI/Quests
+        int GetWorldVar( UINT idx );
+        void SetWorldVar( UINT idx, int val, byte op );
+        int GetEconomyVar( UINT idx );
+        void SetEconomyVar( UINT idx, int val, byte op );
 
         // AIP Functions
         void ReadAIP(strings path, dword index);

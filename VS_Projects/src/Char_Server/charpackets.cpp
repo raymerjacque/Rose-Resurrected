@@ -541,7 +541,7 @@ bool CCharServer::pak7e5 ( CCharClient* thisclient, CPacket* P )
             //Note: previous mails are saved clientside in the ".db" file near client (sqllite format).
             MYSQL_RES *result;
             MYSQL_ROW row;
-            result = DB->QStore( "SELECT mailfromname, message, dhsent FROM mail_list WHERE sendtocharid=%u", thisclient->charid);
+            result = DB->QStore( "SELECT id, mailfromname, message, dhsent, zuly, item_name, is_claimed FROM mail_list WHERE sendtocharid=%u AND is_read=0 ORDER BY id ASC LIMIT 50", thisclient->charid);
             if(result==NULL) return false;
             DWORD nb_mails=mysql_num_rows( result );
             if (nb_mails==0)
@@ -553,25 +553,46 @@ bool CCharServer::pak7e5 ( CCharClient* thisclient, CPacket* P )
             BEGINPACKET( pak, 0x7e5 );
             ADDBYTE    ( pak, 0x02 );
 
+            string mail_ids_to_mark = "";
             while(row = mysql_fetch_row( result ))
             {
-                ADDDWORD (pak,atoi(row[2]));
-                ADDSTRING (pak,row[0]);
-                ADDBYTE (pak,0x00);
-                ADDSTRING (pak,row[1]);
-                ADDBYTE (pak,0x00);
+                DWORD mailId = (DWORD)atoi(row[0]);
+                char* fromName = row[1];
+                char* msgContent = row[2];
+                DWORD sentTime = (DWORD)atoi(row[3]);
+                unsigned long long zulyVal = row[4] ? strtoull(row[4], NULL, 10) : 0;
+                const char* itemName = row[5] ? row[5] : "";
+                int isClaimed = row[6] ? atoi(row[6]) : 0;
+
+                string displayMsg = msgContent ? msgContent : "";
+                if ((zulyVal > 0 || (itemName && strlen(itemName) > 0)) && !isClaimed)
+                {
+                    char attachBuf[256];
+                    if (zulyVal > 0 && itemName && strlen(itemName) > 0)
+                        snprintf(attachBuf, sizeof(attachBuf), "[#%u: %llu Zulies & %s - /mail claim %u] ", mailId, zulyVal, itemName, mailId);
+                    else if (zulyVal > 0)
+                        snprintf(attachBuf, sizeof(attachBuf), "[#%u: %llu Zulies - /mail claim %u] ", mailId, zulyVal, mailId);
+                    else
+                        snprintf(attachBuf, sizeof(attachBuf), "[#%u: %s - /mail claim %u] ", mailId, itemName, mailId);
+                    displayMsg = string(attachBuf) + displayMsg;
+                }
+
+                ADDDWORD (pak, sentTime);
+                ADDSTRING(pak, fromName);
+                ADDBYTE  (pak, 0x00);
+                ADDSTRING(pak, displayMsg.c_str());
+                ADDBYTE  (pak, 0x00);
+
+                if (!mail_ids_to_mark.empty()) mail_ids_to_mark += ",";
+                mail_ids_to_mark += to_string(mailId);
             }
 
             DB->QFree( );
 
-            //let's delete them now.
-            if(!DB->QExecute( "DELETE FROM mail_list WHERE sendtocharid=%u", thisclient->charid))
+            // Mark these delivered mails as read instead of deleting them!
+            if (!mail_ids_to_mark.empty())
             {
-                Log(MSG_WARNING,"Can't delete previous mails from %s",thisclient->charname);
-
-                //sending the packet anyway.
-                thisclient->SendPacket( &pak );
-                return true;
+                DB->QExecute("UPDATE mail_list SET is_read=1 WHERE id IN (%s)", mail_ids_to_mark.c_str());
             }
 
             thisclient->SendPacket( &pak );
@@ -622,7 +643,7 @@ bool CCharServer::pak7e5 ( CCharClient* thisclient, CPacket* P )
             DWORD other_charid=atoi(row[0]);
             DB->QFree( );
 
-            if(!DB->QExecute("INSERT INTO mail_list (mailfromname, mailfromcharid, sendtoname, sendtocharid, message, dhsent) VALUES('%s',%u,'%s',%u,'%s',%u)",thisclient->charname,thisclient->charid,escaped_to.c_str(),other_charid,escaped_message.c_str(),GetServerTime( )))
+            if(!DB->QExecute("INSERT INTO mail_list (mailfromname, mailfromcharid, sendtoname, sendtocharid, message, dhsent, is_read, zuly, item_head, item_data, item_name, is_claimed) VALUES('%s',%u,'%s',%u,'%s',%u,0,0,0,0,'',0)",thisclient->charname,thisclient->charid,escaped_to.c_str(),other_charid,escaped_message.c_str(),GetServerTime( )))
             {
                 Log(MSG_WARNING,"Error, %s tried to send a mail to %s (%s) and it failed to be saved in database.",thisclient->charname,escaped_to.c_str(),escaped_message.c_str());
                 return false;
@@ -639,7 +660,7 @@ bool CCharServer::pak7e5 ( CCharClient* thisclient, CPacket* P )
         {
             //Have I got mail waiting, how many?
             MYSQL_RES *result;
-            result = DB->QStore( "SELECT id FROM mail_list WHERE sendtocharid=%u", thisclient->charid);
+            result = DB->QStore( "SELECT id FROM mail_list WHERE sendtocharid=%u AND (is_read=0 OR (is_claimed=0 AND (zuly>0 OR item_head>0)))", thisclient->charid);
             if(result==NULL) return false;
             DWORD nb_mails=mysql_num_rows( result );
             DB->QFree( );
@@ -650,6 +671,22 @@ bool CCharServer::pak7e5 ( CCharClient* thisclient, CPacket* P )
             thisclient->SendPacket( &pak );
         }
         break;
+
+        case 0x04:
+        {
+            //Per-message deletion by mail ID
+            if (P->Size >= 5)
+            {
+                DWORD mailId = GETDWORD((*P), 1);
+                DB->QExecute("DELETE FROM mail_list WHERE id=%u AND sendtocharid=%u", mailId, thisclient->charid);
+                BEGINPACKET( pak, 0x7e5 );
+                ADDBYTE( pak, 0x04 );
+                ADDDWORD( pak, mailId );
+                thisclient->SendPacket( &pak );
+            }
+        }
+        break;
+
         default:
         {
             Log( MSG_WARNING,"Unknown 0x07e5 mail action %i",action);

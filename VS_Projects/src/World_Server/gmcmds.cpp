@@ -23,6 +23,7 @@
 #include "datatypes.h"
 #include "PlayerBot.h"
 #include "Arena.h"
+#include "DungeonManager.h"
 
 // Parse our commands to their appropriate function
 bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
@@ -94,6 +95,348 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
         }
 
         SendPM(thisclient, "[Akram Arena] Unknown subcommand '%s'. Type '/arena help' for info.", subcmd);
+        return true;
+    }
+
+	if (strcmp(command, "mail") == 0)
+    {
+        char* subcmd = strtok(NULL, " ");
+        if (subcmd == NULL || strcmp(subcmd, "help") == 0)
+        {
+            SendPM(thisclient, "=== RosE Resurrected Mail & Parcel System ===");
+            SendPM(thisclient, "/mail list - View inbox and attached Zulies/items");
+            SendPM(thisclient, "/mail read <id> - Read specific mail text");
+            SendPM(thisclient, "/mail claim <id> - Claim attached Zulies and items");
+            SendPM(thisclient, "/mail send <player> <zuly> [inv_slot] <message> - Send mail/parcel");
+            SendPM(thisclient, "/mail delete <id> - Delete specific mail");
+            return true;
+        }
+
+        if (strcmp(subcmd, "list") == 0)
+        {
+            MYSQL_RES *result = DB->QStore("SELECT id, mailfromname, zuly, item_name, is_claimed, is_read FROM mail_list WHERE sendtocharid=%u ORDER BY id DESC LIMIT 10", thisclient->CharInfo->charid);
+            if (result == NULL || mysql_num_rows(result) == 0)
+            {
+                if (result) DB->QFree();
+                SendPM(thisclient, "[Mail] Your inbox is empty.");
+                return true;
+            }
+            SendPM(thisclient, "=== Your Mail Inbox (Latest 10) ===");
+            MYSQL_ROW row;
+            while ((row = mysql_fetch_row(result)))
+            {
+                DWORD mailId = (DWORD)atoi(row[0]);
+                char* sender = row[1];
+                unsigned long long zuly = row[2] ? strtoull(row[2], NULL, 10) : 0;
+                const char* itemName = (row[3] && strlen(row[3]) > 0) ? row[3] : "None";
+                int isClaimed = row[4] ? atoi(row[4]) : 0;
+                int isRead = row[5] ? atoi(row[5]) : 0;
+                SendPM(thisclient, "#%u From: %s | %s | Zuly: %llu | Item: %s [%s]",
+                    mailId, sender, (isRead ? "Read" : "NEW"), zuly, itemName,
+                    ((zuly > 0 || strcmp(itemName, "None") != 0) ? (isClaimed ? "Claimed" : "UNCLAIMED") : "No Attach"));
+            }
+            DB->QFree();
+            return true;
+        }
+        else if (strcmp(subcmd, "read") == 0)
+        {
+            char* idStr = strtok(NULL, " ");
+            if (idStr == NULL)
+            {
+                SendPM(thisclient, "Usage: /mail read <id>");
+                return true;
+            }
+            DWORD mailId = (DWORD)atoi(idStr);
+            MYSQL_RES *result = DB->QStore("SELECT mailfromname, message, zuly, item_name, is_claimed FROM mail_list WHERE id=%u AND sendtocharid=%u", mailId, thisclient->CharInfo->charid);
+            if (result == NULL || mysql_num_rows(result) == 0)
+            {
+                if (result) DB->QFree();
+                SendPM(thisclient, "[Mail] Mail #%u not found.", mailId);
+                return true;
+            }
+            MYSQL_ROW row = mysql_fetch_row(result);
+            char* sender = row[0];
+            char* msg = row[1];
+            unsigned long long zuly = row[2] ? strtoull(row[2], NULL, 10) : 0;
+            const char* itemName = (row[3] && strlen(row[3]) > 0) ? row[3] : "None";
+            int isClaimed = row[4] ? atoi(row[4]) : 0;
+            DB->QFree();
+
+            DB->QExecute("UPDATE mail_list SET is_read=1 WHERE id=%u", mailId);
+            SendPM(thisclient, "[Mail #%u] From: %s | Zuly: %llu | Item: %s (%s)", mailId, sender, zuly, itemName, (isClaimed ? "Claimed" : "Unclaimed"));
+            SendPM(thisclient, "Message: %s", msg);
+            return true;
+        }
+        else if (strcmp(subcmd, "claim") == 0)
+        {
+            char* idStr = strtok(NULL, " ");
+            if (idStr == NULL)
+            {
+                SendPM(thisclient, "Usage: /mail claim <id>");
+                return true;
+            }
+            DWORD mailId = (DWORD)atoi(idStr);
+            MYSQL_RES *result = DB->QStore("SELECT zuly, item_head, item_data, item_name, is_claimed FROM mail_list WHERE id=%u AND sendtocharid=%u", mailId, thisclient->CharInfo->charid);
+            if (result == NULL || mysql_num_rows(result) == 0)
+            {
+                if (result) DB->QFree();
+                SendPM(thisclient, "[Mail] Mail #%u not found.", mailId);
+                return true;
+            }
+            MYSQL_ROW row = mysql_fetch_row(result);
+            unsigned long long zuly = row[0] ? strtoull(row[0], NULL, 10) : 0;
+            DWORD itemHead = row[1] ? (DWORD)strtoul(row[1], NULL, 10) : 0;
+            DWORD itemData = row[2] ? (DWORD)strtoul(row[2], NULL, 10) : 0;
+            const char* itemName = row[3] ? row[3] : "";
+            int isClaimed = row[4] ? atoi(row[4]) : 0;
+            DB->QFree();
+
+            if (isClaimed)
+            {
+                SendPM(thisclient, "[Mail] Attachments for mail #%u have already been claimed.", mailId);
+                return true;
+            }
+            if (zuly == 0 && itemHead == 0)
+            {
+                SendPM(thisclient, "[Mail] Mail #%u has no attachments to claim.", mailId);
+                return true;
+            }
+
+            if (itemHead != 0)
+            {
+                CItem mailItem;
+                mailItem.itemnum = itemHead & 0xFFFF;
+                mailItem.itemtype = (itemHead >> 16) & 0xFFFF;
+                mailItem.count = itemData & 0x1FF;
+                mailItem.gem = (itemData >> 9) & 0x7F;
+                mailItem.durability = (itemData >> 16) & 0x7F;
+                mailItem.lifespan = ((itemData >> 23) & 0x7F) * 10;
+                mailItem.appraised = true;
+
+                int slot = thisclient->AddItem(mailItem);
+                if (slot == 0xFFFF)
+                {
+                    SendPM(thisclient, "[Mail] Your inventory is full! Make space before claiming item attachments.");
+                    return true;
+                }
+                BEGINPACKET(pak, 0x71f);
+                ADDBYTE(pak, 0x01);
+                ADDBYTE(pak, slot);
+                ADDDWORD(pak, BuildItemHead(&thisclient->items[slot]));
+                ADDDWORD(pak, BuildItemData(&thisclient->items[slot]));
+                ADDDWORD(pak, 0);
+                ADDWORD(pak, 0);
+                thisclient->client->SendPacket(&pak);
+            }
+
+            if (zuly > 0)
+            {
+                thisclient->CharInfo->Zulies += zuly;
+                BEGINPACKET(pak, 0x7b1);
+                ADDBYTE(pak, 0x00);
+                ADDQWORD(pak, thisclient->CharInfo->Zulies);
+                thisclient->client->SendPacket(&pak);
+            }
+
+            DB->QExecute("UPDATE mail_list SET is_claimed=1, is_read=1 WHERE id=%u", mailId);
+            SendPM(thisclient, "[Mail] Successfully claimed attachments from mail #%u! (+%llu Zulies%s%s)",
+                mailId, zuly, (itemHead != 0 ? ", Item: " : ""), (itemHead != 0 ? itemName : ""));
+            return true;
+        }
+        else if (strcmp(subcmd, "delete") == 0)
+        {
+            char* idStr = strtok(NULL, " ");
+            if (idStr == NULL)
+            {
+                SendPM(thisclient, "Usage: /mail delete <id>");
+                return true;
+            }
+            DWORD mailId = (DWORD)atoi(idStr);
+            DB->QExecute("DELETE FROM mail_list WHERE id=%u AND sendtocharid=%u", mailId, thisclient->CharInfo->charid);
+            SendPM(thisclient, "[Mail] Mail #%u deleted.", mailId);
+            return true;
+        }
+        else if (strcmp(subcmd, "send") == 0)
+        {
+            char* recipient = strtok(NULL, " ");
+            char* zulyStr = strtok(NULL, " ");
+            char* slotOrMsg = strtok(NULL, " ");
+            if (!recipient || !zulyStr || !slotOrMsg)
+            {
+                SendPM(thisclient, "Usage: /mail send <player> <zuly> [inv_slot] <message>");
+                return true;
+            }
+            unsigned long long sendZuly = strtoull(zulyStr, NULL, 10);
+            if (sendZuly > thisclient->CharInfo->Zulies)
+            {
+                SendPM(thisclient, "[Mail] You do not have enough Zulies (have %llu, trying to send %llu).", thisclient->CharInfo->Zulies, sendZuly);
+                return true;
+            }
+
+            int sendSlot = -1;
+            char* nextTok = strtok(NULL, "");
+            string mailMsg = "";
+            bool isSlotNumber = true;
+            for (size_t c = 0; c < strlen(slotOrMsg); c++) {
+                if (!isdigit(slotOrMsg[c])) { isSlotNumber = false; break; }
+            }
+            if (isSlotNumber && nextTok != NULL)
+            {
+                sendSlot = atoi(slotOrMsg);
+                mailMsg = nextTok;
+            }
+            else
+            {
+                mailMsg = string(slotOrMsg) + (nextTok ? string(" ") + nextTok : "");
+            }
+
+            DWORD itemHead = 0;
+            DWORD itemData = 0;
+            string itemName = "";
+            if (sendSlot >= 1 && sendSlot <= 140)
+            {
+                if (thisclient->items[sendSlot].count == 0)
+                {
+                    SendPM(thisclient, "[Mail] Inventory slot %d is empty.", sendSlot);
+                    return true;
+                }
+                CItem& itm = thisclient->items[sendSlot];
+                itemHead = BuildItemHead(&itm);
+                itemData = BuildItemData(&itm);
+                const char* prefix = GetSTLItemPrefix(itm.itemtype, itm.itemnum);
+                const char* objName = GetSTLObjNameByID(itm.itemtype, itm.itemnum);
+                if (prefix && strlen(prefix) > 0) { itemName += prefix; itemName += " "; }
+                if (objName && strlen(objName) > 0) { itemName += objName; }
+
+                ClearItem(thisclient->items[sendSlot]);
+                BEGINPACKET(pak, 0x71f);
+                ADDBYTE(pak, 0x01);
+                ADDBYTE(pak, sendSlot);
+                ADDDWORD(pak, 0);
+                ADDDWORD(pak, 0);
+                ADDDWORD(pak, 0);
+                ADDWORD(pak, 0);
+                thisclient->client->SendPacket(&pak);
+            }
+
+            if (sendZuly > 0)
+            {
+                thisclient->CharInfo->Zulies -= sendZuly;
+                BEGINPACKET(pak, 0x7b1);
+                ADDBYTE(pak, 0x00);
+                ADDQWORD(pak, thisclient->CharInfo->Zulies);
+                thisclient->client->SendPacket(&pak);
+            }
+
+            string escRecip, escMsg, escItem;
+            EscapeMySQL(recipient, escRecip, -1, true);
+            EscapeMySQL(mailMsg.c_str(), escMsg, -1, false);
+            EscapeMySQL(itemName.c_str(), escItem, -1, false);
+
+            MYSQL_RES *res = DB->QStore("SELECT id FROM characters WHERE char_name='%s'", escRecip.c_str());
+            if (res == NULL || mysql_num_rows(res) == 0)
+            {
+                if (res) DB->QFree();
+                SendPM(thisclient, "[Mail] Player '%s' does not exist.", recipient);
+                if (sendZuly > 0) thisclient->CharInfo->Zulies += sendZuly;
+                return true;
+            }
+            MYSQL_ROW r = mysql_fetch_row(res);
+            DWORD recipCharId = (DWORD)atoi(r[0]);
+            DB->QFree();
+
+            DB->QExecute("INSERT INTO mail_list (mailfromname, mailfromcharid, sendtoname, sendtocharid, message, dhsent, is_read, zuly, item_head, item_data, item_name, is_claimed) "
+                "VALUES ('%s', %u, '%s', %u, '%s', %u, 0, %llu, %u, %u, '%s', 0)",
+                thisclient->CharInfo->charname, thisclient->CharInfo->charid, escRecip.c_str(), recipCharId, escMsg.c_str(), (DWORD)time(NULL), sendZuly, itemHead, itemData, escItem.c_str());
+
+            SendPM(thisclient, "[Mail] Sent successfully to %s! (Zuly: %llu%s%s)", recipient, sendZuly, (!itemName.empty() ? ", Item: " : ""), (!itemName.empty() ? itemName.c_str() : ""));
+            return true;
+        }
+
+        SendPM(thisclient, "[Mail] Unknown subcommand '%s'. Type '/mail help' for info.", subcmd);
+        return true;
+    }
+
+	if (strcmp(command, "dungeon") == 0)
+    {
+        char* subcmd = strtok(NULL, " ");
+        if (subcmd == NULL || strcmp(subcmd, "help") == 0)
+        {
+            SendPM(thisclient, "=== Dynamic Dungeon Instancing Commands ===");
+            SendPM(thisclient, "/dungeon time - Check remaining time in current instance");
+            SendPM(thisclient, "/dungeon info - View dungeon instance status and members");
+            SendPM(thisclient, "/dungeon leave - Exit current dungeon instance back to entrance");
+            if (thisclient->Session->accesslevel >= 100 || thisclient->CharInfo->isGM)
+            {
+                SendPM(thisclient, "/dungeon wipe - (GM) Force trigger party wipe and evacuation");
+            }
+            return true;
+        }
+
+        bool inInstance = (thisclient->Position->Map < (UINT)MapList.max && MapList.Index[thisclient->Position->Map] && MapList.Index[thisclient->Position->Map]->is_instance);
+
+        if (strcmp(subcmd, "time") == 0)
+        {
+            if (!inInstance)
+            {
+                SendPM(thisclient, "[Dungeon] You are not currently inside an instanced dungeon.");
+                return true;
+            }
+            CMap* curMap = MapList.Index[thisclient->Position->Map];
+            UINT sec = CDungeonManager::GetInstance()->GetRemainingTime(curMap);
+            UINT min = sec / 60;
+            sec %= 60;
+            SendPM(thisclient, "[Dungeon] Time remaining: %u minute(s) and %u second(s).", min, sec);
+            return true;
+        }
+
+        if (strcmp(subcmd, "info") == 0)
+        {
+            if (!inInstance)
+            {
+                SendPM(thisclient, "[Dungeon] You are not currently inside an instanced dungeon.");
+                return true;
+            }
+            CMap* curMap = MapList.Index[thisclient->Position->Map];
+            UINT sec = CDungeonManager::GetInstance()->GetRemainingTime(curMap);
+            SendPM(thisclient, "=== Dungeon Instance Info ===");
+            SendPM(thisclient, "Instance ID: #%u | Base Cave: %u | Party/Owner: %u", curMap->instance_id, curMap->base_zone, curMap->party_id);
+            SendPM(thisclient, "Players inside: %zu | Remaining Time: %02u:%02u", curMap->PlayerList.size(), sec / 60, sec % 60);
+            return true;
+        }
+
+        if (strcmp(subcmd, "leave") == 0)
+        {
+            if (!inInstance)
+            {
+                SendPM(thisclient, "[Dungeon] You are not currently inside an instanced dungeon.");
+                return true;
+            }
+            CMap* curMap = MapList.Index[thisclient->Position->Map];
+            UINT exitMap = 0;
+            fPoint exitPos;
+            CDungeonManager::GetInstance()->GetDungeonExit(curMap->base_zone, exitMap, exitPos);
+            SendPM(thisclient, "[Dungeon] Exiting dungeon to entrance...");
+            MapList.Index[exitMap]->TeleportPlayer(thisclient, exitPos, false);
+            return true;
+        }
+
+        if (strcmp(subcmd, "wipe") == 0)
+        {
+            if (thisclient->Session->accesslevel < 100 && !thisclient->CharInfo->isGM)
+                return true;
+            if (!inInstance)
+            {
+                SendPM(thisclient, "[Dungeon] You are not currently inside an instanced dungeon.");
+                return true;
+            }
+            CMap* curMap = MapList.Index[thisclient->Position->Map];
+            CDungeonManager::GetInstance()->HandlePartyWipe(curMap);
+            SendPM(thisclient, "[Dungeon] Party wipe simulated.");
+            return true;
+        }
+
+        SendPM(thisclient, "[Dungeon] Unknown subcommand '%s'. Type '/dungeon help' for info.", subcmd);
         return true;
     }
 

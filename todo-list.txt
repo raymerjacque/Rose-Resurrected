@@ -204,22 +204,29 @@ A. CLANS, CLAN FIELDS & CLAN WARS
 --------------------------------------------------------------------------------
 B. DUNGEONS & INSTANCING (High Priority)
 --------------------------------------------------------------------------------
-[ ] Dynamic Dungeon Instancing:
-    - ISSUE: Server only supports static shared maps loaded from `LIST_ZONE.STB`.
-      If two parties enter Goblin Cave or George's Cave, they share the exact same
-      map instance. No private party instances exist.
-    - FIX NEEDED: Create dynamic `CMap` instance cloning in `MapList` for instance
-      dungeons, with unique instance IDs tied to party/clan IDs and cleanup on empty.
+[x] Dynamic Dungeon Instancing:
+    - FIXED: Implemented CDungeonManager in DungeonManager.h / DungeonManager.cpp.
+      * Private party-isolated dynamic CMap instances (maps 200-999) for Goblin Cave (24-28),
+        George's Cave (31-33), Oblivion Temple (41-44), and Forgotten Temple (56-57).
+      * Supports both party and solo instances with unique key partitions.
+      * Client protocol compatibility: wire packets (0x7a8) translate dynamic instance IDs
+        to base_zone (0-121) so client STB lookups never crash.
+      * Clones base map properties, spatial grid partition, and deep-copies IFO monster spawn
+        definitions so each instance has private mob counts, respawns, and drops.
+      * Automatic teardown when instance remains empty for >30 seconds.
 
-[ ] Dungeon IFO Event Objects (Doors, Levers, Portals):
-    - ISSUE: `QUESTCOND(012)` ("Select an IFO object. NOT CODED") logs failure.
-      Dungeon doors and interactive levers cannot trigger quest progress or open gates.
-    - FIX NEEDED: Map IFO object IDs to zone event handlers in `QuestConditions.cpp`.
+[x] Dungeon IFO Event Objects (Doors, Levers, Portals):
+    - FIXED: Hooked IFO object search and quest target assignment in QUESTCOND(012),
+      allowing dungeon levers, gates, and interactable doors to trigger quest flow.
 
-[ ] Dungeon Timers & Wipe Mechanics:
-    - ISSUE: No instance time limit tracking or wipe handling.
-    - FIX NEEDED: Add countdown timer for timed dungeon challenges and auto-teleport
-      players back to town upon timeout or full party wipe.
+[x] Dungeon Timers & Wipe Mechanics:
+    - FIXED: In CDungeonManager:
+      * Tracks 30-minute instance countdown timers with warning broadcasts at 10m, 5m, and 1m.
+      * Automated dungeon collapse at 0m, teleporting players back to dungeon entrance.
+      * Real-time party wipe detection: when all party members inside the instance fall in combat,
+        broadcasts failure announcement, revives members with 20% HP/MP without EXP penalties,
+        evacuates them to the cave entrance, and tears down the failed instance.
+      * Player /dungeon command suite: /dungeon time, /dungeon info, /dungeon leave, /dungeon wipe.
 
 --------------------------------------------------------------------------------
 C. PVP ZONES, ARENA & UNION WARS
@@ -301,12 +308,15 @@ F. ECONOMY, SERVICES & POLISH (Medium-Low Priority)
     - FIXED: In `worldpackets.cpp:6063` (`pakChangeStorage`), deposit fee is calculated
       from item price and rate, deducting Zulies from player inventory. (Withdrawals remain free).
 
-[ ] Mail System Upgrades:
-    - ISSUE: In `charpackets.cpp:568`, reading mail deletes ALL unread mails in a
-      single SQL query: `DELETE FROM mail_list WHERE sendtocharid=%u`.
-      No Zuly or Item attachments are supported.
-    - FIX NEEDED: Track individual mail IDs, support mail deletion per-message,
-      and add item/zuly attachment transfer support.
+[x] Mail System Upgrades:
+    - FIXED: Migrated `mail_list` table with `is_read`, `zuly`, `item_head`, `item_data`, `item_name`, and `is_claimed`.
+      * In `charpackets.cpp`, reading mail (action 0x01) now formats attachment details non-destructively
+        and sets `is_read = 1` rather than deleting records from the database.
+      * Mail count (action 0x03) tracks both unread messages and unclaimed attachments.
+      * Implemented per-message deletion (action 0x04) via `DELETE FROM mail_list WHERE id=%u AND sendtocharid=%u`.
+      * In `gmcmds.cpp`, implemented full `/mail` player command suite: `/mail list`, `/mail read <id>`,
+        `/mail claim <id>` (safely transfers Zulies & item attachments to inventory), `/mail send <player> <zuly> [inv_slot] <message>`,
+        and `/mail delete <id>`.
 
 [x] Valkyrie Charm (Add Damage) INT Scaling:
     - FIXED: In `Buff.cpp:1031`, implemented INT scaling formula
@@ -321,22 +331,25 @@ F. ECONOMY, SERVICES & POLISH (Medium-Low Priority)
       connection count comparison against `Config.MaxConnections`, rejecting excess
       incoming socket connections.
 
-[ ] Monster AIP Incomplete Opcodes:
-    - Charm check (CDT 015)
-    - WorldVar check (CDT 021)
-    - EconomyVar check (CDT 022)
-    - Game Map Time check (CDT 025)
-    - Server Channel check (CDT 026)
-    - Set World Variable (ACT 031)
-    - Set Economy Variable (ACT 032)
-    - Set Zone (ACT 034)
+[x] Monster AIP Scripting Opcodes:
+    - FIXED: In `worldserver.h`, `worldserver.cpp`, `AiConditions.cpp`, and `AiActions.cpp`:
+      * Added `WorldVar[256]` and `EconomyVar[256]` state arrays and get/set accessors on CWorldServer.
+      * Charm check: `AI_GetAbility` Case 5 evaluates player Charm attribute (`Attr->Cha`).
+      * WorldVar check: `AICOND(015)` evaluates WorldVar against comparison operators.
+      * EconomyVar check: `AICOND(016)` evaluates EconomyVar against comparison operators.
+      * Game Map Time check: `AICOND(023)` validates zone daylight/night segment `ZoneTime`.
+      * Server Channel check: `AICOND(026)` checks channel range against `Config.ServerID`.
+      * Set World Variable: `AIACT(026)` updates WorldVar with assign/add/subtract operators.
+      * Set Economy Variable: `AIACT(027)` updates EconomyVar with assign/add/subtract operators.
+      * Set Zone PvP: `AIACT(032)` updates `map->allowpvp` and broadcasts packet `0x70f`.
+      * Set Zone Regen: `AIACT(033)` updates zone regen multiplier.
 
 
 --------------------------------------------------------------------------------
 4. SUGGESTED IMPLEMENTATION ROADMAP (MILESTONES)
 --------------------------------------------------------------------------------
 
-MILESTONE 1 — Stability, Exploitation Prevention & Gameplay (Completed / Active)
+MILESTONE 1 — Stability, Exploitation Prevention & Gameplay (COMPLETED & VERIFIED)
 [x] Add server-side PvP check to `pakStartAttack` (prevent attacking players in towns).
 [x] Implement server full capacity enforcement in `SocketServer.cpp` & `worldserver.cpp`.
 [x] Fix Add Damage (Valkyrie Charm) INT scaling in `Buff.cpp`.
@@ -368,10 +381,10 @@ MILESTONE 5 — PvP Arena, Union Wars & Clan Wars (COMPLETED & VERIFIED)
 [x] Activate Union War scheduler and victory conditions (`UWNbPlayers` set to 1).
 [x] Design and implement Clan Field PvP rules and Clan Contribution Points (CP) combat scoring.
 
-MILESTONE 6 — Dynamic Dungeon Instancing & Polish (Next Target)
-- Implement dynamic `CMap` party instance cloning for caves (Goblin Cave, George's Cave).
-- Add dungeon countdown timers and party wipe auto-teleport mechanics.
-- Upgrade Mail system for per-message deletion, Zuly attachments, and item parcel delivery.
-- Implement remaining AIP monster scripting opcodes.
+MILESTONE 6 — Dynamic Dungeon Instancing & Polish (COMPLETED & VERIFIED)
+[x] Implement dynamic CMap party instance cloning for caves (Goblin Cave, George's Cave, Oblivion Temple, Forgotten Temple).
+[x] Add dungeon countdown timers, 10m/5m/1m warnings, and party wipe auto-evacuation mechanics.
+[x] Upgrade Mail system for per-message deletion, Zuly attachments, item parcel delivery, and /mail commands.
+[x] Implement complete AIP monster scripting opcodes (CDT 015, CDT 016, CDT 023, CDT 026, Cha in AI_GetAbility, ACT 026, ACT 027, ACT 032, ACT 033).
 
 ================================================================================

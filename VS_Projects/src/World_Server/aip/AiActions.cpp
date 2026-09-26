@@ -1191,43 +1191,19 @@ AIACT(025)
 //Set Variable (2)
 AIACT(026)
 {
-	//Set WorldVAR
-    //word nVarNo;  //Pos: 0x00
-    //dword iValue; //Pos: 0x04
-    //byte btOp;    //Pos: 0x08
     GETAIACTDATA(026);
-    /*switch(data->nVarNo)
-    {
-        case 1:
-            if(data->iValue > GServer->Config.EXP_RATE)
-            {
-                GServer->Config.EXP_RATE = data->iValue;
-                Log(MSG_INFO,"Exp rate changed to %i", data->iValue);
-            }
-            GServer->NPCAnnounce("Happy Hour is active!","", 0);
-            return AI_SUCCESS;
-            break;
-        case 2:
-            GServer->Config.EXP_RATE = data->iValue;
-            Log(MSG_INFO,"Exp rate changed to %i", data->iValue);
-            GServer->NPCAnnounce("Happy Hour is done!","", 0);
-            return AI_SUCCESS;
-            break;
-        default:
-            return AI_SUCCESS;
-            break;
-    }*/
-	return AI_SUCCESS;
+    GServer->SetWorldVar(data->nVarNo, data->iValue, data->btOp);
+    LogDebug("AIACT(026) Set WorldVar[%i] op=%i val=%i (new: %i)", data->nVarNo, data->btOp, data->iValue, GServer->GetWorldVar(data->nVarNo));
+    return AI_SUCCESS;
 }
 
 //Set Variable (3)
 AIACT(027)
 {
-	//Set EconomyVAR
-	//word nVarNo;	//Pos: 0x00
-	//byte btOp;	//Pos: 0x08
-	//dword iValue;	//Pos: 0x04
-	return AI_SUCCESS;
+    GETAIACTDATA(027);
+    GServer->SetEconomyVar(data->nVarNo, data->iValue, data->btOp);
+    LogDebug("AIACT(027) Set EconomyVar[%i] op=%i val=%i (new: %i)", data->nVarNo, data->btOp, data->iValue, GServer->GetEconomyVar(data->nVarNo));
+    return AI_SUCCESS;
 }
 
 //Shout/Ann LTB String
@@ -1413,17 +1389,26 @@ AIACT(031)
 //Zone (1)
 AIACT(032)
 {
-	//word nZoneNo;	//Pos: 0x00
-	//byte btOnOff;	//Pos: 0x02
-	//Set PK Flag (btOnOff) in nZoneNo
-
-	//LMA: Used ofr Union Wars, mainly.
 	GETAIACTDATA(032);
-	BEGINPACKET(pak, 0x70f);
-    ADDDWORD(pak, data->btOnOff);
-    GServer->SendToAllInMap(&pak,data->nZoneNo);
+	UINT mapId = data->nZoneNo;
+	if (mapId == 0 && entity != NULL && entity->Position != NULL)
+		mapId = entity->Position->Map;
 
-	LogDebug( "AIACT(032) zone (%i) set to %i",data->nZoneNo,data->btOnOff);
+	if (mapId < (UINT)GServer->MapList.max)
+	{
+		CMap* map = GServer->MapList.Index[mapId];
+		if (map != NULL && map != GServer->MapList.nullzone)
+		{
+			map->allowpvp = data->btOnOff;
+			map->pvp_mode = (data->btOnOff ? PVP_MODE_FFA : PVP_MODE_OFF);
+		}
+	}
+
+	BEGINPACKET(pak, 0x70f);
+	ADDDWORD(pak, data->btOnOff);
+	GServer->SendToAllInMap(&pak, mapId);
+
+	LogDebug("AIACT(032) zone (%i) set to %i", mapId, data->btOnOff);
 	return AI_SUCCESS;
 }
 

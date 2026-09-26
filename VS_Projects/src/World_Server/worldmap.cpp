@@ -45,10 +45,53 @@ CMap::CMap( )
     TeleGateList.clear();
     MonsterMutex = PTHREAD_MUTEX_INITIALIZER;
     DropMutex = PTHREAD_MUTEX_INITIALIZER;
+
+    // Dynamic Dungeon Instancing
+    base_zone = 0;
+    instance_id = 0;
+    party_id = 0;
+    creation_time = 0;
+    time_limit_sec = 0;
+    is_instance = false;
+    is_wiped = false;
+    empty_since = 0;
+    warn_10m_sent = false;
+    warn_5m_sent = false;
+    warn_1m_sent = false;
 }
 
 CMap::~CMap( )
 {
+    if(is_instance)
+    {
+        for(UINT i=0;i<MonsterSpawnList.size();i++)
+            delete MonsterSpawnList.at(i);
+        MonsterSpawnList.clear();
+
+        for(UINT i=0;i<MonsterList.size();i++)
+        {
+            CMonster* monster = MonsterList.at(i);
+            if(monster)
+            {
+                GServer->ClearClientID( monster->clientid );
+                delete monster;
+            }
+        }
+        MonsterList.clear();
+        for(UINT i=0;i<DropsList.size();i++)
+        {
+            CDrop* drop = DropsList.at(i);
+            if(drop)
+            {
+                GServer->ClearClientID( drop->clientid );
+                delete drop;
+            }
+        }
+        DropsList.clear();
+        PlayerList.clear();
+        return;
+    }
+
     for(UINT i=0;i<RespawnList.size();i++)
         delete RespawnList.at(i);
     for(UINT i = 0; i < MobGroupList.size(); i++) {

@@ -378,6 +378,42 @@ Stationed permanently in high-density player trade corridors in Junon Polis and 
 - **Database Safety**: `SaveSlot41` skips MySQL queries for bots, keeping database tables clean and free of virtual bot items.
 - **Immunity & Permanence**: Bots are marked static (`isDynamic = false`) so they are never pruned, and their HP/MP is auto-restored each cycle.
 
+### 7. Dynamic Dungeon Instancing Engine (`CDungeonManager.cpp`)
+Provides private, party-isolated `CMap` instances (slots 200–999) for all cave and temple dungeons across the world:
+- **Supported Dungeons**:
+  - **Goblin Cave**: Maps 24 (B1), 25, 26 (B2), 27, 28 (B3)
+  - **George's Cave**: Maps 31 (B1), 32 (B2), 33 (B3)
+  - **Oblivion Temple / Sea of Seeds**: Maps 41, 42, 43, 44
+  - **Forgotten Temple**: Maps 56, 57
+- **Client Protocol Compatibility**: The server streams `(base_zone != 0 ? base_zone : id)` in wire teleport packets (`0x7a8`). The client always receives a valid STB zone ID (0–121) avoiding client-side crashes, while the server engine tracks isolated combat, visibility, and monster spawns under dynamic instance index 200+.
+- **Isolated Spawns & Respawns**: Monster spawn areas (`CSpawnArea`) are deep-copied from base IFO definitions upon instance creation. Each party fights their own private mobs with independent death/respawn timers and drop ownership.
+- **Dungeon Timers & Warning Broadcasts**: 30-minute countdown timers per instance with automated warning broadcasts at 10m, 5m, and 1m. When the timer hits 0m, the dungeon collapses and players are safely evacuated to the cave entrance.
+- **Party Wipe Detection & Auto-Evacuation**: When all players inside an instance fall in combat, `CDungeonManager::HandlePartyWipe` triggers an automated failure sequence: revives players with 20% HP/MP without death EXP penalties, purges debuffs, teleports them back to the entrance portal, and tears down the failed instance.
+- **Player In-Game Commands**:
+  - `/dungeon time`: Checks remaining minutes and seconds in current instance.
+  - `/dungeon info`: Displays instance ID, base cave, party ID, and player count.
+  - `/dungeon leave`: Safely exits the instance back to the cave entrance.
+  - `/dungeon wipe`: (GM only) Simulates or forces party wipe handling.
+
+### 8. Mail System & Parcel Delivery (`charpackets.cpp` & `gmcmds.cpp`)
+Replaces legacy destructive mail wiping with a modern persistent mail and parcel delivery system:
+- **Database Schema**: Added `is_read`, `zuly`, `item_head`, `item_data`, `item_name`, and `is_claimed` columns to `mail_list`.
+- **Non-Destructive Reading**: Opening the client memo UI displays attached Zulies and items without deleting messages from the database.
+- **Per-Message Deletion**: Action `0x04` (`DELETE FROM mail_list WHERE id=%u AND sendtocharid=%u`) deletes only the targeted message.
+- **In-Game Chat Command Suite**:
+  - `/mail list`: Lists last 10 messages with IDs, sender, read status, and attachment status.
+  - `/mail read <id>`: Displays sender, message body, and attachment summary.
+  - `/mail claim <id>`: Validates unclaimed mail, transfers attached Zulies (`0x7b1`) and item attachments (`0x71f`) into player inventory, and marks `is_claimed = 1`.
+  - `/mail send <player> <zuly> [inv_slot] <message>`: Validates balance and inventory slot, deducts Zulies and item with live inventory packets, and persists mail parcel.
+  - `/mail delete <id>`: Deletes specific mail by ID.
+
+### 9. Complete Monster AIP Scripting Engine (`AiConditions.cpp` & `AiActions.cpp`)
+All stubbed monster artificial intelligence opcodes are fully implemented:
+- **Charm Attribute Evaluation**: Case 5 in `AI_GetAbility` queries player Charm (`Attr->Cha`).
+- **World & Economy Variables**: Added `WorldVar[256]` and `EconomyVar[256]` arrays to `CWorldServer`.
+- **Conditions**: `AICOND(015)` (WorldVar check), `AICOND(016)` (EconomyVar check), `AICOND(023)` (Game Map Time / daylight window check), `AICOND(026)` (Server Channel range check).
+- **Actions**: `AIACT(026)` (Set WorldVar), `AIACT(027)` (Set EconomyVar), `AIACT(032)` (Set Zone PvP mode and broadcast packet `0x70f`), `AIACT(033)` (Set Zone Regen rate).
+
 ---
 
 ## Maintenance & Git Synchronization Workflow

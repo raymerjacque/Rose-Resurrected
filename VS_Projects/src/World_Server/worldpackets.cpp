@@ -20,6 +20,7 @@
 */
 #include "worldserver.h"
 #include "../Common/Support.h"
+#include "DungeonManager.h"
 
 // Send Characters information
 void CWorldServer::pakPlayer( CPlayer *thisclient )
@@ -1681,7 +1682,13 @@ bool CWorldServer::pakGate( CPlayer* thisclient, CPacket* P )
             return true;
 	    }
 
-	    if(thisclient->Position->Map != thisgate->srcMap ||distance(thisclient->Position->current, thisgate->src) > 100)
+	    UINT playerBaseMap = thisclient->Position->Map;
+	    if (playerBaseMap < (UINT)MapList.max && MapList.Index[playerBaseMap] && MapList.Index[playerBaseMap]->is_instance)
+	    {
+	        playerBaseMap = MapList.Index[playerBaseMap]->base_zone;
+	    }
+
+	    if(playerBaseMap != thisgate->srcMap || distance(thisclient->Position->current, thisgate->src) > 100)
 	    {
             //hack or wrong gate?
             lastgate = thisgate;
@@ -1714,6 +1721,18 @@ bool CWorldServer::pakGate( CPlayer* thisclient, CPacket* P )
 		map = thisgate->destMap;
 		position = thisgate->dest;
 	}
+
+	// Dynamic Dungeon Instancing: route party or solo cave entries to isolated instance
+	if (!is_hack && CDungeonManager::GetInstance()->IsDungeonZone(map))
+	{
+		CMap* instMap = CDungeonManager::GetInstance()->GetOrCreatePartyInstance( thisclient, map );
+		if (instMap)
+		{
+			instMap->TeleportPlayer( thisclient, position );
+			return true;
+		}
+	}
+
 	// Do the teleporting
 	MapList.Index[map]->TeleportPlayer( thisclient, position );
 	return true;
@@ -2149,9 +2168,17 @@ bool CWorldServer::pakUserDied ( CPlayer* thisclient, CPacket* P )
 
     if(thisrespawn!=NULL)
     {
-        // geo edit for saved town warp // 29 sep 07
-        map = MapList.Index[thisrespawn->destMap];
-        map->TeleportPlayer( thisclient, thisrespawn->dest, false );
+        if (respawn == 1 && thisclient->Position->Map < (UINT)MapList.max && MapList.Index[thisclient->Position->Map] && MapList.Index[thisclient->Position->Map]->is_instance)
+        {
+            CMap* instMap = MapList.Index[thisclient->Position->Map];
+            instMap->TeleportPlayer( thisclient, thisrespawn->dest, false );
+        }
+        else
+        {
+            // geo edit for saved town warp // 29 sep 07
+            map = MapList.Index[thisrespawn->destMap];
+            map->TeleportPlayer( thisclient, thisrespawn->dest, false );
+        }
     }
     else
     {

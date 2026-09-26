@@ -44,6 +44,8 @@ CWorldServer::CWorldServer( string fn )
     QuestList.clear();
     FairyList.clear();
     TeleGateList.clear();
+    memset(WorldVar, 0, sizeof(WorldVar));
+    memset(EconomyVar, 0, sizeof(EconomyVar));
 
     MapMutex = PTHREAD_MUTEX_INITIALIZER; //fast mutex
     SQLMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -1396,5 +1398,43 @@ bool LoadAdverds()
     ////in_ads.close();
 
     return true;
+}
+
+int CWorldServer::GetWorldVar( UINT idx )
+{
+    if ( idx >= 256 ) return 0;
+    return WorldVar[idx];
+}
+
+void CWorldServer::SetWorldVar( UINT idx, int val, byte op )
+{
+    if ( idx >= 256 ) return;
+    switch( op )
+    {
+        case 5: WorldVar[idx] = val; break;
+        case 6: WorldVar[idx] += val; break;
+        case 7: WorldVar[idx] -= val; break;
+        case 9: WorldVar[idx]++; break;
+        default: WorldVar[idx] = val; break;
+    }
+}
+
+int CWorldServer::GetEconomyVar( UINT idx )
+{
+    if ( idx >= 256 ) return 0;
+    return EconomyVar[idx];
+}
+
+void CWorldServer::SetEconomyVar( UINT idx, int val, byte op )
+{
+    if ( idx >= 256 ) return;
+    switch( op )
+    {
+        case 5: EconomyVar[idx] = val; break;
+        case 6: EconomyVar[idx] += val; break;
+        case 7: EconomyVar[idx] -= val; break;
+        case 9: EconomyVar[idx]++; break;
+        default: EconomyVar[idx] = val; break;
+    }
 }
 

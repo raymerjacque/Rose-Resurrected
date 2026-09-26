@@ -21,6 +21,7 @@
 #include "worldserver.h"
 #include "PlayerBot.h"
 #include "Arena.h"
+#include "DungeonManager.h"
 
 // Map Process
 PVOID MapProcess( PVOID TS )
@@ -973,6 +974,7 @@ PVOID WorldProcess( PVOID TS )
             pthread_mutex_unlock( &map->MonsterMutex );
         }
         pthread_mutex_unlock( &GServer->MapMutex );
+        CDungeonManager::GetInstance()->Update();
         GServer->RefreshFairy( );
         Sleep(GServer->Config.WorldDelay);
     }

@@ -44,9 +44,12 @@ int AI_GetAbility(CCharacter* entity, byte btAbType)
 			return entity->Stats->HP;
 		break;
 		case 5:
-             return 0;
-		    ////Log(MSG_WARNING, "Don't have monsters charm yet...");
-		    //return -1;
+            if(entity != NULL && entity->IsPlayer())
+            {
+                CPlayer* player = reinterpret_cast<CPlayer*>(entity);
+                return (int)player->Attr->Cha;
+            }
+            return 0;
 		break;
 		default:
 			////Log(MSG_ERROR, "Unknown cAbType [%d]", btAbType);
@@ -630,22 +633,20 @@ AICOND(014)
 //Check Variable (2) (WorldVAR)
 AICOND(015)
 {
-	//word nVarIDX;	//Pos: 0x00
-	//byte btOp;	//Pos: 0x08
-	//dword iValue;	//Pos: 0x04
-
-	//Check WorldVAR
+	GETAICONDDATA(015);
+	int val = server->GetWorldVar(data->nVarIDX);
+	LogDebug("AICOND(015) Check WorldVar[%i]=%i op=%i val=%i", data->nVarIDX, val, data->btOp, data->iValue);
+	if(OperateValues<int>(data->btOp, &val, data->iValue)) return AI_SUCCESS;
 	return AI_FAILURE;
 }
 
 //Check Variable (3) (EconomyVar)
 AICOND(016)
 {
-	//word nVarIDX;	//Pos: 0x00
-	//dword iValue;	//Pos: 0x04
-	//byte btOp;	//Pos: 0x08
-
-	//Check EconomyVar
+	GETAICONDDATA(016);
+	int val = server->GetEconomyVar(data->nVarIDX);
+	LogDebug("AICOND(016) Check EconomyVar[%i]=%i op=%i val=%i", data->nVarIDX, val, data->btOp, data->iValue);
+	if(OperateValues<int>(data->btOp, &val, data->iValue)) return AI_SUCCESS;
 	return AI_FAILURE;
 }
 
@@ -904,13 +905,22 @@ AICOND(022)
 	return AI_SUCCESS;
 }
 
-//Check Time (3) (Game map time?)
+//Check Time (3) (Game map time)
 AICOND(023)
 {
-	//dword ulTime;	//Pos: 0x00
-	//dword ulEndTime;	//Pos: 0x04
+	GETAICONDDATA(023);
+	if(!entity->IsMonster()) return AI_FAILURE;
+	CMonster* thisMonster = reinterpret_cast<CMonster*>(entity);
+	if(thisMonster == NULL || thisMonster->Position == NULL) return AI_FAILURE;
+	if(thisMonster->Position->Map >= (UINT)server->MapList.max) return AI_FAILURE;
+	CMap* map = server->MapList.Index[thisMonster->Position->Map];
+	if(map == NULL || map == server->MapList.nullzone) return AI_FAILURE;
 
-	//Get_WorldTIME between ulTime and ulEndTime
+	int StartTime = int(data->ulTime);
+	int EndTime = int(data->ulEndTime);
+	LogDebug("AICOND(023) Check ZoneTime %i <= %i <= %i", StartTime, map->ZoneTime, EndTime);
+	if(map->ZoneTime >= (UINT)StartTime && map->ZoneTime <= (UINT)EndTime)
+		return AI_SUCCESS;
 	return AI_FAILURE;
 }
 
@@ -1100,11 +1110,12 @@ AICOND(025)
 AICOND(026)
 {
 	GETAICONDDATA(026);
-	//channel >= min && channel <= max
-
-	//LMA: Success for now ;)
-	return AI_SUCCESS;
-	//return AI_FAILURE;
+	if(server->Config.ServerID >= data->nMin && server->Config.ServerID <= data->nMax)
+	{
+		LogDebug("AICOND(026) ServerID %u in channel range [%u, %u]", server->Config.ServerID, data->nMin, data->nMax);
+		return AI_SUCCESS;
+	}
+	return AI_FAILURE;
 }
 
 //Check Near Character

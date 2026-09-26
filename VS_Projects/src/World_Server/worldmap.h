@@ -37,6 +37,8 @@ enum ePvpMode {
     PVP_MODE_UNION  = 4  // Union War / Cartel (Map 5, Union battlefields)
 };
 
+#define MAX_ZONE_INSTANCES 1000
+
 class CMap
 {
     public:
@@ -92,6 +94,19 @@ class CMap
     unsigned long QSDzone;      //LMA: Zone transfer trigger
     unsigned long QSDkilling;   //LMA: Killing trigger
     unsigned long QSDDeath;        //LMA: Death trigger
+
+    // Dynamic Dungeon Instancing
+    UINT base_zone;            // Base zone ID from LIST_ZONE.STB (for client wire packets)
+    UINT instance_id;          // Dynamic instance index
+    UINT party_id;             // Bound party ID (or player charid | 0x80000000 for solo)
+    clock_t creation_time;     // Instance creation timestamp
+    UINT time_limit_sec;       // Instance countdown timer (e.g. 1800s)
+    bool is_instance;          // True if dynamic private instance
+    bool is_wiped;             // True if full party wipe occurred
+    clock_t empty_since;       // Timestamp when PlayerList became empty
+    bool warn_10m_sent;        // Broadcast sent flags
+    bool warn_5m_sent;
+    bool warn_1m_sent;
 
     //LMA BEGIN
     //20070621-211100
