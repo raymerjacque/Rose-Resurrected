@@ -1459,6 +1459,7 @@ void CPlayerBot::MoveTo( fPoint dest )
             BEGINPACKET( pakStance, 0x0782 );
             ADDWORD    ( pakStance, m_player->clientid );
             ADDBYTE    ( pakStance, 0x04 ); // Stance 4: DRIVING
+            ADDWORD    ( pakStance, m_player->Stats->Base_Speed );
             GServer->SendToVisible( &pakStance, m_player );
         }
     }
@@ -1471,6 +1472,7 @@ void CPlayerBot::MoveTo( fPoint dest )
             BEGINPACKET( pakStance, 0x0782 );
             ADDWORD    ( pakStance, m_player->clientid );
             ADDBYTE    ( pakStance, 0x03 ); // Stance 3: RUNNING
+            ADDWORD    ( pakStance, m_player->Stats->Base_Speed );
             GServer->SendToVisible( &pakStance, m_player );
         }
         else if ( m_player->Status->Stance != DRIVING )
