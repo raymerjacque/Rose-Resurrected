@@ -1429,19 +1429,19 @@ void CPlayerBot::MoveTo( fPoint dest )
 {
     if ( !m_player ) return;
 
-    // Natural movement jitter offset (+/- 1.5 meters) to break up mechanical single-file movement
-    if ( !m_isBuffBot && !m_isVendingBot && m_state != BOT_STATE_FOLLOW )
-    {
-        float jitterX = ( ( rand( ) % 300 ) - 150 ) / 100.0f;
-        float jitterY = ( ( rand( ) % 300 ) - 150 ) / 100.0f;
-        dest.x += jitterX;
-        dest.y += jitterY;
-    }
-
     // If already moving towards approximately the same destination, don't spam 0x79a packet
-    if ( m_player->IsMoving( ) && GServer->distance( m_player->Position->destiny, dest ) < 1.0f )
+    if ( m_player->IsMoving( ) && GServer->distance( m_player->Position->destiny, dest ) < 3.0f )
     {
         return;
+    }
+
+    // Natural movement jitter offset (+/- 1.0 meters) applied ONLY when initiating a new movement
+    if ( !m_isBuffBot && !m_isVendingBot && m_state != BOT_STATE_FOLLOW )
+    {
+        float jitterX = ( ( rand( ) % 200 ) - 100 ) / 100.0f;
+        float jitterY = ( ( rand( ) % 200 ) - 100 ) / 100.0f;
+        dest.x += jitterX;
+        dest.y += jitterY;
     }
 
     if ( m_player->Status->Stance == 1 )
