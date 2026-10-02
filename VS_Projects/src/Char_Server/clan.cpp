@@ -635,6 +635,7 @@ bool CCharServer::pakClanManager ( CCharClient* thisclient, CPacket* P )
                 }
                 if(mysql_num_rows(result)!=1)
                 {
+                    DB->QFree( );
                     Log(MSG_WARNING, "Invalid charname: %s" , nick );
                     delete []nick;
                     return false;
@@ -1593,7 +1594,11 @@ bool CCharServer::pakDownloadCM ( CCharClient* thisclient, CPacket* P )
     //MYSQL_RES* result = DB->QStore("SELECT logo FROM list_clan WHERE id=%i",clanid );
     MYSQL_RES* result = DB->QStore("SELECT siglogo FROM list_clan WHERE id=%i",clanid );
     if(result==NULL) return true;
-    if(mysql_num_rows(result)!=1) return true;
+    if(mysql_num_rows(result)!=1)
+    {
+        DB->QFree( );
+        return true;
+    }
     MYSQL_ROW row = mysql_fetch_row(result);
     unsigned int cmid = atoi(row[0]);
     DB->QFree( );

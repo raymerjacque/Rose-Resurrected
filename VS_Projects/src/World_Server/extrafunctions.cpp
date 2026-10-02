@@ -2784,6 +2784,7 @@ void CWorldServer::TakeItemMallList(CPlayer* thisclient,int qty,int slot)
 
     if(mysql_num_rows(result)!=1)
     {
+      GServer->DB->QFree( );
       Log(MSG_HACK,"%s tried to get %i items from slot %i from mileage and there is nothing there !",thisclient->CharInfo->charname, qty, slot);
       return;
     }
@@ -3029,6 +3030,7 @@ UINT CWorldServer::getClanPoints(int clanid)
     if(result==NULL) return 0;
     if(mysql_num_rows(result)!=1)
     {
+        GServer->DB->QFree( );
         return 0;
     }
     else
@@ -3052,6 +3054,7 @@ UINT CWorldServer::getClanGrade(int clanid)
     if(result==NULL) return 0;
     if(mysql_num_rows(result)!=1)
     {
+        GServer->DB->QFree( );
         return 0;
     }
     else

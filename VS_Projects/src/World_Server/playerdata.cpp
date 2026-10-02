@@ -31,6 +31,7 @@ bool CPlayer::loaddata( )
 	if(mysql_num_rows(result) != 1)
 	{
         Log( MSG_WARNING, "Number of user with charname '%s' is %i", CharInfo->charname,mysql_num_rows(result));
+        GServer->DB->QFree( );
         return false;
     }
 	row = mysql_fetch_row(result);
