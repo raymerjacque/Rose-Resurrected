@@ -21,6 +21,7 @@
 #include "worldserver.h"
 #include "../Common/Support.h"
 #include "DungeonManager.h"
+#include "PlayerBot.h"
 
 // Send Characters information
 void CWorldServer::pakPlayer( CPlayer *thisclient )
@@ -1576,11 +1577,107 @@ bool CWorldServer::pakStartAttack( CPlayer* thisclient, CPacket* P )
     }
 
     WORD clientid = GETWORD((*P),0x00);
-    if ( thisclient->Battle->target == clientid )
+    CMap* map = MapList.Index[thisclient->Position->Map];
+    CCharacter* character = (map != NULL) ? map->GetCharInMap( clientid ) : NULL;
+
+    // ============================================================================
+    // [SERVER-SIDE PLAYER INTERACTION MENU HOOK] - Double-Click Player Target
+    // Rollback Note: To revert, delete this block.
+    // ============================================================================
+    if ( character != NULL && character->IsPlayer() )
     {
-        Log(MSG_WARNING,"%s:: Already targeting CID %u",thisclient->CharInfo->charname,clientid);
+        CPlayer* targetPlayer = (CPlayer*)character;
+
+        // Check if target is a static service NPC (Buff Bot or Merchant Vending Bot)
+        if ( targetPlayer->is_bot && targetPlayer->bot_ai &&
+             ( targetPlayer->bot_ai->IsBuffBot( ) || targetPlayer->bot_ai->IsVendingBot( ) ) )
+        {
+            SendPM( thisclient, "[NPC Service Bot] %s is a %s. Party invites disabled.",
+                    targetPlayer->CharInfo->charname,
+                    targetPlayer->bot_ai->IsBuffBot( ) ? "Buff Bot" : "Merchant Vending Bot" );
+            return true;
+        }
+
+        clock_t now = clock( );
+        bool isDoubleClick = ( thisclient->lastTargetPlayerId == targetPlayer->clientid &&
+                               ( now - thisclient->lastTargetPlayerTime ) <= ( 3 * CLOCKS_PER_SEC ) );
+
+        const char* jobName = "Visitor";
+        switch ( targetPlayer->CharInfo->Job )
+        {
+            case 111: jobName = "Soldier"; break;
+            case 121: jobName = "Knight"; break;
+            case 122: jobName = "Champion"; break;
+            case 211: jobName = "Muse"; break;
+            case 221: jobName = "Mage"; break;
+            case 222: jobName = "Cleric"; break;
+            case 311: jobName = "Hawker"; break;
+            case 321: jobName = "Raider"; break;
+            case 322: jobName = "Scout"; break;
+            case 411: jobName = "Dealer"; break;
+            case 421: jobName = "Bourgeois"; break;
+            case 422: jobName = "Artisan"; break;
+            default: jobName = "Visitor"; break;
+        }
+
+        if ( !isDoubleClick )
+        {
+            // First Click: Target selected
+            thisclient->lastTargetPlayerId = targetPlayer->clientid;
+            thisclient->lastTargetPlayerTime = now;
+
+            SendPM( thisclient, "[Target Selected] %s (Level %i %s). Click again to open interaction menu!",
+                    targetPlayer->CharInfo->charname,
+                    targetPlayer->Stats->Level,
+                    jobName );
+        }
+        else
+        {
+            // Second Click (Double Click): Interaction Menu & Party Invite!
+            thisclient->lastTargetPlayerId = 0; // Reset timer for next interaction
+
+            SendPM( thisclient, "=== TARGET INTERACTION: %s ===", targetPlayer->CharInfo->charname );
+            SendPM( thisclient, "• Status: Level %i %s | HP: %lld/%lld",
+                    targetPlayer->Stats->Level,
+                    jobName,
+                    targetPlayer->Stats->HP,
+                    targetPlayer->Stats->MaxHP );
+
+            bool isPartyMember = false;
+            if ( thisclient->Party->party != NULL )
+            {
+                for ( size_t i = 0; i < thisclient->Party->party->Members.size(); i++ )
+                {
+                    if ( thisclient->Party->party->Members[i] == targetPlayer )
+                    {
+                        isPartyMember = true;
+                        break;
+                    }
+                }
+            }
+
+            if ( !isPartyMember )
+            {
+                SendPM( thisclient, "• Inviting %s to Party...", targetPlayer->CharInfo->charname );
+                BEGINPACKET( partyPak, 0x07d0 );
+                ADDBYTE    ( partyPak, 0x00 ); // Action 0: Invite
+                ADDWORD    ( partyPak, targetPlayer->clientid );
+                ADDBYTE    ( partyPak, 0x00 );
+                pakPartyActions( thisclient, &partyPak );
+            }
+            else
+            {
+                SendPM( thisclient, "• Requesting Trade with %s...", targetPlayer->CharInfo->charname );
+                BEGINPACKET( tradePak, 0x07c0 );
+                ADDBYTE    ( tradePak, 0x00 ); // Action 0: Request Trade
+                ADDWORD    ( tradePak, targetPlayer->clientid );
+                ADDBYTE    ( tradePak, 0x00 );
+                pakTradeAction( thisclient, &tradePak );
+            }
+        }
         return true;
     }
+    // ============================================================================
 
     int weapontype = EquipList[WEAPON].itemList.at (thisclient->items[7].itemnum)->type;
     if( weapontype == BOW && thisclient->items[132].count < 1 )
@@ -1595,8 +1692,6 @@ bool CWorldServer::pakStartAttack( CPlayer* thisclient, CPacket* P )
     if( weapontype == CROSSBOW && thisclient->items[132].count < 1 )
         return true;
 
-    CMap* map = MapList.Index[thisclient->Position->Map];
-    CCharacter* character = map->GetCharInMap( clientid );
     if(character == NULL) return true;
     if(character->IsMonster( ))
     {
@@ -2145,15 +2240,13 @@ bool CWorldServer::pakUserDied ( CPlayer* thisclient, CPacket* P )
 
     }
 
-    if(thisclient->Stats->HP<=0||(thisclient->Stats->HP < (thisclient->Stats->MaxHP * 10 / 100)))
-    {
-        thisclient->Stats->HP = thisclient->Stats->MaxHP * 10 / 100;
-        Log(MSG_INFO,"Player %s died, we give him %I64i Hp",thisclient->CharInfo->charname,thisclient->Stats->HP);
-    }
-    else
-    {
-        Log(MSG_INFO,"Player %s died, he has %I64i Hp",thisclient->CharInfo->charname,thisclient->Stats->HP);
-    }
+    thisclient->Stats->HP = thisclient->Stats->MaxHP;
+    thisclient->Stats->MP = thisclient->Stats->MaxMP;
+    thisclient->lastRegenTime_hp = time(NULL);
+    thisclient->lastRegenTime_mp = time(NULL);
+    thisclient->lastShowTime = 0;
+    thisclient->RefreshHPMP();
+    Log(MSG_INFO,"Player %s respawned, restored to full HP (%I64i) and MP (%I64i)",thisclient->CharInfo->charname,thisclient->Stats->HP,thisclient->Stats->MP);
 
     //LMA: cleaning buffs.
     //and resetting stats.
@@ -2165,6 +2258,7 @@ bool CWorldServer::pakUserDied ( CPlayer* thisclient, CPacket* P )
 
     thisclient->RefreshBuff();
     thisclient->SetStats( );
+    ClearBattle( thisclient->Battle );
 
     if(thisrespawn!=NULL)
     {
@@ -3659,9 +3753,31 @@ bool CWorldServer::pakTradeAction ( CPlayer* thisclient, CPacket* P )
 			ADDBYTE( pak, 0 );
 			ADDWORD( pak, thisclient->clientid );
 			ADDBYTE( pak, 0 );
-			otherclient->client->SendPacket( &pak );
+			if (!otherclient->is_bot && otherclient->client) otherclient->client->SendPacket( &pak );
 			thisclient->Trade->trade_status = 2;
 			otherclient->Trade->trade_status = 1;
+			if ( otherclient->is_bot )
+			{
+				RESETPACKET( pak, 0x7c0 );
+				ADDBYTE( pak, 1 );
+				ADDWORD( pak, otherclient->clientid );
+				ADDBYTE( pak, 0 );
+				if ( thisclient->client ) thisclient->client->SendPacket( &pak );
+				thisclient->Trade->trade_status = 3;
+				otherclient->Trade->trade_status = 3;
+				for(int i=0; i<11; i++) thisclient->Trade->trade_count[i] = 0;
+				for(int i=0; i<10; i++) thisclient->Trade->trade_itemid[i] = 0;
+				for(int i=0; i<11; i++) otherclient->Trade->trade_count[i] = 0;
+				for(int i=0; i<10; i++) otherclient->Trade->trade_itemid[i] = 0;
+
+				otherclient->Trade->trade_count[10] = 25000;
+				BEGINPACKET( pakZulie, 0x7c1 );
+				ADDWORD( pakZulie, otherclient->clientid );
+				ADDBYTE( pakZulie, 10 );
+				ADDWORD( pakZulie, 0 );
+				ADDDWORD( pakZulie, 25000 );
+				if ( thisclient->client ) thisclient->client->SendPacket( &pakZulie );
+			}
 			break;
 		case 1:
 			// ACCEPT TRADE
@@ -3986,7 +4102,7 @@ void CWorldServer::pakQuestData( CPlayer *thisclient )
     {
         ADDWORD( pak,  thisclient->quest.quests[i].QuestID );
         long int Time = 0;
-        if (thisclient->quest.quests[i].QuestID > 0 && STB_QUEST.rows[thisclient->quest.quests[i].QuestID][1] > 0) 
+        if (thisclient->quest.quests[i].QuestID > 0 && (unsigned)thisclient->quest.quests[i].QuestID < STB_QUEST.rowcount && STB_QUEST.rows[thisclient->quest.quests[i].QuestID] != NULL && STB_QUEST.rows[thisclient->quest.quests[i].QuestID][1] > 0) 
 		{
             Time += thisclient->quest.quests[i].StartTime; // Start time
             Time += STB_QUEST.rows[thisclient->quest.quests[i].QuestID][1] * 10; // Time to finish

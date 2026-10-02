@@ -29,6 +29,8 @@ CPlayer::CPlayer( CClientSocket* CLIENT )
     is_born=false;   //LMA: brand new player.
     is_bot = false;
     bot_ai = NULL;
+    lastTargetPlayerId = 0;
+    lastTargetPlayerTime = 0;
 
     pvp_id=-1;  //LMA: Pvp ID (set by qsd most of the time).
 
@@ -261,10 +263,12 @@ CPlayer::CPlayer( CClientSocket* CLIENT )
     }
 
     ActiveQuest = 0;
-    lastRegenTime = 0;
+    lastRegenTime = time(NULL);
+    lastRegenTime_hp = time(NULL);
+    lastRegenTime_mp = time(NULL);
     lastSaveTime = clock( );
     lastDpTime = clock();
-    lastShowTime=0;
+    lastShowTime = time(NULL);
     firstlogin=clock();     //LMA for fairy
     lastGG = 0;
     VisiblePlayers.clear( );

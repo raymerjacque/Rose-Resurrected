@@ -373,11 +373,26 @@ bool CWorldServer::GiveExp (CMonster* thismon)
 				ClearBattle (thisclient->Battle)
 					thisclient->Position->destiny = thisclient->Position->current;			// Kill current movement
 			}
-			if (thismon->MonsterDrop->firsthit == thisclient->CharInfo->charid)				///PY new method of giving rewards. Adapted from 137 source
+			// GW2 OPEN-WORLD AUTO-SHARING: Give quest kill credit to all participants
+			// ROLLBACK NOTE: To revert to single-hitter quest credit, restore:
+			// if (thismon->MonsterDrop->firsthit == thisclient->CharInfo->charid)
+			thisclient->onCheckForMonsterQuests_event (thisclient, thismon);
+
+			// GW2 OPEN-WORLD EXP SHARING:
+			// If multiple players/bots hit the same monster, do not penalize EXP with fractional damage.
+			// Every participant receives at least 100% of monster base EXP plus a 15% co-op bonus.
+			// ROLLBACK NOTE: To revert to fractional EXP, restore:
+			// float MyPercent = (float)thisplayer->damage / thismon->Stats->MaxHP;
+			if (thismon->PlayersDamage.size() > 1)
 			{
-				//Log (MSG_DEBUG, "[worldProcesses] onCheckForMonsterQuests_event called for quest reward");
-				thisclient->onCheckForMonsterQuests_event (thisclient, thismon);			// Triggers QSD death quest handling
+				if (MyPercent < 1.0f) MyPercent = 1.0f;
+				MyPercent *= 1.15f; // 15% open-world cooperation bonus
 			}
+			else if (MyPercent < 1.0f)
+			{
+				MyPercent = 1.0f; // Full EXP for solo kill
+			}
+
 			unsigned int exp = (unsigned int)floor (thismon->thisnpc->exp * MyPercent);		// assign my own exp for monsters that I personally damaged
 			exp = exp * Config.EXP_RATE * tmpMult;											// calculate base exp for this client. No medals or stuff accounted for yet
 			thisclient->CharInfo->Pending_Exp += (exp * thisclient->Stats->xprate);			//store exp into thisclient's pending_exp using personal xprate adjustments

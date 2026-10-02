@@ -1,5 +1,6 @@
 #include "PlayerBot.h"
 #include "VendingCatalog.h"
+#include "Arena.h"
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -407,6 +408,19 @@ void CBotManager::CheckVendingBots( )
         { "WingMaster_Aero",     411, 100, 2, 5505.0f, 5245.0f, "[Wings] Angel, Devil & Fairies",     VEND_CAT_WINGS },
         { "Quartermaster_Rook",  411, 100, 2, 5295.0f, 5250.0f, "[Ammo] Elemental Arrows & Bullets",   VEND_CAT_AMMO },
         { "Dealer_Vance",        411, 100, 2, 5320.0f, 5100.0f, "[Gear] Dual Weapons & Katars",        VEND_CAT_DUAL_KATARS },
+        // Expanded Junon Polis Vendors
+        { "Dealer_Kael",         411, 100, 2, 5645.0f, 5218.0f, "[Katars] Assassins & Dual Blades",   VEND_CAT_DUAL_KATARS },
+        { "Alchemist_Vara",      211, 100, 2, 5678.0f, 5192.0f, "[Pots] Elixirs & Greater Mana",       VEND_CAT_POTIONS_SCROLLS },
+        { "Armorer_Thorne",      111, 100, 2, 5715.0f, 5275.0f, "[Armor] Heavy Plate & Guards",        VEND_CAT_ARMOR_HIGH },
+        { "Bowcraft_Soren",      411, 100, 2, 5658.0f, 5198.0f, "[Bows] Compound Bows & Guns",         VEND_CAT_WEAPONS_HIGH },
+        { "Jeweler_Cynthia",     311, 100, 2, 5525.0f, 5248.0f, "[Jewels] High Amulets & Rings",       VEND_CAT_ACCESSORIES },
+        { "ForgeMaster_Karr",    322, 100, 2, 5718.0f, 5212.0f, "[Refine] Runes & Catalysts",          VEND_CAT_REFINE },
+        { "Mechanic_Gears",      321, 100, 2, 5502.0f, 5228.0f, "[PAT] High Speed Engines",            VEND_CAT_PAT },
+        { "WingMaker_Zephyr",    411, 100, 2, 5498.0f, 5238.0f, "[Wings] Feathered Wings & Backbags",  VEND_CAT_WINGS },
+        { "GemCutter_Talon",     321, 100, 2, 5648.0f, 5202.0f, "[Gems] Perfect Rubies & Sapphires",   VEND_CAT_GEMS },
+        { "Quartermaster_Bane",  411, 100, 2, 5288.0f, 5242.0f, "[Ammo] High Capacity Cartridges",     VEND_CAT_AMMO },
+        { "Supplier_Rowan",      322, 100, 2, 5738.0f, 5238.0f, "[Crafting] Refined Metals & Woods",    VEND_CAT_MATERIALS },
+        { "Enchanter_Mira",      211, 100, 2, 5685.0f, 5208.0f, "[Scrolls] Town Portal & Buff Spells", VEND_CAT_POTIONS_SCROLLS },
 
         // Canyon City of Zant (Map 1) Hotspots
         { "Vendor_Pippin",       311,  50, 1, 5242.0f, 5115.0f, "[Starter] HP/MP Pots & Scrolls",      VEND_CAT_ZANT_STARTER },
@@ -415,7 +429,25 @@ void CBotManager::CheckVendingBots( )
         { "Smith_Brant",         111,  50, 1, 5250.0f, 5210.0f, "[Weapons] Swords, Staffs & Guns",     VEND_CAT_ZANT_WEAPONS },
         { "Tailor_Lydia",        311,  50, 1, 5265.0f, 5218.0f, "[Armor] Novice & Leather Armor",      VEND_CAT_ZANT_ARMOR },
         { "GemTrader_Ruby",      321,  50, 1, 5300.0f, 5228.0f, "[Gems] Cut Jewels & Talismans",       VEND_CAT_ZANT_GEMS },
-        { "Collector_Felix",     311,  50, 1, 5270.0f, 5250.0f, "[Accessories] Rings & Back Bags",    VEND_CAT_ZANT_ACCESSORIES }
+        { "Collector_Felix",     311,  50, 1, 5270.0f, 5250.0f, "[Accessories] Rings & Back Bags",    VEND_CAT_ZANT_ACCESSORIES },
+        // Expanded Zant Vendors
+        { "Vendor_Clara",        311,  50, 1, 5235.0f, 5108.0f, "[Starter] Health Rations & MP Herbs", VEND_CAT_ZANT_STARTER },
+        { "Smith_Jax",           111,  50, 1, 5258.0f, 5202.0f, "[Weapons] Iron Blades & Axes",        VEND_CAT_ZANT_WEAPONS },
+        { "Tailor_Elena",        311,  50, 1, 5272.0f, 5210.0f, "[Armor] Padded Vests & Robes",       VEND_CAT_ZANT_ARMOR },
+        { "Hunter_Brant",        411,  50, 1, 5230.0f, 5115.0f, "[Ammo] Sharp Arrows & Musket Shots",  VEND_CAT_ZANT_AMMO },
+        { "Collector_Otto",      311,  50, 1, 5252.0f, 5138.0f, "[Materials] Raw Hides & Ore Chunks",  VEND_CAT_ZANT_MATERIALS },
+        { "Jeweler_Naya",        311,  50, 1, 5278.0f, 5242.0f, "[Accessories] Copper Rings & Charms", VEND_CAT_ZANT_ACCESSORIES },
+        { "GemTrader_Silas",     321,  50, 1, 5308.0f, 5220.0f, "[Gems] Uncut Crystals & Shards",     VEND_CAT_ZANT_GEMS },
+
+        // Adventurer's Plains (Map 22) Market Outpost
+        { "Plains_Vendor_Tariq", 311,  30, 22, 5120.0f, 5340.0f, "[Novice] Field Supplies & Pots",     VEND_CAT_ZANT_STARTER },
+        { "Plains_Smith_Hark",   111,  30, 22, 5128.0f, 5345.0f, "[Weapons] Traveler Swords & Bows",   VEND_CAT_ZANT_WEAPONS },
+        { "Plains_Fletcher_Bram",411,  30, 22, 5112.0f, 5335.0f, "[Ammo] Practice Arrows & Shells",    VEND_CAT_ZANT_AMMO },
+
+        // Breezy Hills (Map 12) Crossroads
+        { "Hills_Trader_Vane",   311,  70, 12, 5300.0f, 5200.0f, "[Supplies] Travel Pots & Scrolls",   VEND_CAT_POTIONS_SCROLLS },
+        { "Hills_Merchant_Lukas",322,  70, 12, 5310.0f, 5210.0f, "[Refine] Mid-Tier Enhancers",        VEND_CAT_REFINE },
+        { "Hills_Armorer_Dara",  111,  70, 12, 5290.0f, 5190.0f, "[Armor] Guard & Ranger Sets",        VEND_CAT_ARMOR_HIGH }
     };
     static const size_t spotCount = sizeof( spots ) / sizeof( spots[0] );
 
@@ -786,7 +818,7 @@ CPlayer* CBotManager::SpawnBot( const char* name, int job, int level, int mapId,
     bot->SetStats( );
     bot->Stats->HP = bot->Stats->MaxHP;
     bot->Stats->MP = bot->Stats->MaxMP;
-    bot->Status->Stance = WALKING;
+    bot->Status->Stance = RUNNING; // Default movement mode is ALWAYS RUNNING
     bot->Status->CanMove = true;
     bot->Status->CanAttack = true;
     bot->Status->CanCastSkill = true;
@@ -822,6 +854,15 @@ bool CBotManager::RemoveBot( const char* name )
 
                 if ( bot )
                 {
+                    if ( bot->Party && bot->Party->party )
+                    {
+                        bot->Party->party->RemovePlayer( bot );
+                    }
+                    if ( bot->Battle )
+                    {
+                        ClearBattle( bot->Battle );
+                    }
+
                     if ( bot->Position && bot->Position->Map < (UINT)GServer->MapList.max )
                     {
                         CMap* map = GServer->MapList.Index[bot->Position->Map];
@@ -985,7 +1026,7 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_targetDropCid( 0 ),
       m_followTarget( NULL ),
       m_autoRoam( true ),
-      m_roamRadius( 35.0f ),
+      m_roamRadius( 100.0f ),
       m_isBuffBot( false ),
       m_bonfireCid( 0 ),
       m_lastBuffSay( 0 ),
@@ -998,7 +1039,21 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_lastKnownLevel( 1 ),
       m_lastPartyBuffTime( 0 ),
       m_lastResurrectTime( 0 ),
-      m_lastTauntTime( 0 )
+      m_lastTauntTime( 0 ),
+      m_lastHpPotionTime( 0 ),
+      m_lastMpPotionTime( 0 ),
+      m_lastChatterTime( 0 ),
+      m_lastEmoteTime( 0 ),
+      m_lastPartyInviteTime( 0 ),
+      m_lastMigrationCheck( 0 ),
+      m_lastGreetingTime( 0 ),
+      m_duelTargetCid( 0 ),
+      m_duelStartTime( 0 ),
+      m_personality( (BotPersonality)( rand( ) % 4 ) ),
+      m_lastShopBrowseTime( 0 ),
+      m_lastWhisperTime( 0 ),
+      m_lastArenaQueueTime( 0 ),
+      m_lastDungeonCheckTime( 0 )
 {
     m_lastAiTick = clock( );
     m_stateTimer = clock( );
@@ -1011,6 +1066,10 @@ CPlayerBot::CPlayerBot( CPlayer* player )
         m_roamCenter = m_player->Position->current;
         m_lastPos = m_player->Position->current;
         m_lastKnownLevel = m_player->Stats->Level;
+        m_strollDest = m_roamCenter;
+        AssignClanTag( );
+        AssignTitle( );
+        ApplyRandomCosmetics( );
     }
     else
     {
@@ -1040,10 +1099,12 @@ const char* CPlayerBot::GetStateString( ) const
         case BOT_STATE_REST:      return "REST";
         case BOT_STATE_FOLLOW:    return "FOLLOW";
         case BOT_STATE_DEAD:      return "DEAD";
-        case BOT_STATE_BUFF_BOT:  return "BUFF_BOT";
-        case BOT_STATE_SEEK_BUFF: return "SEEK_BUFF";
-        case BOT_STATE_VENDING:   return "VENDING";
-        default:                  return "UNKNOWN";
+        case BOT_STATE_BUFF_BOT:   return "BUFF_BOT";
+        case BOT_STATE_SEEK_BUFF:  return "SEEK_BUFF";
+        case BOT_STATE_VENDING:    return "VENDING";
+        case BOT_STATE_TOWN_STROLL: return "TOWN_STROLL";
+        case BOT_STATE_MIGRATE:    return "MIGRATE";
+        default:                   return "UNKNOWN";
     }
 }
 
@@ -1063,6 +1124,296 @@ void CPlayerBot::Say( const char* msg )
     GServer->SendToVisible( &pak, m_player );
 }
 
+void CPlayerBot::DoEmote( BYTE emoteId )
+{
+    if ( !m_player ) return;
+    clock_t now = clock( );
+    if ( ( now - m_lastEmoteTime ) < ( 2 * CLOCKS_PER_SEC ) ) return;
+    m_lastEmoteTime = now;
+
+    BEGINPACKET( pak, 0x781 );
+    ADDWORD    ( pak, m_player->clientid );
+    ADDBYTE    ( pak, emoteId );
+    GServer->SendToVisible( &pak, m_player );
+}
+
+void CPlayerBot::ConsumePotions( )
+{
+    if ( !m_player || m_player->IsDead( ) || m_player->Stats->HP <= 0 ) return;
+    clock_t now = clock( );
+
+    // HP Potion Check (< 55% HP)
+    if ( m_player->Stats->HP < ( m_player->Stats->MaxHP * 55 / 100 ) )
+    {
+        if ( ( now - m_lastHpPotionTime ) >= ( 3 * CLOCKS_PER_SEC ) )
+        {
+            m_lastHpPotionTime = now;
+            long long heal = m_player->Stats->MaxHP * 35 / 100;
+            if ( heal < 50 ) heal = 50;
+            m_player->Stats->HP += heal;
+            if ( m_player->Stats->HP > m_player->Stats->MaxHP )
+                m_player->Stats->HP = m_player->Stats->MaxHP;
+
+            m_player->lastShowTime = 0;
+            m_player->RefreshHPMP( );
+
+            BEGINPACKET( pak, 0x7a3 );
+            ADDWORD    ( pak, m_player->clientid );
+            ADDWORD    ( pak, 301 );
+            GServer->SendToVisible( &pak, m_player );
+
+            SayChatter( "low_hp" );
+        }
+    }
+
+    // MP Potion Check (< 40% MP)
+    if ( m_player->Stats->MP < ( m_player->Stats->MaxMP * 40 / 100 ) )
+    {
+        if ( ( now - m_lastMpPotionTime ) >= ( 3 * CLOCKS_PER_SEC ) )
+        {
+            m_lastMpPotionTime = now;
+            long long mana = m_player->Stats->MaxMP * 40 / 100;
+            if ( mana < 40 ) mana = 40;
+            m_player->Stats->MP += mana;
+            if ( m_player->Stats->MP > m_player->Stats->MaxMP )
+                m_player->Stats->MP = m_player->Stats->MaxMP;
+
+            m_player->lastShowTime = 0;
+            m_player->RefreshHPMP( );
+
+            BEGINPACKET( pak, 0x7a3 );
+            ADDWORD    ( pak, m_player->clientid );
+            ADDWORD    ( pak, 311 );
+            GServer->SendToVisible( &pak, m_player );
+        }
+    }
+}
+
+bool CPlayerBot::KiteTarget( CCharacter* target )
+{
+    if ( !m_player || !target || target->IsDead( ) ) return false;
+
+    int wType = m_player->getWeaponType( );
+    bool isRanged = ( wType == BOW || wType == GUN || wType == LAUNCHER || wType == CROSSBOW || wType == WAND || wType == STAFF );
+    if ( !isRanged ) return false;
+
+    float dist = GServer->distance( m_player->Position->current, target->Position->current );
+    if ( dist < 7.5f && target->Battle && target->Battle->target == m_player->clientid )
+    {
+        fPoint kitePos;
+        float dx = m_player->Position->current.x - target->Position->current.x;
+        float dy = m_player->Position->current.y - target->Position->current.y;
+        float len = sqrtf( dx * dx + dy * dy );
+        if ( len < 0.1f ) { dx = 1.0f; dy = 0.0f; len = 1.0f; }
+
+        kitePos.x = m_player->Position->current.x + ( dx / len ) * 12.0f;
+        kitePos.y = m_player->Position->current.y + ( dy / len ) * 12.0f;
+        kitePos.z = m_player->Position->current.z;
+
+        MoveTo( kitePos );
+        return true;
+    }
+    return false;
+}
+
+bool CPlayerBot::IsKillSteal( CMonster* mob )
+{
+    if ( !mob || mob->IsDead( ) || mob->Stats->HP <= 0 ) return false;
+    if ( !mob->Battle || mob->Battle->target == 0 ) return false;
+
+    if ( mob->Battle->target == m_player->clientid ) return false;
+
+    if ( m_player->Party && m_player->Party->party )
+    {
+        CParty* party = m_player->Party->party;
+        for ( size_t i = 0; i < party->Members.size( ); i++ )
+        {
+            if ( party->Members[i] && party->Members[i]->clientid == mob->Battle->target )
+            {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+void CPlayerBot::CelebrateLevelUp( )
+{
+    if ( !m_player ) return;
+
+    BEGINPACKET( pak, 0x7b1 );
+    ADDWORD    ( pak, m_player->clientid );
+    ADDWORD    ( pak, m_player->Stats->Level );
+    GServer->SendToVisible( &pak, m_player );
+
+    DoEmote( 6 );
+
+    char msg[80];
+    const char* dings[] = {
+        "Ding! Level %d!",
+        "Awesome! Reached level %d!",
+        "Level %d at last! Onward!",
+        "Ding! GG everyone!"
+    };
+    snprintf( msg, sizeof(msg), dings[rand() % 4], m_player->Stats->Level );
+    Say( msg );
+}
+
+void CPlayerBot::SayChatter( const char* category )
+{
+    if ( !m_player || !category ) return;
+    clock_t now = clock( );
+    if ( ( now - m_lastChatterTime ) < ( 30 * CLOCKS_PER_SEC ) ) return;
+
+    if ( strcmp( category, "low_hp" ) == 0 )
+    {
+        const char* msgs[] = { "Whoa, that hit hard!", "Chugging a potion!", "Need to stay alive!" };
+        Say( msgs[rand() % 3] );
+        m_lastChatterTime = now;
+    }
+    else if ( strcmp( category, "rare_drop" ) == 0 )
+    {
+        const char* msgs[] = { "Nice drop!", "Sweet loot!", "Jackpot!", "I'm taking this!" };
+        Say( msgs[rand() % 4] );
+        m_lastChatterTime = now;
+    }
+    else if ( strcmp( category, "greeting" ) == 0 )
+    {
+        const char* msgs[] = { "Hey there! Good luck!", "Yo! Safe travels!", "Hi everyone!", "Happy grinding!" };
+        Say( msgs[rand() % 4] );
+        m_lastChatterTime = now;
+    }
+    else if ( strcmp( category, "combat_cheer" ) == 0 )
+    {
+        const char* msgs[] = { "Take that!", "Down you go!", "One more down!", "Bullseye!" };
+        Say( msgs[rand() % 4] );
+        m_lastChatterTime = now;
+    }
+}
+
+void CPlayerBot::CheckPartyInvitations( )
+{
+    if ( !m_player || m_isBuffBot || m_isVendingBot ) return;
+    clock_t now = clock( );
+    if ( ( now - m_lastPartyInviteTime ) < ( 30 * CLOCKS_PER_SEC ) ) return;
+    m_lastPartyInviteTime = now;
+
+    if ( m_player->Party->party != NULL && m_player->Party->party->Members[0] != m_player ) return;
+
+    CMap* map = GetMap( );
+    if ( !map ) return;
+
+    for ( size_t i = 0; i < map->PlayerList.size( ); i++ )
+    {
+        CPlayer* other = map->PlayerList[i];
+        if ( !other || other == m_player || other->IsDead( ) ) continue;
+        if ( other->bot_ai && ( other->bot_ai->IsBuffBot( ) || other->bot_ai->IsVendingBot( ) ) ) continue;
+        if ( other->Party->party != NULL ) continue;
+
+        int lvlDiff = abs( (int)m_player->Stats->Level - (int)other->Stats->Level );
+        if ( lvlDiff <= 7 )
+        {
+            float dist = GServer->distance( m_player->Position->current, other->Position->current );
+            if ( dist <= 20.0f )
+            {
+                if ( m_player->Party->party == NULL )
+                {
+                    CParty* party = new CParty( );
+                    party->AddPlayer( m_player );
+                    party->AddPlayer( other );
+                }
+                else
+                {
+                    m_player->Party->party->AddPlayer( other );
+                }
+
+                char msg[80];
+                snprintf( msg, sizeof(msg), "Hey %s, join my party! Let's team up!", other->CharInfo->charname );
+                Say( msg );
+
+                if ( other->bot_ai )
+                {
+                    CPlayerBot* otherBot = reinterpret_cast<CPlayerBot*>( other->bot_ai );
+                    otherBot->SetFollowTarget( m_player );
+                    otherBot->SetState( BOT_STATE_FOLLOW );
+                }
+                break;
+            }
+        }
+    }
+}
+
+void CPlayerBot::ApplyRandomCosmetics( )
+{
+    if ( !m_player || !m_player->CharInfo ) return;
+
+    static const int s_validFaceIds[] = { 1, 8, 15, 22, 29, 36, 43 };
+    static const size_t s_validFaceCount = sizeof( s_validFaceIds ) / sizeof( s_validFaceIds[0] );
+    m_player->CharInfo->Face = s_validFaceIds[ rand( ) % s_validFaceCount ];
+
+    static const int s_validHairIds[] = {
+        0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 15, 16, 17, 18, 20, 21, 22, 23
+    };
+    static const size_t s_validHairCount = sizeof( s_validHairIds ) / sizeof( s_validHairIds[0] );
+    m_player->CharInfo->Hair = s_validHairIds[ rand( ) % s_validHairCount ];
+
+    int lvl = m_player->Stats->Level;
+    if ( lvl >= 30 )
+    {
+        int backId = ( rand( ) % 3 == 0 ) ? ( 1 + rand( ) % 15 ) : 0;
+        if ( backId > 0 )
+        {
+            m_player->items[13].itemtype = 11;
+            m_player->items[13].itemnum = backId;
+            m_player->items[13].durability = 40;
+        }
+    }
+}
+
+void CPlayerBot::CheckZoneMigration( )
+{
+    if ( !m_player || m_isBuffBot || m_isVendingBot || m_followTarget ) return;
+    clock_t now = clock( );
+    if ( ( now - m_lastMigrationCheck ) < ( 60 * CLOCKS_PER_SEC ) ) return;
+    m_lastMigrationCheck = now;
+
+    int lvl = m_player->Stats->Level;
+    int currMap = m_player->Position->Map;
+    int targetMap = currMap;
+    fPoint targetPos = m_player->Position->current;
+
+    if ( lvl >= 45 && currMap != 2 )
+    {
+        targetMap = 2; // Junon Polis
+        targetPos = { 5655.0f, 5238.0f, 0.0f };
+    }
+    else if ( lvl >= 25 && lvl < 45 && currMap == 22 )
+    {
+        targetMap = 23; // Breezy Hills
+        targetPos = { 5096.0f, 4905.0f, 0.0f };
+    }
+    else if ( lvl >= 10 && lvl < 25 && currMap == 22 )
+    {
+        targetMap = 1; // Zant
+        targetPos = { 5240.0f, 5190.0f, 0.0f };
+    }
+
+    if ( targetMap != currMap && targetMap < (UINT)GServer->MapList.max )
+    {
+        CMap* nextMap = GServer->MapList.Index[targetMap];
+        if ( nextMap && nextMap != GServer->MapList.nullzone )
+        {
+            Log( MSG_INFO, "Bot '%s' (Lvl %d) migrating from map %d to map %d",
+                 m_player->CharInfo->charname, lvl, currMap, targetMap );
+            Say( "Time to move to a higher level zone!" );
+            nextMap->TeleportPlayer( m_player, targetPos, false );
+            m_roamCenter = targetPos;
+            m_roamRadius = 100.0f;
+            EquipTieredGear( true );
+        }
+    }
+}
+
 void CPlayerBot::MoveTo( fPoint dest )
 {
     if ( !m_player ) return;
@@ -1078,9 +1429,58 @@ void CPlayerBot::MoveTo( fPoint dest )
         StandUp( );
     }
 
+    float moveDist = GServer->distance( m_player->Position->current, dest );
+
+    // Check if high enough level to drive a Kart/Car (Level 30+) for long distance travel (>25m) out of combat
+    if ( m_player->Stats->Level >= 30 && moveDist >= 25.0f && !m_player->IsOnBattle( ) && !m_isBuffBot && !m_isVendingBot )
+    {
+        if ( m_player->Stats->Level >= 70 )
+        {
+            // Castle Gear 01 Set: Body 367, Engine 31, Legs 377, Arms 387
+            m_player->items[135].itemnum = 367; // Body (CastleGear01_BODY01.txt)
+            m_player->items[136].itemnum = 31;  // Engine (CastleGear01_ENGINE01.txt)
+            m_player->items[136].lifespan = 1000; // Fuel
+            m_player->items[137].itemnum = 377; // Legs (CastleGear01_LEG01.txt)
+            m_player->items[138].itemnum = 387; // Arms (CastleGear01_ARM01.txt)
+        }
+        else
+        {
+            // Cart 01 Set: Body 2, Engine 35, Wheels 68
+            m_player->items[135].itemnum = 2;   // Frame / Body (cart01_BODY03_CBK.txt)
+            m_player->items[136].itemnum = 35;  // Engine (cart01_ENGINE06.txt)
+            m_player->items[136].lifespan = 1000; // Fuel
+            m_player->items[137].itemnum = 68;  // Wheels (cart01_WHEEL01.txt)
+            m_player->items[138].itemnum = 0;   // No Arms for Cart
+        }
+
+        if ( m_player->Status->Stance != DRIVING )
+        {
+            m_player->Status->Stance = DRIVING;
+            BEGINPACKET( pakStance, 0x0782 );
+            ADDWORD    ( pakStance, m_player->clientid );
+            ADDBYTE    ( pakStance, 0x04 ); // Stance 4: DRIVING
+            GServer->SendToVisible( &pakStance, m_player );
+        }
+    }
+    else
+    {
+        // Demount if entering combat or close range
+        if ( m_player->Status->Stance == DRIVING && ( moveDist < 12.0f || m_player->IsOnBattle( ) ) )
+        {
+            m_player->Status->Stance = RUNNING;
+            BEGINPACKET( pakStance, 0x0782 );
+            ADDWORD    ( pakStance, m_player->clientid );
+            ADDBYTE    ( pakStance, 0x03 ); // Stance 3: RUNNING
+            GServer->SendToVisible( &pakStance, m_player );
+        }
+        else if ( m_player->Status->Stance != DRIVING )
+        {
+            m_player->Status->Stance = RUNNING;
+        }
+    }
+
     m_player->Position->destiny = dest;
     m_player->Position->lastMoveTime = clock( );
-    m_player->Status->Stance = RUNNING;
     m_player->Stats->Move_Speed = m_player->GetMoveSpeed( );
 
     BEGINPACKET( pak, 0x79a );
@@ -1101,7 +1501,10 @@ void CPlayerBot::StopMoving( )
     if ( !m_player->IsMoving( ) ) return;
 
     m_player->Position->destiny = m_player->Position->current;
-    m_player->Status->Stance = WALKING;
+    if ( m_player->Status->Stance != DRIVING )
+    {
+        m_player->Status->Stance = RUNNING; // Default stance is ALWAYS RUNNING
+    }
 
     if ( !m_player->IsOnBattle( ) )
     {
@@ -1354,7 +1757,7 @@ void CPlayerBot::EquipTieredGear( bool broadcast )
         m_player->items[8].itemnum
     };
 
-    auto SetEquip = []( CItem& itm, int type, int num ) {
+    auto SetEquip = []( CItem& itm, int type, int num, int refine = 0 ) {
         if ( num > 0 )
         {
             itm.itemtype = type;
@@ -1363,7 +1766,7 @@ void CPlayerBot::EquipTieredGear( bool broadcast )
             itm.durability = 50;
             itm.lifespan = 100;
             itm.appraised = true;
-            itm.refine = 0;
+            itm.refine = refine;
         }
         else
         {
@@ -1377,11 +1780,17 @@ void CPlayerBot::EquipTieredGear( bool broadcast )
         }
     };
 
+    int weaponRefine = 0;
+    if ( lvl >= 100 ) weaponRefine = 10;
+    else if ( lvl >= 70 ) weaponRefine = 9;
+    else if ( lvl >= 35 ) weaponRefine = 7;
+    else if ( lvl >= 20 ) weaponRefine = 4;
+
     SetEquip( m_player->items[2], CAP, capNum );
     SetEquip( m_player->items[3], BODY, bodyNum );
     SetEquip( m_player->items[5], GLOVE, armNum );
     SetEquip( m_player->items[6], SHOE, footNum );
-    SetEquip( m_player->items[7], WEAPON, wepNum );
+    SetEquip( m_player->items[7], WEAPON, wepNum, weaponRefine );
     SetEquip( m_player->items[8], SUBWEAPON, shieldNum );
 
     if ( ammoType == 1 )
@@ -1679,6 +2088,118 @@ void CPlayerBot::ForcePartyBuff( )
     CheckPartyBuffs( );
 }
 
+bool CPlayerBot::CheckProximityBuffs( )
+{
+    if ( !m_player ) return false;
+    if ( !m_player->Status->CanCastSkill || m_player->Stats->MP < 30 ) return false;
+
+    // Only Muse (211), Mage (221), Cleric (222) can perform proximity buffing
+    int job = m_player->CharInfo->Job;
+    if ( job != 211 && job != 221 && job != 222 ) return false;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastPartyBuffTime ) < (clock_t)( 3.0f * CLOCKS_PER_SEC ) ) return false;
+
+    CMap* map = GetMap( );
+    if ( !map ) return false;
+
+    CPlayer* targetToBuff = NULL;
+    UINT skillToCast = 0;
+    const char* buffName = NULL;
+
+    for ( size_t i = 0; i < map->PlayerList.size( ); i++ )
+    {
+        CPlayer* p = map->PlayerList[i];
+        if ( !p || p == m_player || p->IsDead( ) ) continue;
+        if ( p->Session == NULL || !p->Session->inGame ) continue;
+        if ( p->bot_ai != NULL ) continue; // Target real players
+
+        // 1. MUST BE STANDING STILL (do not run after moving players)
+        if ( p->IsMoving( ) ) continue;
+
+        // 2. MUST BE WITHIN SPELL CAST RANGE (max 15.0m - no chasing!)
+        float dist = GServer->distance( m_player->Position->current, p->Position->current );
+        if ( dist > 15.0f ) continue;
+
+        // 3. Priority checks for missing buffs or healing
+        if ( p->Stats->HP < ( p->Stats->MaxHP * 85 / 100 ) )
+        {
+            targetToBuff = p;
+            skillToCast = 985; // Recovery
+            buffName = "Heal";
+            break;
+        }
+        else if ( p->Status->Dash_up == 0xff )
+        {
+            targetToBuff = p;
+            skillToCast = 930; // Hustle Charm (Move Speed)
+            buffName = "Hustle";
+            break;
+        }
+        else if ( p->Status->Haste_up == 0xff )
+        {
+            targetToBuff = p;
+            skillToCast = 1254; // Battle Charm (Attack Speed)
+            buffName = "Battle Charm";
+            break;
+        }
+        else if ( p->Status->Attack_up == 0xff )
+        {
+            targetToBuff = p;
+            skillToCast = 1270; // Clobber Charm (Attack Power)
+            buffName = "Clobber Charm";
+            break;
+        }
+        else if ( p->Status->Defense_up == 0xff )
+        {
+            targetToBuff = p;
+            skillToCast = 1004; // Resilience Charm (Defense)
+            buffName = "Resilience";
+            break;
+        }
+        else if ( p->Status->Accuracy_up == 0xff )
+        {
+            targetToBuff = p;
+            skillToCast = 1019; // Precision Charm (Accuracy)
+            buffName = "Precision";
+            break;
+        }
+        else if ( p->Status->Critical_up == 0xff )
+        {
+            targetToBuff = p;
+            skillToCast = 1284; // Critical Charm (Crit Rate)
+            buffName = "Critical Charm";
+            break;
+        }
+        else if ( p->Status->ExtraDamage_up == 0xff )
+        {
+            targetToBuff = p;
+            skillToCast = 1294; // Valkyrie Charm (Extra Damage)
+            buffName = "Valkyrie Charm";
+            break;
+        }
+    }
+
+    if ( targetToBuff && skillToCast > 0 )
+    {
+        CSkills* sk = GServer->GetSkillByID( skillToCast );
+        if ( sk && m_player->IsTargetReached( targetToBuff, sk ) )
+        {
+            // Cast buff from current position without chasing or moving towards the player
+            m_player->StartAction( targetToBuff, SKILL_BUFF, skillToCast );
+            m_lastPartyBuffTime = now;
+            m_lastSkillCastTime = now;
+
+            char buffMsg[64];
+            snprintf( buffMsg, sizeof(buffMsg), "%s for %s!", buffName, targetToBuff->CharInfo->charname );
+            Say( buffMsg );
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool CPlayerBot::CheckPartyResurrect( )
 {
     if ( !m_player || !m_player->Party || !m_player->Party->party ) return false;
@@ -1848,6 +2369,7 @@ void CPlayerBot::CheckProgression( )
         char lvlMsg[64];
         snprintf( lvlMsg, sizeof(lvlMsg), "Ding! Level %d!", currentLvl );
         Say( lvlMsg );
+        CelebrateLevelUp( );
         m_lastKnownLevel = currentLvl;
     }
 }
@@ -1893,6 +2415,30 @@ void CPlayerBot::Respawn( )
     }
 }
 
+CMonster* CPlayerBot::FindNearbyWorldBoss( float radius )
+{
+    CMap* map = GetMap( );
+    if ( !map || !m_player || !m_player->Position ) return NULL;
+
+    fPoint myPos = m_player->Position->current;
+    for ( UINT i = 0; i < map->MonsterList.size( ); i++ )
+    {
+        CMonster* mob = map->MonsterList[i];
+        if ( !mob || mob->IsDead( ) || mob->Stats->HP <= 0 || !mob->Position ) continue;
+        if ( mob->IsBonfire( ) || mob->GetOwner( ) != NULL ) continue;
+
+        if ( mob->Stats->MaxHP >= 4000 || mob->montype >= 400 )
+        {
+            float dist = GServer->distance( myPos, mob->Position->current );
+            if ( dist <= radius )
+            {
+                return mob;
+            }
+        }
+    }
+    return NULL;
+}
+
 CMonster* CPlayerBot::FindNearbyMonster( float radius )
 {
     CMap* map = GetMap( );
@@ -1908,6 +2454,7 @@ CMonster* CPlayerBot::FindNearbyMonster( float radius )
         if ( !mob || mob->IsDead( ) || mob->Stats->HP <= 0 || !mob->Position ) continue;
         if ( mob->IsBonfire( ) ) continue; // Bonfires are non-combat entities
         if ( mob->GetOwner( ) != NULL ) continue; // Player/bot summons are friendly
+        if ( IsKillSteal( mob ) ) continue; // Respect mob ownership
 
         float dx = myPos.x - mob->Position->current.x;
         if ( dx > radius || dx < -radius ) continue;
@@ -2011,8 +2558,35 @@ void CPlayerBot::Update( )
     }
     m_lastAiTick = now;
 
+    // Phase 1: Potion consumption check
+    ConsumePotions( );
+
     // Check progression, stat points, and tiered equipment
     CheckProgression( );
+
+    // Phase 2: Autonomous party invitations check
+    CheckPartyInvitations( );
+
+    // Phase 3: Zone migration check
+    CheckZoneMigration( );
+
+    // Player Greetings: Wave and greet nearby real players
+    CheckPlayerGreetings( );
+
+    // Autonomous Player Shop Browsing & Economy Purchases
+    CheckPlayerShops( );
+
+    // Private Message Whispers & Social Interaction
+    CheckWhispers( );
+
+    // Akram Arena PvP Battleground Participation
+    CheckArenaQueue( );
+
+    // Dungeon Crawling & Raids
+    CheckDungeonRuns( );
+
+    // Proximity buffing: buff nearby unbuffed stationary real players (without chasing/moving toward them)
+    if ( CheckProximityBuffs( ) ) return;
 
     // Self-defense check: If attacked by a monster while not in combat
     if ( m_state != BOT_STATE_COMBAT && m_state != BOT_STATE_DEAD )
@@ -2038,16 +2612,19 @@ void CPlayerBot::Update( )
 
     switch ( m_state )
     {
-        case BOT_STATE_IDLE:      HandleIdle( );      break;
-        case BOT_STATE_ROAM:      HandleRoam( );      break;
-        case BOT_STATE_COMBAT:    HandleCombat( );    break;
-        case BOT_STATE_LOOT:      HandleLoot( );      break;
-        case BOT_STATE_REST:      HandleRest( );      break;
-        case BOT_STATE_FOLLOW:    HandleFollow( );    break;
-        case BOT_STATE_DEAD:      HandleDead( );      break;
-        case BOT_STATE_BUFF_BOT:  HandleBuffBot( );   break;
-        case BOT_STATE_SEEK_BUFF: HandleSeekBuff( );  break;
-        case BOT_STATE_VENDING:   HandleVendingBot( ); break;
+        case BOT_STATE_IDLE:        HandleIdle( );        break;
+        case BOT_STATE_ROAM:        HandleRoam( );        break;
+        case BOT_STATE_COMBAT:      HandleCombat( );      break;
+        case BOT_STATE_LOOT:        HandleLoot( );        break;
+        case BOT_STATE_REST:        HandleRest( );        break;
+        case BOT_STATE_FOLLOW:      HandleFollow( );      break;
+        case BOT_STATE_DEAD:        HandleDead( );        break;
+        case BOT_STATE_BUFF_BOT:    HandleBuffBot( );     break;
+        case BOT_STATE_SEEK_BUFF:   HandleSeekBuff( );    break;
+        case BOT_STATE_VENDING:     HandleVendingBot( );  break;
+        case BOT_STATE_TOWN_STROLL: HandleTownStroll( );  break;
+        case BOT_STATE_MIGRATE:     HandleMigrate( );     break;
+        case BOT_STATE_DUEL:        HandleDuel( );        break;
     }
 }
 
@@ -2080,7 +2657,7 @@ void CPlayerBot::HandleIdle( )
     }
 
     // 3. Look for nearby drops first
-    CDrop* drop = FindNearbyDrop( 25.0f );
+    CDrop* drop = FindNearbyDrop( 60.0f );
     if ( drop )
     {
         m_targetDropCid = drop->clientid;
@@ -2089,8 +2666,8 @@ void CPlayerBot::HandleIdle( )
         return;
     }
 
-    // 3. Look for nearby monsters to attack
-    CMonster* mob = FindNearbyMonster( 25.0f );
+    // 3. Look for nearby monsters to attack (greatly expanded aggro detection radius)
+    CMonster* mob = FindNearbyMonster( 90.0f );
     if ( mob )
     {
         AttackTarget( mob );
@@ -2124,7 +2701,7 @@ void CPlayerBot::HandleRoam( )
     if ( !m_player ) return;
 
     // Check for drops while roaming
-    CDrop* drop = FindNearbyDrop( 20.0f );
+    CDrop* drop = FindNearbyDrop( 50.0f );
     if ( drop )
     {
         m_targetDropCid = drop->clientid;
@@ -2133,8 +2710,8 @@ void CPlayerBot::HandleRoam( )
         return;
     }
 
-    // Check for monsters while roaming
-    CMonster* mob = FindNearbyMonster( 20.0f );
+    // Check for monsters while roaming (expanded detection radius)
+    CMonster* mob = FindNearbyMonster( 85.0f );
     if ( mob )
     {
         AttackTarget( mob );
@@ -2200,8 +2777,8 @@ void CPlayerBot::HandleCombat( )
             return;
         }
 
-        // Solo bot: check for loot within 25m
-        CDrop* drop = FindNearbyDrop( 25.0f );
+        // Solo bot: check for loot within 50m
+        CDrop* drop = FindNearbyDrop( 50.0f );
         if ( drop )
         {
             m_targetDropCid = drop->clientid;
@@ -2226,8 +2803,11 @@ void CPlayerBot::HandleCombat( )
     // Target is valid: check attack range
     float dist = GServer->distance( m_player->Position->current, mob->Position->current );
 
+    // Ranged kiting AI check
+    KiteTarget( mob );
+
     // If target is too far away, drop combat
-    if ( dist > 35.0f )
+    if ( dist > 100.0f )
     {
         m_targetMobCid = 0;
         ClearBattle( m_player->Battle );
@@ -2388,7 +2968,17 @@ void CPlayerBot::HandleFollow( )
         }
     }
 
-    // 7. Tactical formation follow
+    // 7. Tactical formation follow (and cross-map teleportation)
+    if ( m_player->Position->Map != m_followTarget->Position->Map )
+    {
+        CMap* targetMap = GServer->MapList.Index[m_followTarget->Position->Map];
+        if ( targetMap != NULL )
+        {
+            targetMap->TeleportPlayer( m_player, m_followTarget->Position->current, false );
+            return;
+        }
+    }
+
     int slot = GetPartySlotIndex( );
     fPoint destPos = GetFormationOffset( slot, m_followTarget->Position->current, m_followTarget->Position->destiny );
 
@@ -2417,6 +3007,46 @@ void CPlayerBot::HandleDead( )
     {
         Respawn( );
     }
+}
+
+void CPlayerBot::HandleTownStroll( )
+{
+    if ( !m_player ) return;
+
+    if ( !m_player->IsMoving( ) )
+    {
+        clock_t elapsed = clock( ) - m_stateTimer;
+        if ( elapsed >= (clock_t)( 8 * CLOCKS_PER_SEC ) )
+        {
+            float angle = ( (float)( rand( ) % 360 ) ) * ( 3.14159265f / 180.0f );
+            float dist = 4.0f + ( (float)( rand( ) % 12 ) );
+            fPoint dest;
+            dest.x = m_roamCenter.x + cosf( angle ) * dist;
+            dest.y = m_roamCenter.y + sinf( angle ) * dist;
+            dest.z = 0;
+            MoveTo( dest );
+
+            if ( rand( ) % 2 == 0 )
+            {
+                BYTE emotes[] = { 1, 2, 3, 4, 6 };
+                DoEmote( emotes[rand( ) % 5] );
+            }
+            if ( rand( ) % 4 == 0 )
+            {
+                SayChatter( "greeting" );
+            }
+            m_stateTimer = clock( );
+        }
+        else if ( elapsed >= (clock_t)( 20 * CLOCKS_PER_SEC ) )
+        {
+            SetState( BOT_STATE_IDLE );
+        }
+    }
+}
+
+void CPlayerBot::HandleMigrate( )
+{
+    SetState( BOT_STATE_IDLE );
 }
 
 bool CPlayerBot::NeedsBuffs( )
@@ -2583,6 +3213,7 @@ void CPlayerBot::HandleBuffBot( )
         float dist = GServer->distance( m_player->Position->current, p->Position->current );
         if ( dist <= 16.0f )
         {
+            if ( p->IsMoving( ) ) continue; // Require player to stand still
             bool needsHelp = false;
             if ( p->Stats->HP < ( p->Stats->MaxHP * 85 / 100 ) ) needsHelp = true;
             else if ( p->Status->Dash_up == 0xff ||
@@ -2619,6 +3250,7 @@ void CPlayerBot::HandleBuffBot( )
             float dist = GServer->distance( m_player->Position->current, p->Position->current );
             if ( dist <= 16.0f )
             {
+                if ( p->IsMoving( ) ) continue; // Require bot to stand still
                 bool needsHelp = false;
                 if ( p->Stats->HP < ( p->Stats->MaxHP * 85 / 100 ) ) needsHelp = true;
                 else if ( p->Status->Dash_up == 0xff ||
@@ -2764,6 +3396,290 @@ void CPlayerBot::HandleVendingBot( )
         if ( promo && strlen( promo ) > 0 )
         {
             Say( promo );
+        }
+    }
+}
+
+void CPlayerBot::AssignClanTag( )
+{
+    if ( !m_player || !m_player->Clan ) return;
+    if ( m_player->Clan->clanid == 0 )
+    {
+        m_player->Clan->clanid = 1 + ( rand( ) % 5 );
+        m_player->Clan->clanrank = 2 + ( rand( ) % 4 );
+    }
+}
+
+void CPlayerBot::CheckPlayerGreetings( )
+{
+    if ( !m_player || m_isVendingBot || m_state == BOT_STATE_DEAD || m_state == BOT_STATE_DUEL ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastGreetingTime ) < (clock_t)( 45 * CLOCKS_PER_SEC ) ) return;
+
+    CMap* map = GetMap( );
+    if ( !map ) return;
+
+    for ( UINT i = 0; i < map->PlayerList.size( ); i++ )
+    {
+        CPlayer* p = map->PlayerList[i];
+        if ( p && !p->is_bot && p->Session && p->Session->inGame && p->Position )
+        {
+            float dist = GServer->distance( m_player->Position->current, p->Position->current );
+            if ( dist <= 8.0f )
+            {
+                m_lastGreetingTime = now;
+                DoEmote( 1 ); // Wave
+
+                char msg[80];
+                const char* greetings[] = {
+                    "Hey there, %s!",
+                    "Good luck hunting out here, %s!",
+                    "Nice gear you got there, %s!",
+                    "Stay safe out there, %s!"
+                };
+                snprintf( msg, sizeof(msg), greetings[rand() % 4], p->CharInfo->charname );
+                Say( msg );
+                return;
+            }
+        }
+    }
+}
+
+void CPlayerBot::StartDuel( CPlayer* challenger )
+{
+    if ( !m_player || !challenger || m_state == BOT_STATE_DEAD ) return;
+
+    m_duelTargetCid = challenger->clientid;
+    m_duelStartTime = clock( );
+
+    char msg[80];
+    snprintf( msg, sizeof(msg), "Challenge accepted, %s! Prepare yourself!", challenger->CharInfo->charname );
+    Say( msg );
+    DoEmote( 2 ); // Joy/Cheer
+
+    SetState( BOT_STATE_DUEL );
+}
+
+void CPlayerBot::HandleDuel( )
+{
+    if ( !m_player ) return;
+
+    CMap* map = GetMap( );
+    if ( !map )
+    {
+        SetState( BOT_STATE_IDLE );
+        return;
+    }
+
+    CPlayer* challenger = map->GetPlayerInMap( m_duelTargetCid );
+    if ( !challenger || challenger->IsDead( ) || challenger->Stats->HP <= ( challenger->Stats->MaxHP * 10 / 100 ) )
+    {
+        if ( challenger && challenger->Stats->HP <= ( challenger->Stats->MaxHP * 10 / 100 ) )
+        {
+            Say( "Good fight! You fought well." );
+            DoEmote( 6 );
+        }
+        m_duelTargetCid = 0;
+        ClearBattle( m_player->Battle );
+        SetState( BOT_STATE_IDLE );
+        return;
+    }
+
+    if ( m_player->Stats->HP <= ( m_player->Stats->MaxHP * 10 / 100 ) )
+    {
+        Say( "Yield! You win this time, nice duel!" );
+        DoEmote( 6 );
+        m_duelTargetCid = 0;
+        ClearBattle( m_player->Battle );
+        SetState( BOT_STATE_REST );
+        return;
+    }
+
+    clock_t now = clock( );
+    if ( ( now - m_duelStartTime ) > (clock_t)( 120 * CLOCKS_PER_SEC ) )
+    {
+        Say( "Time's up! Let me know if you want to duel again." );
+        m_duelTargetCid = 0;
+        ClearBattle( m_player->Battle );
+        SetState( BOT_STATE_IDLE );
+        return;
+    }
+
+    float dist = GServer->distance( m_player->Position->current, challenger->Position->current );
+    if ( dist > 30.0f )
+    {
+        MoveTo( challenger->Position->current );
+        return;
+    }
+
+    KiteTarget( challenger );
+
+    if ( !m_player->IsOnBattle( ) || m_player->Battle->target != challenger->clientid )
+    {
+        AttackTarget( challenger );
+        return;
+    }
+
+    if ( m_player->IsTargetReached( challenger ) )
+    {
+        CastCombatSkill( challenger );
+    }
+}
+
+void CPlayerBot::AssignTitle( )
+{
+    if ( !m_player ) return;
+    int lvl = m_player->Stats->Level;
+
+    if ( lvl >= 100 ) m_title = "<Apex Legend>";
+    else if ( lvl >= 80 ) m_title = "<Hero of Junon>";
+    else if ( lvl >= 60 ) m_title = "<Master Crafter>";
+    else if ( lvl >= 40 ) m_title = "<Shadow Raider>";
+    else m_title = "<Novice Slayer>";
+}
+
+void CPlayerBot::WhisperPlayer( CPlayer* target, const char* msg )
+{
+    if ( !m_player || !target || !target->client || !msg ) return;
+
+    BEGINPACKET( pak, 0x784 );
+    ADDSTRING  ( pak, m_player->CharInfo->charname );
+    ADDSTRING  ( pak, (char*)msg );
+    ADDBYTE    ( pak, 0 );
+    target->client->SendPacket( &pak );
+}
+
+void CPlayerBot::CheckPlayerShops( )
+{
+    if ( !m_player || m_isVendingBot || m_state == BOT_STATE_DEAD || m_state == BOT_STATE_DUEL ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastShopBrowseTime ) < (clock_t)( 40 * CLOCKS_PER_SEC ) ) return;
+
+    CMap* map = GetMap( );
+    if ( !map ) return;
+
+    for ( UINT i = 0; i < map->PlayerList.size( ); i++ )
+    {
+        CPlayer* p = map->PlayerList[i];
+        if ( p && !p->is_bot && p->Shop && p->Shop->open && p->Position )
+        {
+            float dist = GServer->distance( m_player->Position->current, p->Position->current );
+            if ( dist <= 12.0f )
+            {
+                m_lastShopBrowseTime = now;
+                MoveTo( p->Position->current );
+
+                if ( dist <= 3.5f )
+                {
+                    for ( int idx = 0; idx < 30; idx++ )
+                    {
+                        if ( p->Shop->SellingList[idx].count > 0 && p->Shop->SellingList[idx].price > 0 )
+                        {
+                            UINT slot = p->Shop->SellingList[idx].slot;
+                            UINT price = (UINT)p->Shop->SellingList[idx].price;
+                            if ( slot < 140 && p->items[slot].itemnum != 0 && m_player->CharInfo->Zulies >= price )
+                            {
+                                m_player->CharInfo->Zulies -= price;
+                                p->CharInfo->Zulies += price;
+
+                                CItem boughtItem = p->items[slot];
+                                p->Shop->SellingList[idx].count--;
+                                if ( p->Shop->SellingList[idx].count == 0 )
+                                {
+                                    p->items[slot].itemnum = 0;
+                                    p->items[slot].count = 0;
+                                }
+
+                                m_player->AddItem( boughtItem );
+
+                                char whisperMsg[90];
+                                snprintf( whisperMsg, sizeof(whisperMsg), "Thanks for the deal on your shop items!" );
+                                WhisperPlayer( p, whisperMsg );
+
+                                Say( "Bought some great supplies from your shop!" );
+                                DoEmote( 2 ); // Cheer
+                                return;
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+        }
+    }
+}
+
+void CPlayerBot::CheckWhispers( )
+{
+    if ( !m_player || m_isVendingBot || m_state == BOT_STATE_DEAD ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastWhisperTime ) < (clock_t)( 180 * CLOCKS_PER_SEC ) ) return;
+
+    CMap* map = GetMap( );
+    if ( !map ) return;
+
+    for ( UINT i = 0; i < map->PlayerList.size( ); i++ )
+    {
+        CPlayer* p = map->PlayerList[i];
+        if ( p && !p->is_bot && p->Session && p->Session->inGame )
+        {
+            m_lastWhisperTime = now;
+            char msg[100];
+            if ( m_personality == BOT_PERSONALITY_RIVAL )
+            {
+                snprintf( msg, sizeof(msg), "Hey %s! I'm level %d now. Trying to stay ahead of you!", p->CharInfo->charname, m_player->Stats->Level );
+            }
+            else if ( m_personality == BOT_PERSONALITY_HELPER )
+            {
+                snprintf( msg, sizeof(msg), "Greetings %s! Let me know if you need party buffs or support!", p->CharInfo->charname );
+            }
+            else
+            {
+                snprintf( msg, sizeof(msg), "Good luck hunting out here, %s!", p->CharInfo->charname );
+            }
+            WhisperPlayer( p, msg );
+            return;
+        }
+    }
+}
+
+void CPlayerBot::CheckArenaQueue( )
+{
+    if ( !m_player || m_player->Stats->Level < 30 || m_state == BOT_STATE_DEAD || m_state == BOT_STATE_DUEL ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastArenaQueueTime ) < (clock_t)( 60 * CLOCKS_PER_SEC ) ) return;
+    m_lastArenaQueueTime = now;
+
+    eArenaState state = CArenaManager::GetInstance()->GetState( );
+    if ( state == ARENA_STATE_COUNTDOWN )
+    {
+        CArenaManager::GetInstance()->JoinArena( m_player );
+    }
+}
+
+void CPlayerBot::CheckDungeonRuns( )
+{
+    if ( !m_player || m_player->Stats->Level < 60 || m_state == BOT_STATE_DEAD || m_state == BOT_STATE_DUEL ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastDungeonCheckTime ) < (clock_t)( 120 * CLOCKS_PER_SEC ) ) return;
+    m_lastDungeonCheckTime = now;
+
+    if ( m_player->Position && m_player->Position->Map == 2 ) // Junon Polis
+    {
+        if ( rand( ) % 5 == 0 )
+        {
+            CMap* dungeonMap = GServer->MapList.Index[51]; // Barka Dungeon
+            if ( dungeonMap && dungeonMap != GServer->MapList.nullzone )
+            {
+                fPoint enterPos = { 5200.0f, 5200.0f, 0.0f };
+                dungeonMap->TeleportPlayer( m_player, enterPos, false );
+                Say( "Entering Barka Dungeon to raid dungeon bosses!" );
+            }
         }
     }
 }

@@ -20,7 +20,17 @@ enum BotState {
     BOT_STATE_DEAD,
     BOT_STATE_BUFF_BOT,
     BOT_STATE_SEEK_BUFF,
-    BOT_STATE_VENDING
+    BOT_STATE_VENDING,
+    BOT_STATE_TOWN_STROLL,
+    BOT_STATE_MIGRATE,
+    BOT_STATE_DUEL
+};
+
+enum BotPersonality {
+    BOT_PERSONALITY_RIVAL,
+    BOT_PERSONALITY_HELPER,
+    BOT_PERSONALITY_MERCHANT,
+    BOT_PERSONALITY_BRAWLER
 };
 
 class CPlayerBot {
@@ -44,6 +54,22 @@ public:
     void HandleVendingBot( );
     void SetupVendingShop( const char* shopTitle, int category );
 
+    void HandleTownStroll( );
+    void HandleMigrate( );
+    void HandleDuel( );
+    void StartDuel( CPlayer* challenger );
+    void CheckPlayerGreetings( );
+    void AssignClanTag( );
+
+    void CheckPlayerShops( );
+    void CheckWhispers( );
+    void CheckArenaQueue( );
+    void CheckDungeonRuns( );
+    void AssignTitle( );
+    const char* GetTitleString( ) const { return m_title.c_str( ); }
+    BotPersonality GetPersonality( ) const { return m_personality; }
+    void WhisperPlayer( CPlayer* target, const char* msg );
+
     // Actions
     void SetState( BotState state );
     void MoveTo( fPoint dest );
@@ -54,6 +80,21 @@ public:
     void AllocateStats( );
     void Respawn( );
     void Say( const char* msg );
+    void DoEmote( BYTE emoteId );
+
+    // Phase 1: Combat Intelligence & Potions
+    void ConsumePotions( );
+    bool KiteTarget( CCharacter* target );
+    bool IsKillSteal( CMonster* mob );
+
+    // Phase 2: Social Engine & Party System
+    void CelebrateLevelUp( );
+    void SayChatter( const char* category );
+    void CheckPartyInvitations( );
+
+    // Phase 3: Town Life, Migration & Custom Appearance
+    void ApplyRandomCosmetics( );
+    void CheckZoneMigration( );
 
     // Progression, Skills & Equipment
     void EquipTieredGear( bool broadcast = true );
@@ -63,6 +104,7 @@ public:
     bool CheckPartyBuffs( );
     bool CheckPartyResurrect( );
     bool CheckPartyTaunt( );
+    bool CheckProximityBuffs( );
     fPoint GetFormationOffset( int slotIndex, fPoint leaderCurrent, fPoint leaderDest );
     int GetPartySlotIndex( ) const;
     void ForcePartyBuff( );
@@ -72,6 +114,7 @@ public:
     // Perception & Targeting
     CMap* GetMap( ) const;
     CMonster* FindNearbyMonster( float radius );
+    CMonster* FindNearbyWorldBoss( float radius );
     CDrop* FindNearbyDrop( float radius );
 
     // Getters and Setters
@@ -114,6 +157,19 @@ private:
     int m_lastKnownLevel;
     fPoint m_lastPos;
 
+    // Phase 1 Timers
+    clock_t m_lastHpPotionTime;
+    clock_t m_lastMpPotionTime;
+
+    // Phase 2 Timers
+    clock_t m_lastChatterTime;
+    clock_t m_lastEmoteTime;
+    clock_t m_lastPartyInviteTime;
+
+    // Phase 3 Timers & Navigation
+    clock_t m_lastMigrationCheck;
+    fPoint m_strollDest;
+
     // Buff Bot
     bool m_isBuffBot;
     UINT m_bonfireCid;
@@ -147,6 +203,19 @@ private:
     clock_t m_lastPartyBuffTime;
     clock_t m_lastResurrectTime;
     clock_t m_lastTauntTime;
+
+    // Greetings & Duels
+    clock_t m_lastGreetingTime;
+    UINT m_duelTargetCid;
+    clock_t m_duelStartTime;
+
+    // Advanced Realism & Personality
+    BotPersonality m_personality;
+    std::string m_title;
+    clock_t m_lastShopBrowseTime;
+    clock_t m_lastWhisperTime;
+    clock_t m_lastArenaQueueTime;
+    clock_t m_lastDungeonCheckTime;
 };
 
 class CBotManager {

@@ -111,6 +111,8 @@ class CPlayer: public CCharacter
     bool is_invisible;  //LMA: for AIP.
     bool is_bot;
     CPlayerBot* bot_ai;
+    UINT lastTargetPlayerId;
+    clock_t lastTargetPlayerTime;
     UINT uw_kills;  //LMA: for Union War.
     unsigned int hits;
     USEDITEM* UsedItem;
@@ -222,10 +224,10 @@ class CPlayer: public CCharacter
     bool skip_qsd_zone;
 
     // Time
-	clock_t lastRegenTime;
-	clock_t lastRegenTime_hp;   //LMA: regen for HP
-	clock_t lastRegenTime_mp;   //LMA: regen for MP
-	clock_t lastShowTime;       //LMA HP Jumping
+	time_t lastRegenTime;
+	time_t lastRegenTime_hp;   //LMA: regen for HP
+	time_t lastRegenTime_mp;   //LMA: regen for MP
+	time_t lastShowTime;       //LMA HP Jumping
 	clock_t firstlogin;         //LMA for fairy
 	clock_t lastSaveTime;
 	clock_t lastDpTime;

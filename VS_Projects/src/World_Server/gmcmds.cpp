@@ -98,6 +98,33 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
         return true;
     }
 
+    if (strcmp(command, "duel") == 0 || strcmp(command, "challenge") == 0)
+    {
+        char* botname = strtok(NULL, " ");
+        if (botname == NULL)
+        {
+            SendPM(thisclient, "Usage: /duel <BotName>");
+            return true;
+        }
+
+        CPlayerBot* bot = CBotManager::GetInstance()->GetBot(botname);
+        if (!bot || !bot->GetPlayer())
+        {
+            SendPM(thisclient, "[Duel] PlayerBot '%s' not found or offline.", botname);
+            return true;
+        }
+
+        if (bot->GetState() == BOT_STATE_DEAD)
+        {
+            SendPM(thisclient, "[Duel] PlayerBot '%s' is currently dead.", botname);
+            return true;
+        }
+
+        bot->StartDuel(thisclient);
+        SendPM(thisclient, "[Duel] You challenged %s to a duel!", botname);
+        return true;
+    }
+
 	if (strcmp(command, "mail") == 0)
     {
         char* subcmd = strtok(NULL, " ");
@@ -445,7 +472,29 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
         char* subcmd = strtok(NULL, " ");
         if (!subcmd)
         {
-            SendPM(thisclient, "[Party Bot] Usage: /party bot <buff|follow|assist|info>");
+            SendPM(thisclient, "[Party Bot] Usage: /party bot <buff|follow|assist|info> OR /party invite <name>");
+            return true;
+        }
+
+        if (strcmp(subcmd, "invite") == 0)
+        {
+            char* targetName = strtok(NULL, " ");
+            if (!targetName)
+            {
+                SendPM(thisclient, "Usage: /party invite <PlayerName>");
+                return true;
+            }
+            CPlayer* targetPlayer = GetClientByCharNameCI(targetName);
+            if (!targetPlayer)
+            {
+                SendPM(thisclient, "[Party] Player/Bot '%s' not found online.", targetName);
+                return true;
+            }
+            BEGINPACKET(partyPak, 0x07d0);
+            ADDBYTE    (partyPak, 0x00); // Action 0: Invite
+            ADDWORD    (partyPak, targetPlayer->clientid);
+            ADDBYTE    (partyPak, 0x00);
+            pakPartyActions(thisclient, &partyPak);
             return true;
         }
 

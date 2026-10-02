@@ -63,18 +63,12 @@ void CCharacter::DoAttack( )
         return;
     }
 	// Likewise if the Enemy is dead there is no point continuing to pound him. Unless Enemy is actually a friend who we are trying to ressurect perhaps??
-	if(Enemy != NULL)
+	if(Enemy != NULL && Enemy->IsDead())
 	{ 
-		if (Enemy->IsDead ()) 
-		{
-			if(skill != NULL)				//check that skill is valid
-			{ 
-				if(skill->skilltype != 20)	//if skilltype of skill is ressurection then we do not want to kick out at this point
-				{ 
-					ClearBattle (Battle);	//OK so it's NOT ressurection. We can shut down the battle
-					return;
-				}
-			}
+		if(skill == NULL || skill->skilltype != 20)	//if skilltype of skill is ressurection then we do not want to kick out at this point
+		{ 
+			ClearBattle(Battle);	//OK so it's NOT ressurection. We can shut down the battle
+			return;
 		}
 	}
     if(IsMonster())  //PY Make sure TD monsters don't attack
@@ -554,6 +548,11 @@ void CCharacter::NormalAttack( CCharacter* Enemy )
 {
     //LMA: Sometimes it's fired several times, no need to kill several times ;)
     bool is_already_dead = Enemy->IsDead();
+    if (is_already_dead)
+    {
+        ClearBattle(Battle);
+        return;
+    }
 
 
     Position->destiny = Position->current;
@@ -591,18 +590,28 @@ void CCharacter::NormalAttack( CCharacter* Enemy )
 	float DidWeHit = (float)GServer->RandNumber (0, 100);
 	if (DidWeHit < hitchance)
 	{			//Success. Now we check Attack Power against Defence
-		if (Stats->MagicAttack == 1)
+		if (IsMonster() && Enemy->IsPlayer())
+		{
+			float def = (Stats->MagicAttack == 1) ? EnemyMDef : EnemyDef;
+			float base_dmg = (float)Stats->Attack_Power - (def * 0.5f);
+			if (base_dmg < 3.0f)
+				base_dmg = (float)GServer->RandNumber(1, 4);
+			hitpower = (long int)floor(base_dmg);
+		}
+		else if (Stats->MagicAttack == 1)
 		{
 			hitpower = (long int)floor(((float)Stats->Attack_Power * ((float)Stats->Attack_Power / EnemyMDef) * 50.0f / 100.0f) * constant);
 			atkdefmult = (float)Stats->Attack_Power / EnemyMDef;
+			if (hitpower > (long int)(Stats->Attack_Power * 2))
+				hitpower = Stats->Attack_Power * 2;
 		}
 		else
 		{
 			hitpower = (long int)floor(((float)Stats->Attack_Power * ((float)Stats->Attack_Power / EnemyDef) * 50.0f / 100.0f) * constant);
 			atkdefmult = (float)Stats->Attack_Power / EnemyDef;
+			if (hitpower > (long int)(Stats->Attack_Power * 2))
+				hitpower = Stats->Attack_Power * 2;
 		}
-		if (hitpower > (long int)(Stats->Attack_Power * 2))
-			hitpower = Stats->Attack_Power * 2;		//limiter. Cannot be greater than attack power * 2
 		if (hitpower < 1) 
 			hitpower = 1;							// since we did hit successfully we should have at least some damage
 		
@@ -1715,6 +1724,11 @@ void CCharacter::UseAtkSkill( CCharacter* Enemy, CSkills* skill, bool deBuff )
     Log(MSG_INFO,"UseAtkSkill, Performing skill %i",skill->skilltype);
     //LMA: Sometimes it's fired several times, no need to kill several times ;)
     bool is_already_dead = Enemy->IsDead();
+    if (is_already_dead && (skill == NULL || skill->skilltype != 20))
+    {
+        ClearBattle(Battle);
+        return;
+    }
 
     //We Check if The Skill need a Bow, Gun, Launcher or Crossbow and reduce the number of Arrow, Bullet or Canon the player have by 1 (Client is Buged)
     bool need_arrows=false;

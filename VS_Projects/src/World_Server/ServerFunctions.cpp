@@ -271,7 +271,10 @@ CDrop* CWorldServer::GetDrop( CMonster* thismon )
     newdrop->posMap = thismon->Position->Map;
     newdrop->pos = RandInCircle( thismon->Position->current, 3 );
     newdrop->droptime = time(NULL);
-    newdrop->owner = thismon->MonsterDrop->firsthit;
+    // GW2 OPEN-WORLD AUTO-SHARING: Set owner = 0 when multiple attackers participate
+    // ROLLBACK NOTE: To revert to strict first-hitter ownership, restore:
+    // newdrop->owner = thismon->MonsterDrop->firsthit;
+    newdrop->owner = (thismon->PlayersDamage.size() > 1) ? 0 : thismon->MonsterDrop->firsthit;
     newdrop->thisparty = thismon->thisparty;
     ClearItem(newdrop->item);
     int randv = RandNumber( 1, 100);
@@ -521,10 +524,18 @@ CDrop* CWorldServer::GetPYDrop( CMonster* thismon, UINT droptype )
     newdrop->posMap = thismon->Position->Map;
     newdrop->pos = RandInCircle( thismon->Position->current, 3 );
     newdrop->droptime = time(NULL);
-    newdrop->owner = thismon->MonsterDrop->firsthit;
+    // GW2 OPEN-WORLD AUTO-SHARING: Set owner = 0 when multiple attackers participate
+    newdrop->owner = (thismon->PlayersDamage.size() > 1) ? 0 : thismon->MonsterDrop->firsthit;
     newdrop->thisparty = thismon->thisparty;
 
     CPlayer* thisclient = GServer->GetClientByCID(thismon->MonsterDrop->firsthit);
+    if(thisclient == NULL && thismon->PlayersDamage.size() > 0)
+    {
+        for (UINT pd = 0; pd < thismon->PlayersDamage.size(); pd++) {
+            thisclient = GServer->GetClientByCID(thismon->PlayersDamage.at(pd)->charid);
+            if (thisclient != NULL) break;
+        }
+    }
     if(thisclient == NULL)
     {
         ClearClientID(newdrop->clientid);
@@ -906,12 +917,20 @@ CDrop* CWorldServer::GetPYDropAnd( CMonster* thismon, UINT droptype )
     newdrop->posMap = thismon->Position->Map;
     newdrop->pos = RandInCircle( thismon->Position->current, 3 );
     newdrop->droptime = time(NULL);
-    newdrop->owner = thismon->MonsterDrop->firsthit;
+    // GW2 OPEN-WORLD AUTO-SHARING: Set owner = 0 when multiple attackers participate
+    newdrop->owner = (thismon->PlayersDamage.size() > 1) ? 0 : thismon->MonsterDrop->firsthit;
     newdrop->thisparty = thismon->thisparty;
 	//newdrop->item = new (nothrow) CItem;
     //Clearitem(newdrop->item);
 
     CPlayer* thisclient = GServer->GetClientByCID(thismon->MonsterDrop->firsthit);
+    if(thisclient == NULL && thismon->PlayersDamage.size() > 0)
+    {
+        for (UINT pd = 0; pd < thismon->PlayersDamage.size(); pd++) {
+            thisclient = GServer->GetClientByCID(thismon->PlayersDamage.at(pd)->charid);
+            if (thisclient != NULL) break;
+        }
+    }
     if(thisclient == NULL)
     {
         ClearClientID(newdrop->clientid);

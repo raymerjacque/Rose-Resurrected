@@ -280,7 +280,7 @@ tail -f log/loginserver_stdout.log
 
 ## PlayerBot & Grind-Spot Buff Bot AI Deep-Dive
 
-RosE Resurrected features an advanced autonomous bot system designed to make the world feel populated and provide grinding support.
+RosE Resurrected features an industry-leading, fully autonomous PlayerBot system designed to make the world feel populated, vibrant, and alive while providing complete solo-player gameplay support.
 
 ```
                     +------------------------------------+
@@ -288,29 +288,70 @@ RosE Resurrected features an advanced autonomous bot system designed to make the
                     +-----------------+------------------+
                                       |
          +----------------------------+----------------------------+
+         |                            |                            |
+         v                            v                            v
++------------------+         +------------------+         +------------------+
+|  Grinding Combat |         | Grind-Spot Cleric|         |  Player Economy  |
+|  - 90m Detection |         |  - SisterAngela  |         |  - Shop Browsing |
+|  - Job Combos    |         |  - 3x Regen Fire |         |  - /trade Engine |
+|  - PAT Mounts    |         |  - 7-Charm Aura  |         |  - Street Vendors|
++--------+---------+         +--------+---------+         +--------+---------+
+         |                            |                            |
+         +----------------------------+----------------------------+
+                                      |
+         +----------------------------+----------------------------+
          |                                                         |
          v                                                         v
-+-------------------------------+                       +-------------------------------+
-|      Grinding Combat Bots     |                       |   Grind-Spot Cleric Buff Bots |
-|  - Autonomous Roaming / Hunt  |                       |  - SisterAngela, Maria, etc.  |
-|  - Skill Rotations by Job     |                       |  - Large Bonfire Maintenance  |
-|  - HP/MP Resting Mechanics    |                       |  - Smart Real-Player Buffing  |
-|  - Anti-Bounce Movement Sync  |                       |  - Full 7 Cleric Charms Aura  |
-+-------------------------------+                       +-------------------------------+
++----------------------------------+     +----------------------------------+
+|   Social Engine & Whispers       |     |   PvP & Dungeon Raiding Engine   |
+|   - Real-Player /wave Greetings  |     |   - Open-World /duel System      |
+|   - Rival / Helper Personality PMs|     |   - Akram Arena /arena Queueing  |
+|   - Level-Up /cheer & Emotes     |     |   - Instanced Dungeon Crawling   |
+|   - Clan Tags & Earned Titles    |     |   - World Boss Raid Groups       |
++----------------------------------+     +----------------------------------+
 ```
 
 ### 1. Autonomous Grinding Combat Bots (`PlayerBot.cpp`)
-- **State Machine**: Bots cycle between `BOT_STATE_IDLE`, `BOT_STATE_SEEKING`, `BOT_STATE_COMBAT`, and `BOT_STATE_RESTING`.
-- **Target Selection & Leashing**: Evaluates nearest hostile monsters within sensor range, honors combat leashes, and avoids stealing targets from low-health players.
-- **Class-Specific Rotations**:
-  - *Soldier / Knight / Champion*: Taunt, charge, melee strike sequences, shield defensive buffs.
-  - *Muse / Mage / Cleric*: Spell distance kiting, elemental nuke casting, self-healing thresholds.
-  - *Hawker / Raider / Scout*: Bow/gun range kiting, stealth opener, high-critical rapid attacks.
-  - *Dealer / Bourgeois / Artisan*: Gun/launcher artillery fire, summon support bots, zuly shot skills.
-- **Resting & Recovery**: When HP or MP drops below 25%, bots execute the sit stance (`Status->Stance = SITTING`), enter natural regeneration state, and stand when recovery reaches 95%.
-- **Anti-Bounce Movement Sync**: Position packets (`0x79a`) are rate-limited with interpolation heuristics to prevent client-side rubberbanding.
+- **Expanded Aggro Sensor Radius**: Sensor detection expanded to **$85\text{m} - 90\text{m}$** (over $4\times$ standard range). Bots spot monsters as soon as they spawn across wide map areas without standing idle.
+- **Combat Leash & Targeting**: Maximum combat target distance set to **$100\text{m}$**, preventing bots from abandoning targets while approaching them across long distances. Anti-KS logic ensures bots respect player monster ownership.
+- **Class-Specific Skill Combos**:
+  * *Soldier / Knight / Champion*: Taunts mobs off squishy allies, charges, shield bash/stun combos, voltage crash.
+  * *Muse / Mage / Cleric*: Spell distance kiting, elemental nukes (Ice Bolt, Mana Spear, Voltage Jolt), party heals (Single & AOE), resurrect.
+  * *Hawker / Raider / Scout*: Bow/gun range kiting, stealth openers, Stun Arrow, Triple Arrow, high-critical strike combos.
+  * *Dealer / Bourgeois / Artisan*: PAT artillery fire, Sniping, Demolition Expertise, Triple Shot.
+- **Resting & Recovery**: When HP or MP drops below 40% HP / 30% MP, bots execute sit stance (`Status->Stance = SITTING`), regenerate HP/MP, and stand when recovered.
+- **Weapon Refine Particle Glows (+4 to +10)**: Weapon refine levels dynamically scale with bot level tiers (+4 at Lvl 20+, +7 at Lvl 35+, +9 at Lvl 70+, +10 at Lvl 100+), rendering glowing weapon particle effects.
 
-### 2. Worldwide Grind-Spot Buff Bots (The Cleric Sisters)
+### 2. PAT Vehicles (Cart & Castle Gear Robot Mounts)
+- **Automatic PAT Deployment**: Bots level 30+ automatically mount PAT vehicles when traveling long distances ($>25\text{m}$) out of combat.
+- **Precise STB 3D Model Mapping**:
+  * *Cart (Levels 30–69)*: Body 2 (`cart01_BODY03_CBK`), Engine 35 (`cart01_ENGINE06`), Wheels 68 (`cart01_WHEEL01`).
+  * *Castle Gear Robot (Levels 70+)*: Body 367 (`CastleGear01_BODY01`), Engine 31 (`CastleGear01_ENGINE01`), Legs 377 (`CastleGear01_LEG01`), Arms 387 (`CastleGear01_ARM01`).
+
+### 3. Social Engine: Greetings, Emotes, Clan Tags & Titles
+- **Real-Player Proximity Greetings**: Scans for real human players within $8\text{m}$. The bot turns to face the player, executes a `/wave` emote (`0x781` packet), and says a friendly greeting (*"Hey there, [PlayerName]!"*, *"Good luck hunting out here, [PlayerName]!"*, *"Nice gear you got there!"*).
+- **Level-Up Celebrations**: Level-up packet `0x7b1` accompanied by `/cheer` or `/dance` emotes and local chat announcements (*"WOOT! Level UP!"*).
+- **Clan Tags & Ranks**: Bots automatically carry clan tags (`<Junon Guard>`, `<Adventure Club>`, `<Shadow Syndicate>`, `<Apex Legends>`) and clan member ranks.
+- **Earned Titles**: Dynamic titles (`<Novice Slayer>`, `<Shadow Raider>`, `<Master Crafter>`, `<Hero of Junon>`, `<Apex Legend>`) assigned based on level progress.
+
+### 4. Player-Driven Economy & Direct Trading
+- **Bots Shopping from Real Player Vendors**: Roaming bots in Junon Polis / Zant locate real player street shops (`/vendor`), walk up to them, browse items, and purchase crafting materials, gems, and potions using their Zulies. Bots send a thank-you whisper (*"Thanks for the deal on your shop items!"*) to the player shop owner.
+- **Direct Player-to-Bot Trading (`/trade <BotName>`)**: Players can challenge any online bot to a trade (`/trade <BotName>`). The bot auto-accepts the trade request, places 25,000 Zulies into the trade window, and completes the trade when the player accepts.
+
+### 5. Whisper & Rivalry Engine
+- **Personality Archetypes**: Assigned distinct personalities (`BOT_PERSONALITY_RIVAL`, `BOT_PERSONALITY_HELPER`, `BOT_PERSONALITY_MERCHANT`, `BOT_PERSONALITY_BRAWLER`).
+- **Rival PMs**: Sent when players level up (*"Hey [PlayerName]! I'm level 55 now, trying to stay ahead of you!"*).
+- **Helper PMs**: Sent when players enter challenging maps (*"Greetings [PlayerName]! Let me know if you need party buffs or support!"*).
+
+### 6. PvP Arena & Open-World Duels
+- **Open-World Duels (`/duel <BotName>`)**: Real players can challenge any online bot to a duel using `/duel <BotName>`. The bot accepts in chat (*"Challenge accepted!"*), engages in PvP combat against the player, and yields (`/bow`) when either combatant reaches 10% HP to prevent death.
+- **Akram Arena Queueing (`/arena`)**: Ambient bots monitor Akram Arena countdown states (`ARENA_STATE_COUNTDOWN`) and queue via `CArenaManager::GetInstance()->JoinArena( m_player )`, competing on Red vs Blue teams inside the Colosseum with PvP combat AI.
+
+### 7. Instanced Dungeon Crawling & World Boss Raids
+- **Dungeon Raiding**: Level 60+ bot parties check for dungeon portals (e.g. Barka Dungeon map 51, Pyramids, Forgotten Temple) and enter instances to clear monsters and raid dungeon bosses.
+- **World Boss Targeting**: Bots scan for world bosses and high-HP targets (e.g. *King Hoplon*, *Karkome*), calling out in chat and assembling raid groups.
+
+### 8. Worldwide Grind-Spot Buff Bots (The Cleric Sisters)
 Placed at key leveling spots across the world, these cleric bots provide essential buffs and bonfires:
 
 | Sister | Location | Zone / Region |
@@ -323,12 +364,12 @@ Placed at key leveling spots across the world, these cleric bots provide essenti
 | **SisterGrace** | Forest of Wisdom | Ghost & Elder monster zones |
 | **SisterFaith** | Kenji Beach | High-level beach combat grounds |
 
-### 3. Large Bonfire (ID 806) Aura & Maintenance
+### 9. Large Bonfire (ID 806) Aura & Maintenance
 - **3x Natural Regeneration Aura**: Nearby players within a 25-meter radius gain triple HP and MP natural recovery.
 - **Automatic Bonfire Maintenance**: The bot monitors bonfire duration and automatically renews the fire before it expires.
 - **Combat Immunity & Exclusion**: Bonfire entities have special targeting masks preventing monsters from attacking or extinguishing the flame.
 
-### 4. Smart Priority Buff Queue
+### 10. Smart Priority Buff Queue
 - **Real-Player Priority**: The bot's sensory loop checks for players entering the camp radius. Real human players are placed at the front of the queue ahead of bot companions.
 - **7-Charm Full Cleric Blessing Rotation**:
   1. **Pure Charm**: Maximum HP boost.
@@ -338,16 +379,8 @@ Placed at key leveling spots across the world, these cleric bots provide essenti
   5. **Defense Charm**: Armor and physical defense increase.
   6. **Magic Defense Charm**: Magic resistance shield.
   7. **Blessing / Accuracy Charm**: Hit rate and critical strike rating boost.
-- **Anti-Looping Timer**: The bot inspects active buff bits on target players. It will not recast charms that have more than 60 seconds of remaining duration, preventing spell-spam lockups.
 
-### 5. GM / Admin In-Game Bot Commands
-Authorized Game Masters (Access Level $\ge 300$) can control bots using in-game chat commands:
-- `/bot spawn [class] [level] [name]`: Spawns a bot with designated class, level, and gear.
-- `/bot buff`: Triggers immediate area buffing from nearby cleric bots.
-- `/bot kill [name]`: Despawns an active bot.
-- `/bot list`: Lists active bot instances and coordinates.
-
-### 6. Autonomous Market Vending Bots (`VendingCatalog.cpp` & `PlayerBot.cpp`)
+### 11. Autonomous Market Vending Bots (`VendingCatalog.cpp` & `PlayerBot.cpp`)
 Stationed permanently in high-density player trade corridors in Junon Polis and Canyon City of Zant, 18 autonomous vendor bots provide an active, authentic economy:
 
 | # | Vendor Name | Zone / Map | Landmark Spot | Stall Signboard Title | Specialty Goods |

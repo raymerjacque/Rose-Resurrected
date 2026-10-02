@@ -18,3 +18,24 @@
 	ALTER TABLE `mail_list` ADD COLUMN IF NOT EXISTS `item_name` VARCHAR(64) NOT NULL DEFAULT '';
 	ALTER TABLE `mail_list` ADD COLUMN IF NOT EXISTS `is_claimed` TINYINT(1) NOT NULL DEFAULT 0;
 
+	ALTER TABLE `list_clan` ADD COLUMN IF NOT EXISTS `money` BIGINT UNSIGNED NOT NULL DEFAULT 0;
+	ALTER TABLE `list_clan` ADD COLUMN IF NOT EXISTS `skills` VARCHAR(500) NOT NULL DEFAULT '';
+
+	CREATE TABLE IF NOT EXISTS `clan_storage` (
+	  `clanid` int(11) NOT NULL,
+	  `slotnum` int(11) NOT NULL,
+	  `itemnum` int(11) DEFAULT 0,
+	  `itemtype` int(11) DEFAULT 0,
+	  `count` int(11) DEFAULT 0,
+	  `lifespan` int(11) DEFAULT 100,
+	  `itemdurability` int(11) DEFAULT 100,
+	  `itemstats` int(11) DEFAULT 0,
+	  `itemappraisal` int(11) DEFAULT 0,
+	  `itemgem` int(11) DEFAULT 0,
+	  `itemrefine` int(11) DEFAULT 0,
+	  `itemisappraised` int(11) DEFAULT 0,
+	  `restriction` int(11) DEFAULT 0,
+	  `usetype` int(11) DEFAULT 0,
+	  PRIMARY KEY (`clanid`, `slotnum`)
+	) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+

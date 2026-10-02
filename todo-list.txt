@@ -442,6 +442,7 @@ MILESTONE 7 — Combat Mechanics Polish, Spawn Physics & Player Bot Vanguard AI 
 [x] Implement Soldier/Knight aggro taunting and monster intercept for squishy party members.
 [x] Add polite party bot loot etiquette (leaving spoils to party leader).
 [x] Add player `/party bot <buff|follow|assist|info>` and `/bot party` chat commands.
+[x] Implement Guild Wars 2 style Open-World Auto-Sharing: full EXP credit with 15% co-op bonus, universal quest kill credit, and shared un-locked drop permissions for all non-partied players & player bots attacking the same monster.
 
 ================================================================================
 

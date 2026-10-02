@@ -16,17 +16,14 @@
 
 // Windows clock() measures in milliseconds with CLOCKS_PER_SEC = 1000.
 // Emulate Windows millisecond clock on Linux to keep game timers, intervals, and fuel rates accurate.
+#undef CLOCKS_PER_SEC
+#define CLOCKS_PER_SEC 1000
 inline clock_t rose_clock() {
     using namespace std::chrono;
     static const auto start_time = steady_clock::now();
     return (clock_t)duration_cast<milliseconds>(steady_clock::now() - start_time).count();
 }
-
-#undef CLOCKS_PER_SEC
-#define CLOCKS_PER_SEC 1000
-
-#undef clock
-#define clock rose_clock
+#define clock() rose_clock()
 
 // Fixed-width integer types for 64-bit Linux compatibility
 typedef unsigned int        UINT;

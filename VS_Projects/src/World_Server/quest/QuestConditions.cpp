@@ -422,11 +422,12 @@ QUESTCOND(008)
     }
 
     long int Time = 0;
-    if (server->STB_QUEST.rows[client->quest.quests[client->CheckQuest].QuestID][1] > 0)
+    word qid = client->quest.quests[client->CheckQuest].QuestID;
+    if ((unsigned)qid < server->STB_QUEST.rowcount && server->STB_QUEST.rows[qid] != NULL && server->STB_QUEST.rows[qid][1] > 0)
     {
         Time += client->quest.quests[client->CheckQuest].StartTime; // Start time
         LogDebug("QUESTCOND::start time %li",Time);
-        Time += server->STB_QUEST.rows[client->quest.quests[client->CheckQuest].QuestID][1] * 10; // Time to finish
+        Time += server->STB_QUEST.rows[qid][1] * 10; // Time to finish
         LogDebug("QUESTCOND::with time to finish %li",Time);
         Time -= time(NULL); // Current time
         if (Time < 0) Time = 0; // Time is up

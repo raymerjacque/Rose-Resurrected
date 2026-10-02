@@ -731,13 +731,14 @@ CMonster* CWorldServer::GetMonsterByID( UINT id, UINT map )
 // Search a Client by Username
 CPlayer* CWorldServer::GetClientByUserName( char *username )
 {
+    if (username == NULL) return NULL;
     for(UINT i=0;i<ClientList.size();i++)
     {
+        if (ClientList.at(i) == NULL) continue;
         CPlayer* thisclient = (CPlayer*) ClientList.at(i)->player;
+        if (thisclient == NULL || thisclient->Session == NULL) continue;
 
-        //LMA: no case
-		//if (strcmp(thisclient->Session->username,username)==0)
-		if (_stricmp(thisclient->Session->username,username)==0)
+        if (_stricmp(thisclient->Session->username,username)==0)
             return thisclient;
 	}
 	return NULL;
@@ -750,7 +751,9 @@ CPlayer* CWorldServer::GetClientByID( UINT id, UINT map )
         return MapList.Index[map]->GetPlayerInMap( id );
     for(UINT i=0;i<ClientList.size();i++)
     {
+        if (ClientList.at(i) == NULL) continue;
         CPlayer* thisclient = (CPlayer*) ClientList.at(i)->player;
+        if (thisclient == NULL) continue;
 		if (thisclient->clientid==id)
             return thisclient;
 	}
@@ -764,7 +767,9 @@ CPlayer* CWorldServer::GetClientByCID( DWORD id, UINT map )
         return MapList.Index[map]->GetCharIDInMap( id );
     for(UINT i=0;i<ClientList.size();i++)
     {
+        if (ClientList.at(i) == NULL) continue;
         CPlayer* thisclient = (CPlayer*) ClientList.at(i)->player;
+        if (thisclient == NULL || thisclient->CharInfo == NULL) continue;
 		if (thisclient->CharInfo->charid==id)
             return thisclient;
 	}
@@ -774,9 +779,12 @@ CPlayer* CWorldServer::GetClientByCID( DWORD id, UINT map )
 // Search a client by Charname
 CPlayer* CWorldServer::GetClientByCharName( char* name)
 {
+    if (name == NULL) return NULL;
     for(UINT i=0;i<ClientList.size();i++)
     {
+        if (ClientList.at(i) == NULL) continue;
         CPlayer* thisclient = (CPlayer*) ClientList.at(i)->player;
+        if (thisclient == NULL || thisclient->CharInfo == NULL) continue;
         if (strncmp(thisclient->CharInfo->charname,name, 16)==0)
             return thisclient;
 	}
@@ -787,9 +795,12 @@ CPlayer* CWorldServer::GetClientByCharName( char* name)
 //LMA: Search a client by Charname (Case insensitive search)
 CPlayer* CWorldServer::GetClientByCharNameCI( char* name  )
 {
+    if (name == NULL) return NULL;
     for(UINT i=0;i<ClientList.size();i++)
     {
+        if (ClientList.at(i) == NULL) continue;
         CPlayer* thisclient = (CPlayer*) ClientList.at(i)->player;
+        if (thisclient == NULL || thisclient->CharInfo == NULL) continue;
         if (_strnicmp(thisclient->CharInfo->charname,name, 16) == 0)
             return thisclient;
 	}
@@ -2054,7 +2065,9 @@ CPlayer* CWorldServer::GetClientByUserID( UINT userid )
 {
     for(UINT i=0;i<ClientList.size();i++)
 	{
+        if (ClientList.at(i) == NULL) continue;
         CPlayer* thisclient = (CPlayer*)ClientList.at(i)->player;
+        if (thisclient == NULL || thisclient->Session == NULL) continue;
         if(thisclient->Session->userid==userid && thisclient->Session->accesslevel != 0xffff)
             return thisclient;
 	};

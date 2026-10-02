@@ -42,7 +42,7 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                     return true;
                 }
             }
-            CPlayer* otherclient = map->GetPlayerInMap( clientid );// have to be in same map
+            CPlayer* otherclient = GetClientByID( clientid, 0 ); // Look across all maps in the world
             if(otherclient==NULL)
             {
                 BEGINPACKET( pak, 0x7d1 );
@@ -73,6 +73,13 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
 
             if ( otherclient->is_bot )
             {
+                // Buff Bots and Merchant Vending Bots cannot join parties (they are static service NPCs)
+                if ( otherclient->bot_ai && ( otherclient->bot_ai->IsBuffBot( ) || otherclient->bot_ai->IsVendingBot( ) ) )
+                {
+                    SendPM( thisclient, "Buff Bots and Merchant Vending Bots cannot join parties." );
+                    return true;
+                }
+
                 // Bot automatically accepts the party invitation
                 CParty* party = thisclient->Party->party;
                 if( party == NULL )
@@ -116,12 +123,22 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                 // Add bot to party
                 party->AddPlayer( otherclient );
 
+                // Teleport player bot to inviting player's location anywhere in the world
+                if ( thisclient->Position != NULL && MapList.Index[thisclient->Position->Map] != NULL )
+                {
+                    CMap* pMap = MapList.Index[thisclient->Position->Map];
+                    fPoint spawnCoord = thisclient->Position->current;
+                    spawnCoord.x += ( ( rand() % 60 ) - 30 ) / 10.0f;
+                    spawnCoord.y += ( ( rand() % 60 ) - 30 ) / 10.0f;
+                    pMap->TeleportPlayer( otherclient, spawnCoord, false );
+                }
+
                 // Update bot AI state
                 if ( otherclient->bot_ai )
                 {
                     otherclient->bot_ai->SetFollowTarget( thisclient );
                     otherclient->bot_ai->SetState( BOT_STATE_FOLLOW );
-                    otherclient->bot_ai->Say( "I'm with you! Taking formation, let's hunt together!" );
+                    otherclient->bot_ai->Say( "I'm with you! Teleporting to your side, let's hunt together!" );
                     otherclient->bot_ai->ForcePartyBuff( );
                 }
                 return true;

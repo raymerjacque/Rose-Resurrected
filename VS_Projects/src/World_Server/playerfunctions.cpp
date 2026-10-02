@@ -579,10 +579,12 @@ void CPlayer::RestartPlayerVal( )
 
 //LMA
 //Force refresh of actual HP / MP Hp/Mp jumping bug.
+//LMA
+//Force refresh of actual HP / MP Hp/Mp jumping bug.
 bool CPlayer::RefreshHPMP()
 {
-    clock_t etime = clock() - lastShowTime;
-    if ( etime < CLOCKS_PER_SEC )
+    time_t now = time(NULL);
+    if ( (now - lastShowTime) < 1 )
         return true;
 
     BEGINPACKET( pak, 0x7ec );
@@ -597,15 +599,13 @@ bool CPlayer::RefreshHPMP()
         ADDWORD    ( pak, clientid );
         ADDWORD    ( pak, GetMaxHP( ) );
         ADDWORD    ( pak, Stats->HP );
-        //ADDDWORD   ( pak, 0x01000000 );//Tomiz: Was not commented before
-        ADDDWORD   ( pak, GServer->BuildBuffs( this ));//Tomiz: Buff Data
-        //ADDDWORD   ( pak, 0x0000000f );//Tomiz: Was not commented before
-        ADDDWORD   ( pak, 0x1f40008c );//Tomiz
+        ADDDWORD   ( pak, GServer->BuildBuffs( this ));
+        ADDDWORD   ( pak, 0x1f40008c );
         ADDWORD    ( pak, 0x1388 );
         Party->party->SendToMembers( &pak);
     }
 
-    lastShowTime = clock();
+    lastShowTime = now;
     return true;
 }
 
@@ -613,110 +613,115 @@ bool CPlayer::RefreshHPMP()
 // HP/MP Regeneration Function
 bool CPlayer::Regeneration()
 {
-    if (Stats->MaxHP==Stats->HP)
-       lastRegenTime_hp = clock();
+    time_t now = time(NULL);
 
-    if (Stats->MaxMP==Stats->MP)
-      lastRegenTime_mp = clock();
+    if (Stats->MaxHP == Stats->HP)
+       lastRegenTime_hp = now;
 
-    if ((Stats->MaxHP==Stats->HP)&&(Stats->MaxMP==Stats->MP))
+    if (Stats->MaxMP == Stats->MP)
+       lastRegenTime_mp = now;
+
+    if ((Stats->MaxHP == Stats->HP) && (Stats->MaxMP == Stats->MP))
        return true;
 
-     UINT bonus_sitted=1;
-     UINT bonus_fairy=1;
-     int bonus_hp=0;
-     int bonus_mp=0;
-     int nb_sec_stance=5;   //old setting = 5
+    UINT bonus_sitted = 1;
+    UINT bonus_fairy = 1;
+    int bonus_hp = 0;
+    int bonus_mp = 0;
+    int nb_sec_stance = 5;
 
-     if(Fairy)
-     {
-     nb_sec_stance= 2;      //old setting = 3
-     bonus_mp++;
-     bonus_hp++;
-     bonus_fairy=3;
-     }
-     if (Status->Stance==1)
-     {
-     nb_sec_stance= 3;      //new setting = 3
-     bonus_mp++;
-     bonus_hp++;
-     bonus_sitted=3;
-     }
-
-     // Bonfire aura check: nearby active bonfire grants rapid recovery
-     CMap* curMap = (Position && Position->Map < (UINT)GServer->MapList.max) ? GServer->MapList.Index[Position->Map] : NULL;
-     if ( curMap && curMap != GServer->MapList.nullzone )
-     {
-         for ( size_t m = 0; m < curMap->MonsterList.size( ); m++ )
-         {
-             CMonster* mon = curMap->MonsterList[m];
-             if ( mon && !mon->IsDead( ) && mon->Stats->HP > 0 && mon->IsBonfire( ) )
-             {
-                 if ( GServer->distance( Position->current, mon->Position->current ) <= 10.0f )
-                 {
-                     nb_sec_stance = 2;
-                     bonus_hp += 2;
-                     bonus_mp += 2;
-                     bonus_sitted = 3;
-                     break;
-                 }
-             }
-         }
-     }
-
-     int TimeDiff=nb_sec_stance*CLOCKS_PER_SEC;
-
-    //LMA: HP
-    if (Stats->HP<Stats->MaxHP)
+    if (Fairy)
     {
-        clock_t etimeHP = clock() - lastRegenTime_hp;
+        nb_sec_stance = 2;
+        bonus_mp++;
+        bonus_hp++;
+        bonus_fairy = 3;
+    }
+    if (Status->Stance == 1) // Sitting stance
+    {
+        nb_sec_stance = 3;
+        bonus_mp++;
+        bonus_hp++;
+        bonus_sitted = 3;
+    }
 
-        if( etimeHP >= TimeDiff && Stats->HP > 0 )
+    // Bonfire aura check: nearby active bonfire grants rapid recovery
+    CMap* curMap = (Position && Position->Map < (UINT)GServer->MapList.max) ? GServer->MapList.Index[Position->Map] : NULL;
+    if ( curMap && curMap != GServer->MapList.nullzone )
+    {
+        for ( size_t m = 0; m < curMap->MonsterList.size( ); m++ )
+        {
+            CMonster* mon = curMap->MonsterList[m];
+            if ( mon && !mon->IsDead( ) && mon->Stats->HP > 0 && mon->IsBonfire( ) )
+            {
+                if ( GServer->distance( Position->current, mon->Position->current ) <= 10.0f )
+                {
+                    nb_sec_stance = 2;
+                    bonus_hp += 2;
+                    bonus_mp += 2;
+                    bonus_sitted = 3;
+                    break;
+                }
+            }
+        }
+    }
+
+    bool hp_changed = false;
+    bool mp_changed = false;
+
+    // HP Regeneration
+    if (Stats->HP < Stats->MaxHP && Stats->HP > 0)
+    {
+        if ( (now - lastRegenTime_hp) >= nb_sec_stance )
         {
             unsigned int hpamount = GetHPRegenAmount( );
+            if (hpamount < 5) hpamount = 5; // Min 5 HP per tick
 
-            if (bonus_hp!=0)
+            if (bonus_hp != 0)
             {
-               Stats->HP += (long int) (hpamount*bonus_sitted)*bonus_fairy;
-               //Log(MSG_INFO,"REGEN HP %i(%i*%i)*%i",(long int) (hpamount*bonus_sitted)*bonus_fairy,hpamount,bonus_sitted,bonus_fairy);
+                Stats->HP += (long int)(hpamount * bonus_sitted) * bonus_fairy;
             }
             else
             {
                 Stats->HP += hpamount;
             }
-            if( Stats->HP > Stats->MaxHP)
+            if (Stats->HP > Stats->MaxHP)
                 Stats->HP = Stats->MaxHP;
 
-            if (Stats->HP < Stats->MaxHP)
-                lastRegenTime_hp = clock();
+            lastRegenTime_hp = now;
+            hp_changed = true;
         }
     }
 
-    //LMA: MP
-    if(Stats->MP<Stats->MaxMP)
+    // MP Regeneration
+    if (Stats->MP < Stats->MaxMP && Stats->HP > 0)
     {
-        clock_t etimeMP = clock() - lastRegenTime_mp;
-
-        if( etimeMP >= TimeDiff && Stats->HP > 0 )
+        if ( (now - lastRegenTime_mp) >= nb_sec_stance )
         {
             unsigned int mpamount = GetMPRegenAmount( );
+            if (mpamount < 5) mpamount = 5; // Min 5 MP per tick
 
-            if (bonus_mp!=0)
+            if (bonus_mp != 0)
             {
-               Stats->MP += (long int) (mpamount * bonus_sitted)* bonus_fairy;
-               //Log(MSG_INFO,"RegenMP %i(%i*%i)*%i",(long int) (mpamount*bonus_sitted)*bonus_fairy,mpamount,bonus_sitted,bonus_fairy);
+                Stats->MP += (long int)(mpamount * bonus_sitted) * bonus_fairy;
             }
             else
             {
                 Stats->MP += mpamount;
             }
-            if( Stats->MP > Stats->MaxMP )
+            if (Stats->MP > Stats->MaxMP)
                 Stats->MP = Stats->MaxMP;
 
-            if (Stats->HP < Stats->MaxHP)
-                lastRegenTime_mp = clock();
+            lastRegenTime_mp = now;
+            mp_changed = true;
         }
     }
+
+    if (hp_changed || mp_changed)
+    {
+        RefreshHPMP();
+    }
+
     return true;
 }
 
@@ -2139,7 +2144,7 @@ void CPlayer::SendQuestUpdate()
     {
         ADDWORD( pak,  quest.quests[i].QuestID );
         long int Time = 0;
-        if (quest.quests[i].QuestID > 0 && GServer->STB_QUEST.rows[quest.quests[i].QuestID][1] > 0)
+        if (quest.quests[i].QuestID > 0 && (unsigned)quest.quests[i].QuestID < GServer->STB_QUEST.rowcount && GServer->STB_QUEST.rows[quest.quests[i].QuestID] != NULL && GServer->STB_QUEST.rows[quest.quests[i].QuestID][1] > 0)
         {
             Time += quest.quests[i].StartTime; // Start time
             Time += GServer->STB_QUEST.rows[quest.quests[i].QuestID][1] * 10; // Time to finish
@@ -2213,7 +2218,7 @@ void CPlayer::CheckDelayedQuestTriggers()
     // 2. Check active timed quests countdown / expiration
     for (unsigned i = 0; i < 10; i++)
     {
-        if (quest.quests[i].QuestID > 0 && GServer->STB_QUEST.rows[quest.quests[i].QuestID][1] > 0)
+        if (quest.quests[i].QuestID > 0 && (unsigned)quest.quests[i].QuestID < GServer->STB_QUEST.rowcount && GServer->STB_QUEST.rows[quest.quests[i].QuestID] != NULL && GServer->STB_QUEST.rows[quest.quests[i].QuestID][1] > 0)
         {
             time_t duration = (time_t)GServer->STB_QUEST.rows[quest.quests[i].QuestID][1] * 10;
             if (quest.quests[i].StartTime > 1 && now >= (time_t)(quest.quests[i].StartTime + duration))
@@ -2299,7 +2304,7 @@ int CPlayer::GetQuestVar(short nVarType, short nVarNO){
       SQuest* activeQuest = GetActiveQuest();
       if(activeQuest == NULL || activeQuest->QuestID == 0) return 0;
       long int Time = 0;
-      if (GServer->STB_QUEST.rows[activeQuest->QuestID][1] > 0)
+      if ((unsigned)activeQuest->QuestID < GServer->STB_QUEST.rowcount && GServer->STB_QUEST.rows[activeQuest->QuestID] != NULL && GServer->STB_QUEST.rows[activeQuest->QuestID][1] > 0)
       {
           Time += activeQuest->StartTime;
           Time += GServer->STB_QUEST.rows[activeQuest->QuestID][1] * 10;

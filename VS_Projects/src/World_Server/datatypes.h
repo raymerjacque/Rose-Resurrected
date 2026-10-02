@@ -21,6 +21,8 @@
 #ifndef __ROSE_DATATYPES__
 #define __ROSE_DATATYPES__
 
+#include "../Common/Compat.h"
+
 //LMA: new refine system
 #ifndef REFINENEW
 #define REFINENEW
