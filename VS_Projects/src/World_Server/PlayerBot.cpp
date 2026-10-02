@@ -2469,15 +2469,17 @@ bool CPlayerBot::IsMobReserved( CMonster* mob )
     if ( !mob || mob->IsDead( ) || mob->Stats->HP <= 0 ) return true;
 
     CMap* map = GetMap( );
-    if ( !map ) return false;
+    if ( !map || !m_player ) return false;
+
+    int claimCount = 0;
 
     for ( UINT i = 0; i < map->PlayerList.size( ); i++ )
     {
         CPlayer* otherPlayer = map->PlayerList[i];
         if ( !otherPlayer || otherPlayer == m_player ) continue;
 
-        // Skip party members if in a party (party members can assist on same mob if boss/high hp)
-        if ( m_player->Party && m_player->Party->party )
+        // Skip party members if in a party (party members can assist on same mob)
+        if ( m_player->Party != NULL && m_player->Party->party != NULL )
         {
             CParty* party = m_player->Party->party;
             bool isPartyMember = false;
@@ -2492,15 +2494,19 @@ bool CPlayerBot::IsMobReserved( CMonster* mob )
             if ( isPartyMember ) continue;
         }
 
-        if ( otherPlayer->bot_ai )
+        if ( otherPlayer->bot_ai != NULL )
         {
             CPlayerBot* otherBot = reinterpret_cast<CPlayerBot*>( otherPlayer->bot_ai );
             if ( otherBot && otherBot->m_targetMobCid == mob->clientid )
             {
-                return true;
+                claimCount++;
             }
         }
     }
+
+    // Allow up to 2 non-party bots to target the same monster
+    if ( claimCount >= 2 ) return true;
+
     return false;
 }
 
@@ -2514,8 +2520,10 @@ CMonster* CPlayerBot::FindNearbyMonster( float radius )
     struct MobCandidate {
         CMonster* mob;
         float distSq;
+        bool reserved;
     };
-    std::vector<MobCandidate> candidates;
+    std::vector<MobCandidate> unreservedCandidates;
+    std::vector<MobCandidate> allCandidates;
 
     for ( UINT i = 0; i < map->MonsterList.size( ); i++ )
     {
@@ -2525,28 +2533,33 @@ CMonster* CPlayerBot::FindNearbyMonster( float radius )
         if ( mob->GetOwner( ) != NULL ) continue; 
         if ( IsKillSteal( mob ) ) continue; 
 
-        // Check if mob is reserved by another non-party bot
-        if ( IsMobReserved( mob ) ) continue;
-
         float dx = myPos.x - mob->Position->current.x;
         if ( dx > radius || dx < -radius ) continue;
         float dy = myPos.y - mob->Position->current.y;
         if ( dy > radius || dy < -radius ) continue;
 
         float distSq = dx * dx + dy * dy;
-        candidates.push_back( { mob, distSq } );
+        bool reserved = IsMobReserved( mob );
+
+        allCandidates.push_back( { mob, distSq, reserved } );
+        if ( !reserved )
+        {
+            unreservedCandidates.push_back( { mob, distSq, false } );
+        }
     }
 
-    if ( candidates.empty( ) ) return NULL;
+    // Prefer unreserved candidates to spread bots out naturally across mobs
+    std::vector<MobCandidate>& pool = !unreservedCandidates.empty( ) ? unreservedCandidates : allCandidates;
+    if ( pool.empty( ) ) return NULL;
 
-    std::sort( candidates.begin( ), candidates.end( ), []( const MobCandidate& a, const MobCandidate& b ) {
+    std::sort( pool.begin( ), pool.end( ), []( const MobCandidate& a, const MobCandidate& b ) {
         return a.distSq < b.distSq;
     } );
 
-    int poolSize = ( candidates.size( ) < 3 ) ? (int)candidates.size( ) : 3;
+    int poolSize = ( pool.size( ) < 3 ) ? (int)pool.size( ) : 3;
     int choice = rand( ) % poolSize;
 
-    return candidates[choice].mob;
+    return pool[choice].mob;
 }
 
 CDrop* CPlayerBot::FindNearbyDrop( float radius )
