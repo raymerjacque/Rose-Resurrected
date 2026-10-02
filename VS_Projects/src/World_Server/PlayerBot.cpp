@@ -1062,6 +1062,14 @@ CPlayerBot::CPlayerBot( CPlayer* player )
     m_lastSkillCastTime = clock( );
     m_lastPlayerNearby = clock( );
 
+    // Stagger initial social timers to prevent packet flooding on client login
+    clock_t now = clock( );
+    m_lastWhisperTime = now + ( ( 120 + ( rand( ) % 360 ) ) * CLOCKS_PER_SEC );
+    m_lastGreetingTime = now + ( ( 45 + ( rand( ) % 180 ) ) * CLOCKS_PER_SEC );
+    m_lastChatterTime = now + ( ( 60 + ( rand( ) % 240 ) ) * CLOCKS_PER_SEC );
+    m_lastVendingSay = now + ( ( 30 + ( rand( ) % 120 ) ) * CLOCKS_PER_SEC );
+    m_lastPartyInviteTime = now + ( ( 90 + ( rand( ) % 300 ) ) * CLOCKS_PER_SEC );
+
     if ( m_player )
     {
         m_roamCenter = m_player->Position->current;
@@ -3884,17 +3892,24 @@ void CPlayerBot::CheckWhispers( )
     if ( !m_player || m_isVendingBot || m_state == BOT_STATE_DEAD ) return;
 
     clock_t now = clock( );
-    if ( ( now - m_lastWhisperTime ) < (clock_t)( 180 * CLOCKS_PER_SEC ) ) return;
+    if ( ( now - m_lastWhisperTime ) < (clock_t)( ( 300 + ( rand( ) % 300 ) ) * CLOCKS_PER_SEC ) ) return;
+    m_lastWhisperTime = now;
+
+    // 10% chance to whisper when cooldown expires
+    if ( rand( ) % 100 >= 10 ) return;
 
     CMap* map = GetMap( );
-    if ( !map ) return;
+    if ( !map || !m_player->Position ) return;
 
     for ( UINT i = 0; i < map->PlayerList.size( ); i++ )
     {
         CPlayer* p = map->PlayerList[i];
-        if ( p && !p->is_bot && p->Session && p->Session->inGame )
+        if ( p && !p->is_bot && p->Session && p->Session->inGame && p->Position )
         {
-            m_lastWhisperTime = now;
+            // Only whisper if player is nearby (within 25.0f units)
+            float dist = GServer->distance( m_player->Position->current, p->Position->current );
+            if ( dist > 25.0f ) continue;
+
             char msg[100];
             if ( m_personality == BOT_PERSONALITY_RIVAL )
             {
