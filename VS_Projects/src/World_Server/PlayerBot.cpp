@@ -407,7 +407,7 @@ void CBotManager::CheckVendingBots( )
         { "Mechanic_Torque",     321, 100, 2, 5510.0f, 5235.0f, "[PAT] Frames, Engines & Wheels",      VEND_CAT_PAT },
         { "Jeweler_Serena",      311, 100, 2, 5518.0f, 5240.0f, "[Jewelry] Stat Rings & Necklaces",    VEND_CAT_ACCESSORIES },
         { "WingMaster_Aero",     411, 100, 2, 5505.0f, 5245.0f, "[Wings] Angel, Devil & Fairies",     VEND_CAT_WINGS },
-        { "Quartermaster_Rook",  411, 100, 2, 5295.0f, 5250.0f, "[Ammo] Elemental Arrows & Bullets",   VEND_CAT_AMMO },
+        { "QMaster_Rook",        411, 100, 2, 5295.0f, 5250.0f, "[Ammo] Elemental Arrows & Bullets",   VEND_CAT_AMMO },
         { "Dealer_Vance",        411, 100, 2, 5320.0f, 5100.0f, "[Gear] Dual Weapons & Katars",        VEND_CAT_DUAL_KATARS },
         // Expanded Junon Polis Vendors
         { "Dealer_Kael",         411, 100, 2, 5645.0f, 5218.0f, "[Katars] Assassins & Dual Blades",   VEND_CAT_DUAL_KATARS },
@@ -415,11 +415,11 @@ void CBotManager::CheckVendingBots( )
         { "Armorer_Thorne",      111, 100, 2, 5715.0f, 5275.0f, "[Armor] Heavy Plate & Guards",        VEND_CAT_ARMOR_HIGH },
         { "Bowcraft_Soren",      411, 100, 2, 5658.0f, 5198.0f, "[Bows] Compound Bows & Guns",         VEND_CAT_WEAPONS_HIGH },
         { "Jeweler_Cynthia",     311, 100, 2, 5525.0f, 5248.0f, "[Jewels] High Amulets & Rings",       VEND_CAT_ACCESSORIES },
-        { "ForgeMaster_Karr",    322, 100, 2, 5718.0f, 5212.0f, "[Refine] Runes & Catalysts",          VEND_CAT_REFINE },
+        { "Forge_Karr",          322, 100, 2, 5718.0f, 5212.0f, "[Refine] Runes & Catalysts",          VEND_CAT_REFINE },
         { "Mechanic_Gears",      321, 100, 2, 5502.0f, 5228.0f, "[PAT] High Speed Engines",            VEND_CAT_PAT },
-        { "WingMaker_Zephyr",    411, 100, 2, 5498.0f, 5238.0f, "[Wings] Feathered Wings & Backbags",  VEND_CAT_WINGS },
+        { "WMaker_Zephyr",       411, 100, 2, 5498.0f, 5238.0f, "[Wings] Feathered Wings & Backbags",  VEND_CAT_WINGS },
         { "GemCutter_Talon",     321, 100, 2, 5648.0f, 5202.0f, "[Gems] Perfect Rubies & Sapphires",   VEND_CAT_GEMS },
-        { "Quartermaster_Bane",  411, 100, 2, 5288.0f, 5242.0f, "[Ammo] High Capacity Cartridges",     VEND_CAT_AMMO },
+        { "QMaster_Bane",        411, 100, 2, 5288.0f, 5242.0f, "[Ammo] High Capacity Cartridges",     VEND_CAT_AMMO },
         { "Supplier_Rowan",      322, 100, 2, 5738.0f, 5238.0f, "[Crafting] Refined Metals & Woods",    VEND_CAT_MATERIALS },
         { "Enchanter_Mira",      211, 100, 2, 5685.0f, 5208.0f, "[Scrolls] Town Portal & Buff Spells", VEND_CAT_POTIONS_SCROLLS },
 
@@ -441,14 +441,14 @@ void CBotManager::CheckVendingBots( )
         { "GemTrader_Silas",     321,  50, 1, 5308.0f, 5220.0f, "[Gems] Uncut Crystals & Shards",     VEND_CAT_ZANT_GEMS },
 
         // Adventurer's Plains (Map 22) Market Outpost
-        { "Plains_Vendor_Tariq", 311,  30, 22, 5120.0f, 5340.0f, "[Novice] Field Supplies & Pots",     VEND_CAT_ZANT_STARTER },
-        { "Plains_Smith_Hark",   111,  30, 22, 5128.0f, 5345.0f, "[Weapons] Traveler Swords & Bows",   VEND_CAT_ZANT_WEAPONS },
-        { "Plains_Fletcher_Bram",411,  30, 22, 5112.0f, 5335.0f, "[Ammo] Practice Arrows & Shells",    VEND_CAT_ZANT_AMMO },
+        { "Plains_Tariq",        311,  30, 22, 5120.0f, 5340.0f, "[Novice] Field Supplies & Pots",     VEND_CAT_ZANT_STARTER },
+        { "Plains_Hark",         111,  30, 22, 5128.0f, 5345.0f, "[Weapons] Traveler Swords & Bows",   VEND_CAT_ZANT_WEAPONS },
+        { "Plains_Bram",         411,  30, 22, 5112.0f, 5335.0f, "[Ammo] Practice Arrows & Shells",    VEND_CAT_ZANT_AMMO },
 
         // Breezy Hills (Map 12) Crossroads
-        { "Hills_Trader_Vane",   311,  70, 12, 5300.0f, 5200.0f, "[Supplies] Travel Pots & Scrolls",   VEND_CAT_POTIONS_SCROLLS },
-        { "Hills_Merchant_Lukas",322,  70, 12, 5310.0f, 5210.0f, "[Refine] Mid-Tier Enhancers",        VEND_CAT_REFINE },
-        { "Hills_Armorer_Dara",  111,  70, 12, 5290.0f, 5190.0f, "[Armor] Guard & Ranger Sets",        VEND_CAT_ARMOR_HIGH }
+        { "Hills_Vane",          311,  70, 12, 5300.0f, 5200.0f, "[Supplies] Travel Pots & Scrolls",   VEND_CAT_POTIONS_SCROLLS },
+        { "Hills_Lukas",         322,  70, 12, 5310.0f, 5210.0f, "[Refine] Mid-Tier Enhancers",        VEND_CAT_REFINE },
+        { "Hills_Dara",          111,  70, 12, 5290.0f, 5190.0f, "[Armor] Guard & Ranger Sets",        VEND_CAT_ARMOR_HIGH }
     };
     static const size_t spotCount = sizeof( spots ) / sizeof( spots[0] );
 
@@ -467,7 +467,7 @@ void CBotManager::CheckVendingBots( )
             CPlayerBot* bAi = m_bots[i];
             if ( bAi && bAi->GetPlayer( ) && bAi->GetPlayer( )->CharInfo )
             {
-                if ( strcmp( bAi->GetPlayer( )->CharInfo->charname, loc.name ) == 0 )
+                if ( strncmp( bAi->GetPlayer( )->CharInfo->charname, loc.name, 15 ) == 0 )
                 {
                     exists = true;
                     break;
