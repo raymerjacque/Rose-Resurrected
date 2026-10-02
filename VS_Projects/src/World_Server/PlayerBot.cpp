@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cstdio>
+#include <algorithm>
 
 // -------------------------------------------------------------
 // Authentic Player Name Pool
@@ -1265,29 +1266,32 @@ void CPlayerBot::SayChatter( const char* category )
     clock_t now = clock( );
     if ( ( now - m_lastChatterTime ) < ( 30 * CLOCKS_PER_SEC ) ) return;
 
+    // Roll d20: 12 or higher required (~45% chance to speak on chatter event)
+    if ( RollD20( ) < 12 ) return;
+
     if ( strcmp( category, "low_hp" ) == 0 )
     {
         const char* msgs[] = { "Whoa, that hit hard!", "Chugging a potion!", "Need to stay alive!" };
         Say( msgs[rand() % 3] );
-        m_lastChatterTime = now;
+        m_lastChatterTime = now + ( ( rand( ) % 15 ) * CLOCKS_PER_SEC );
     }
     else if ( strcmp( category, "rare_drop" ) == 0 )
     {
         const char* msgs[] = { "Nice drop!", "Sweet loot!", "Jackpot!", "I'm taking this!" };
         Say( msgs[rand() % 4] );
-        m_lastChatterTime = now;
+        m_lastChatterTime = now + ( ( rand( ) % 15 ) * CLOCKS_PER_SEC );
     }
     else if ( strcmp( category, "greeting" ) == 0 )
     {
         const char* msgs[] = { "Hey there! Good luck!", "Yo! Safe travels!", "Hi everyone!", "Happy grinding!" };
         Say( msgs[rand() % 4] );
-        m_lastChatterTime = now;
+        m_lastChatterTime = now + ( ( rand( ) % 15 ) * CLOCKS_PER_SEC );
     }
     else if ( strcmp( category, "combat_cheer" ) == 0 )
     {
         const char* msgs[] = { "Take that!", "Down you go!", "One more down!", "Bullseye!" };
         Say( msgs[rand() % 4] );
-        m_lastChatterTime = now;
+        m_lastChatterTime = now + ( ( rand( ) % 15 ) * CLOCKS_PER_SEC );
     }
 }
 
@@ -1298,7 +1302,14 @@ void CPlayerBot::CheckPartyInvitations( )
     if ( ( now - m_lastPartyInviteTime ) < ( 30 * CLOCKS_PER_SEC ) ) return;
     m_lastPartyInviteTime = now;
 
-    if ( m_player->Party->party != NULL && m_player->Party->party->Members[0] != m_player ) return;
+    if ( m_player->Party->party != NULL )
+    {
+        if ( m_player->Party->party->Members[0] != m_player ) return;
+        if ( m_player->Party->party->Members.size( ) >= 5 ) return; // Limit grinding parties to 5 members maximum
+    }
+
+    // Roll d20: 12 or higher required to want to invite someone right now (~45% chance)
+    if ( RollD20( ) < 12 ) return;
 
     CMap* map = GetMap( );
     if ( !map ) return;
@@ -1417,6 +1428,15 @@ void CPlayerBot::CheckZoneMigration( )
 void CPlayerBot::MoveTo( fPoint dest )
 {
     if ( !m_player ) return;
+
+    // Natural movement jitter offset (+/- 1.5 meters) to break up mechanical single-file movement
+    if ( !m_isBuffBot && !m_isVendingBot && m_state != BOT_STATE_FOLLOW )
+    {
+        float jitterX = ( ( rand( ) % 300 ) - 150 ) / 100.0f;
+        float jitterY = ( ( rand( ) % 300 ) - 150 ) / 100.0f;
+        dest.x += jitterX;
+        dest.y += jitterY;
+    }
 
     // If already moving towards approximately the same destination, don't spam 0x79a packet
     if ( m_player->IsMoving( ) && GServer->distance( m_player->Position->destiny, dest ) < 1.0f )
@@ -2100,7 +2120,10 @@ bool CPlayerBot::CheckProximityBuffs( )
     if ( job != 211 && job != 221 && job != 222 ) return false;
 
     clock_t now = clock( );
-    if ( ( now - m_lastPartyBuffTime ) < (clock_t)( 3.0f * CLOCKS_PER_SEC ) ) return false;
+    if ( ( now - m_lastPartyBuffTime ) < (clock_t)( 5.0f * CLOCKS_PER_SEC ) ) return false;
+
+    // Roll d20: 14 or higher required (~35% chance to buff a passing stranger)
+    if ( RollD20( ) < 14 ) return false;
 
     CMap* map = GetMap( );
     if ( !map ) return false;
@@ -2441,22 +2464,69 @@ CMonster* CPlayerBot::FindNearbyWorldBoss( float radius )
     return NULL;
 }
 
+bool CPlayerBot::IsMobReserved( CMonster* mob )
+{
+    if ( !mob || mob->IsDead( ) || mob->Stats->HP <= 0 ) return true;
+
+    CMap* map = GetMap( );
+    if ( !map ) return false;
+
+    for ( UINT i = 0; i < map->PlayerList.size( ); i++ )
+    {
+        CPlayer* otherPlayer = map->PlayerList[i];
+        if ( !otherPlayer || otherPlayer == m_player ) continue;
+
+        // Skip party members if in a party (party members can assist on same mob if boss/high hp)
+        if ( m_player->Party && m_player->Party->party )
+        {
+            CParty* party = m_player->Party->party;
+            bool isPartyMember = false;
+            for ( size_t m = 0; m < party->Members.size( ); m++ )
+            {
+                if ( party->Members[m] == otherPlayer )
+                {
+                    isPartyMember = true;
+                    break;
+                }
+            }
+            if ( isPartyMember ) continue;
+        }
+
+        if ( otherPlayer->bot_ai )
+        {
+            CPlayerBot* otherBot = reinterpret_cast<CPlayerBot*>( otherPlayer->bot_ai );
+            if ( otherBot && otherBot->m_targetMobCid == mob->clientid )
+            {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 CMonster* CPlayerBot::FindNearbyMonster( float radius )
 {
     CMap* map = GetMap( );
     if ( !map || !m_player || !m_player->Position ) return NULL;
 
-    CMonster* bestTarget = NULL;
-    float bestDistSq = radius * radius;
     fPoint myPos = m_player->Position->current;
+
+    struct MobCandidate {
+        CMonster* mob;
+        float distSq;
+    };
+    std::vector<MobCandidate> candidates;
 
     for ( UINT i = 0; i < map->MonsterList.size( ); i++ )
     {
         CMonster* mob = map->MonsterList[i];
         if ( !mob || mob->IsDead( ) || mob->Stats->HP <= 0 || !mob->Position ) continue;
-        if ( mob->IsBonfire( ) ) continue; // Bonfires are non-combat entities
-        if ( mob->GetOwner( ) != NULL ) continue; // Player/bot summons are friendly
-        if ( IsKillSteal( mob ) ) continue; // Respect mob ownership
+        if ( mob->IsBonfire( ) ) continue; 
+        if ( mob->GetOwner( ) != NULL ) continue; 
+        if ( IsKillSteal( mob ) ) continue; 
+
+        // Check if mob is reserved by another non-party bot
+        if ( IsMobReserved( mob ) ) continue;
 
         float dx = myPos.x - mob->Position->current.x;
         if ( dx > radius || dx < -radius ) continue;
@@ -2464,13 +2534,19 @@ CMonster* CPlayerBot::FindNearbyMonster( float radius )
         if ( dy > radius || dy < -radius ) continue;
 
         float distSq = dx * dx + dy * dy;
-        if ( distSq < bestDistSq )
-        {
-            bestDistSq = distSq;
-            bestTarget = mob;
-        }
+        candidates.push_back( { mob, distSq } );
     }
-    return bestTarget;
+
+    if ( candidates.empty( ) ) return NULL;
+
+    std::sort( candidates.begin( ), candidates.end( ), []( const MobCandidate& a, const MobCandidate& b ) {
+        return a.distSq < b.distSq;
+    } );
+
+    int poolSize = ( candidates.size( ) < 3 ) ? (int)candidates.size( ) : 3;
+    int choice = rand( ) % poolSize;
+
+    return candidates[choice].mob;
 }
 
 CDrop* CPlayerBot::FindNearbyDrop( float radius )
@@ -3062,17 +3138,23 @@ void CPlayerBot::HandleTownRepair( )
     if ( !m_player ) return;
     clock_t now = clock( );
 
-    if ( m_stateTimer == 0 || ( now - m_stateTimer ) > ( 30 * CLOCKS_PER_SEC ) )
+    if ( m_stateTimer == 0 || ( now - m_stateTimer ) > ( 25 * CLOCKS_PER_SEC ) )
     {
-        Say( "Gear repaired and inventory cleared! Heading back to hunt." );
+        if ( RollD20( ) >= 10 )
+        {
+            Say( "Gear repaired and inventory cleared! Heading back to hunt." );
+        }
         SetState( BOT_STATE_ROAM );
         return;
     }
 
     if ( ( ( now - m_stateTimer ) / CLOCKS_PER_SEC ) == 3 )
     {
-        Say( "Visiting NPC Blacksmith to repair equipment and sell loot." );
-        DoEmote( 2 ); // Nod / Cheer
+        if ( RollD20( ) >= 12 )
+        {
+            Say( "Visiting NPC Blacksmith to repair equipment and sell loot." );
+            DoEmote( 2 ); // Nod / Cheer
+        }
     }
 }
 
@@ -3583,6 +3665,9 @@ void CPlayerBot::CheckPlayerGreetings( )
     clock_t now = clock( );
     if ( ( now - m_lastGreetingTime ) < (clock_t)( 45 * CLOCKS_PER_SEC ) ) return;
 
+    // Roll d20: 15 or higher required to greet a nearby player (~30% chance)
+    if ( RollD20( ) < 15 ) return;
+
     CMap* map = GetMap( );
     if ( !map ) return;
 
@@ -3594,18 +3679,22 @@ void CPlayerBot::CheckPlayerGreetings( )
             float dist = GServer->distance( m_player->Position->current, p->Position->current );
             if ( dist <= 8.0f )
             {
-                m_lastGreetingTime = now;
+                m_lastGreetingTime = now + ( ( rand( ) % 20 ) * CLOCKS_PER_SEC );
                 DoEmote( 1 ); // Wave
 
-                char msg[80];
-                const char* greetings[] = {
-                    "Hey there, %s!",
-                    "Good luck hunting out here, %s!",
-                    "Nice gear you got there, %s!",
-                    "Stay safe out there, %s!"
-                };
-                snprintf( msg, sizeof(msg), greetings[rand() % 4], p->CharInfo->charname );
-                Say( msg );
+                // 50% chance to also chat out loud on greeting
+                if ( RollD20( ) >= 10 )
+                {
+                    char msg[80];
+                    const char* greetings[] = {
+                        "Hey there, %s!",
+                        "Good luck hunting out here, %s!",
+                        "Nice gear you got there, %s!",
+                        "Stay safe out there, %s!"
+                    };
+                    snprintf( msg, sizeof(msg), greetings[rand() % 4], p->CharInfo->charname );
+                    Say( msg );
+                }
                 return;
             }
         }

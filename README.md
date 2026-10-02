@@ -348,7 +348,18 @@ RosE Resurrected features an industry-leading, fully autonomous PlayerBot system
 - **Open-World Duels (`/duel <BotName>`)**: Real players can challenge any online bot to a duel using `/duel <BotName>`. The bot accepts in chat (*"Challenge accepted!"*), engages in PvP combat against the player, and yields (`/bow`) when either combatant reaches 10% HP to prevent death.
 - **Akram Arena Queueing (`/arena`)**: Ambient bots monitor Akram Arena countdown states (`ARENA_STATE_COUNTDOWN`) and queue via `CArenaManager::GetInstance()->JoinArena( m_player )`, competing on Red vs Blue teams inside the Colosseum with PvP combat AI.
 
-### 7. Instanced Dungeon Crawling, World Boss Raids & Town Life
+### 7. D&D Dice Engine & Natural Movement Realism (`RollD20` / `RollD100`)
+- **D&D Dice Roll Decision System ($d20$ / $d100$)**: All bot actions (greetings, proximity buffing, combat chatter, party invitations, town repair visits) are driven by probabilistic dice rolls (`RollD20()` and `RollD100()`) rather than synchronized or deterministic logic:
+  - **Proximity Greetings**: $d20 \ge 15$ (~30% probability).
+  - **Stranger Buffing**: $d20 \ge 14$ (~35% probability for Muse/Cleric bots).
+  - **Combat Chatter & Cheers**: $d20 \ge 12$ (~45% probability).
+  - **Party Invitations**: $d20 \ge 12$ (~45% probability).
+  - **Town Restock & Repair Visits**: $d100 \ge 85$ (~15% probability per hunt cycle) with randomized 15–45 minute intervals.
+- **Target Reservation & Anti-Clustering Engine (`IsMobReserved`)**: Eliminates mechanical "bot trains" where multiple bots run to the same monster in single file. Bots check `IsMobReserved()` to verify if another bot is already approaching or targeting a monster; candidates are randomly selected from the top unreserved monsters using dice rolls.
+- **5-Member Grinding Party Cap**: Strict cap of 5 members maximum for standard open-world grinding parties (unlimited only for Boss Raids and Dungeons).
+- **Positional Movement Jitter ($\pm 1.5\text{m}$)**: Applies subtle random spatial offsets to destination vectors, creating organic, human-like movement paths and preventing single-file line formations.
+
+### 8. Instanced Dungeon Crawling, World Boss Raids & Town Life
 - **Living Town Life & Repair Routines (`BOT_STATE_TOWN_REPAIR`)**: After extensive hunting cycles, bots return to town to visit NPC Blacksmiths to repair equipment, sell extra loot, browse player street shops, rest, and mount Carts to travel to new zones.
 - **Dungeon Raiding**: Level 60+ bot parties check for dungeon portals (e.g. Barka Dungeon map 51, Pyramids, Forgotten Temple) and enter instances to clear monsters and raid dungeon bosses.
 - **World Boss Convergence Raids**: Bots scan for world bosses (e.g. *King Spider*, *Chapeau*, *Karkome*), shouting map coordinates in local chat (*"🔥 WORLD BOSS ALERT: Boss spotted near (5200, 4800)! Assemble raid!"*), and converging into a joint raid team.

@@ -77,6 +77,11 @@ public:
     BotPersonality GetPersonality( ) const { return m_personality; }
     void WhisperPlayer( CPlayer* target, const char* msg );
 
+    // D&D Dice Roll Helpers & Anti-Clustering Logic
+    static int RollD20( ) { return 1 + ( rand( ) % 20 ); }
+    static int RollD100( ) { return 1 + ( rand( ) % 100 ); }
+    bool IsMobReserved( CMonster* mob );
+
     // Actions
     void SetState( BotState state );
     void MoveTo( fPoint dest );
