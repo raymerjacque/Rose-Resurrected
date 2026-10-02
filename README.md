@@ -338,18 +338,20 @@ RosE Resurrected features an industry-leading, fully autonomous PlayerBot system
 - **Bots Shopping from Real Player Vendors**: Roaming bots in Junon Polis / Zant locate real player street shops (`/vendor`), walk up to them, browse items, and purchase crafting materials, gems, and potions using their Zulies. Bots send a thank-you whisper (*"Thanks for the deal on your shop items!"*) to the player shop owner.
 - **Direct Player-to-Bot Trading (`/trade <BotName>`)**: Players can challenge any online bot to a trade (`/trade <BotName>`). The bot auto-accepts the trade request, places 25,000 Zulies into the trade window, and completes the trade when the player accepts.
 
-### 5. Whisper & Rivalry Engine
+### 5. Whisper, LFG & Interactive AI Engine
 - **Personality Archetypes**: Assigned distinct personalities (`BOT_PERSONALITY_RIVAL`, `BOT_PERSONALITY_HELPER`, `BOT_PERSONALITY_MERCHANT`, `BOT_PERSONALITY_BRAWLER`).
-- **Rival PMs**: Sent when players level up (*"Hey [PlayerName]! I'm level 55 now, trying to stay ahead of you!"*).
-- **Helper PMs**: Sent when players enter challenging maps (*"Greetings [PlayerName]! Let me know if you need party buffs or support!"*).
+- **LFG & LFM Map Shouts**: Bots broadcast role and level-appropriate group shouts in map chat (*"LFG Barka Dungeon - Level 65 Cleric ready! PST!"*, *"LF2M Level 25+ Grind Party! PST or target invite!"*).
+- **Interactive Whisper Parser (`/w <BotName>`)**: Real players can whisper bots to ask for location coordinates, party invitations, or duel challenges, receiving intelligent context-aware replies (*"I'm currently at (5240, 5190) on map 2! Feel free to join me!"*).
+- **Rival PMs & Persistent PvP Memory**: Bots remember past duels and PvP outcomes (`m_pvpRecord`), sending personalized rivalry messages when crossing paths with players (*"Back for round 2?"*).
 
 ### 6. PvP Arena & Open-World Duels
 - **Open-World Duels (`/duel <BotName>`)**: Real players can challenge any online bot to a duel using `/duel <BotName>`. The bot accepts in chat (*"Challenge accepted!"*), engages in PvP combat against the player, and yields (`/bow`) when either combatant reaches 10% HP to prevent death.
 - **Akram Arena Queueing (`/arena`)**: Ambient bots monitor Akram Arena countdown states (`ARENA_STATE_COUNTDOWN`) and queue via `CArenaManager::GetInstance()->JoinArena( m_player )`, competing on Red vs Blue teams inside the Colosseum with PvP combat AI.
 
-### 7. Instanced Dungeon Crawling & World Boss Raids
+### 7. Instanced Dungeon Crawling, World Boss Raids & Town Life
+- **Living Town Life & Repair Routines (`BOT_STATE_TOWN_REPAIR`)**: After extensive hunting cycles, bots return to town to visit NPC Blacksmiths to repair equipment, sell extra loot, browse player street shops, rest, and mount Carts to travel to new zones.
 - **Dungeon Raiding**: Level 60+ bot parties check for dungeon portals (e.g. Barka Dungeon map 51, Pyramids, Forgotten Temple) and enter instances to clear monsters and raid dungeon bosses.
-- **World Boss Targeting**: Bots scan for world bosses and high-HP targets (e.g. *King Hoplon*, *Karkome*), calling out in chat and assembling raid groups.
+- **World Boss Convergence Raids**: Bots scan for world bosses (e.g. *King Spider*, *Chapeau*, *Karkome*), shouting map coordinates in local chat (*"🔥 WORLD BOSS ALERT: Boss spotted near (5200, 4800)! Assemble raid!"*), and converging into a joint raid team.
 
 ### 8. Worldwide Grind-Spot Buff Bots (The Cleric Sisters)
 Placed at key leveling spots across the world, these cleric bots provide essential buffs and bonfires:

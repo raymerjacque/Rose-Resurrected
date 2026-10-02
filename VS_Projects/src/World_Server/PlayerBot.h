@@ -23,7 +23,9 @@ enum BotState {
     BOT_STATE_VENDING,
     BOT_STATE_TOWN_STROLL,
     BOT_STATE_MIGRATE,
-    BOT_STATE_DUEL
+    BOT_STATE_DUEL,
+    BOT_STATE_TOWN_REPAIR,
+    BOT_STATE_LFG_SHOUT
 };
 
 enum BotPersonality {
@@ -57,6 +59,7 @@ public:
     void HandleTownStroll( );
     void HandleMigrate( );
     void HandleDuel( );
+    void HandleTownRepair( );
     void StartDuel( CPlayer* challenger );
     void CheckPlayerGreetings( );
     void AssignClanTag( );
@@ -65,6 +68,10 @@ public:
     void CheckWhispers( );
     void CheckArenaQueue( );
     void CheckDungeonRuns( );
+    void CheckLfgShouts( );
+    void CheckWorldBossRaids( );
+    void ProcessIncomingWhisper( CPlayer* sender, const char* msg );
+    void TrackPvpResult( UINT playerCharId, bool won );
     void AssignTitle( );
     const char* GetTitleString( ) const { return m_title.c_str( ); }
     BotPersonality GetPersonality( ) const { return m_personality; }
@@ -216,6 +223,10 @@ private:
     clock_t m_lastWhisperTime;
     clock_t m_lastArenaQueueTime;
     clock_t m_lastDungeonCheckTime;
+    clock_t m_lastLfgShoutTime;
+    clock_t m_lastBossRaidCheckTime;
+    clock_t m_lastTownRepairTime;
+    std::map<UINT, int> m_pvpRecord; // Player CharID -> win(+1)/loss(-1)
 };
 
 class CBotManager {

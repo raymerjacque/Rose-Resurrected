@@ -2587,6 +2587,10 @@ void CPlayerBot::Update( )
     // Dungeon Crawling & Raids
     CheckDungeonRuns( );
 
+    // Phase 4 Realism: LFG Shouts & World Boss Raids
+    CheckLfgShouts( );
+    CheckWorldBossRaids( );
+
     // Proximity buffing: buff nearby unbuffed stationary real players (without chasing/moving toward them)
     if ( CheckProximityBuffs( ) ) return;
 
@@ -2627,6 +2631,7 @@ void CPlayerBot::Update( )
         case BOT_STATE_TOWN_STROLL: HandleTownStroll( );  break;
         case BOT_STATE_MIGRATE:     HandleMigrate( );     break;
         case BOT_STATE_DUEL:        HandleDuel( );        break;
+        case BOT_STATE_TOWN_REPAIR: HandleTownRepair( );  break;
     }
 }
 
@@ -3049,6 +3054,162 @@ void CPlayerBot::HandleTownStroll( )
 void CPlayerBot::HandleMigrate( )
 {
     SetState( BOT_STATE_IDLE );
+}
+
+void CPlayerBot::HandleTownRepair( )
+{
+    if ( !m_player ) return;
+    clock_t now = clock( );
+
+    if ( m_stateTimer == 0 || ( now - m_stateTimer ) > ( 30 * CLOCKS_PER_SEC ) )
+    {
+        Say( "Gear repaired and inventory cleared! Heading back to hunt." );
+        SetState( BOT_STATE_ROAM );
+        return;
+    }
+
+    if ( ( ( now - m_stateTimer ) / CLOCKS_PER_SEC ) == 3 )
+    {
+        Say( "Visiting NPC Blacksmith to repair equipment and sell loot." );
+        DoEmote( 2 ); // Nod / Cheer
+    }
+}
+
+void CPlayerBot::CheckLfgShouts( )
+{
+    if ( !m_player || m_isBuffBot || m_isVendingBot ) return;
+    clock_t now = clock( );
+    if ( ( now - m_lastLfgShoutTime ) < ( 90 * CLOCKS_PER_SEC ) ) return;
+    m_lastLfgShoutTime = now;
+
+    if ( m_player->Party->party != NULL && m_player->Party->party->Members.size() >= 4 ) return;
+
+    int lvl = m_player->Stats->Level;
+    int job = m_player->CharInfo->Job;
+
+    const char* jobStr = "Visitor";
+    switch(job) {
+        case 111: jobStr = "Soldier"; break;
+        case 121: jobStr = "Knight"; break;
+        case 122: jobStr = "Champion"; break;
+        case 211: jobStr = "Muse"; break;
+        case 221: jobStr = "Mage"; break;
+        case 222: jobStr = "Cleric"; break;
+        case 311: jobStr = "Hawker"; break;
+        case 321: jobStr = "Raider"; break;
+        case 322: jobStr = "Scout"; break;
+        case 411: jobStr = "Dealer"; break;
+        case 421: jobStr = "Bourgeois"; break;
+        case 422: jobStr = "Artisan"; break;
+    }
+
+    char msg[128];
+    if ( m_player->Party->party == NULL )
+    {
+        if ( lvl >= 60 )
+            snprintf( msg, sizeof(msg), "LFG Barka Dungeon - Level %d %s ready! PST!", lvl, jobStr );
+        else if ( lvl >= 25 )
+            snprintf( msg, sizeof(msg), "LFG Goblin Cave / Breezy Hills - Level %d %s!", lvl, jobStr );
+        else
+            snprintf( msg, sizeof(msg), "LFG Adventure Plains! Level %d %s looking for party!", lvl, jobStr );
+    }
+    else
+    {
+        snprintf( msg, sizeof(msg), "LF%dM Level %d+ Grind Party! PST or target invite!",
+                  4 - (int)m_player->Party->party->Members.size(), lvl - 5 );
+    }
+
+    BEGINPACKET( pak, 0x783 );
+    ADDWORD    ( pak, m_player->clientid );
+    ADDSTRING  ( pak, msg );
+    ADDBYTE    ( pak, 0 );
+    GServer->SendToVisible( &pak, m_player );
+}
+
+void CPlayerBot::CheckWorldBossRaids( )
+{
+    if ( !m_player || m_isBuffBot || m_isVendingBot || m_state == BOT_STATE_DEAD ) return;
+    clock_t now = clock( );
+    if ( ( now - m_lastBossRaidCheckTime ) < ( 25 * CLOCKS_PER_SEC ) ) return;
+    m_lastBossRaidCheckTime = now;
+
+    CMonster* boss = FindNearbyWorldBoss( 200.0f );
+    if ( boss )
+    {
+        if ( m_state != BOT_STATE_COMBAT )
+        {
+            char msg[128];
+            snprintf( msg, sizeof(msg), "WORLD BOSS ALERT: Boss spotted near (%.0f, %.0f)! Assemble raid!",
+                      boss->Position->current.x, boss->Position->current.y );
+
+            BEGINPACKET( pak, 0x783 );
+            ADDWORD    ( pak, m_player->clientid );
+            ADDSTRING  ( pak, msg );
+            ADDBYTE    ( pak, 0 );
+            GServer->SendToVisible( &pak, m_player );
+
+            AttackTarget( boss );
+            SetState( BOT_STATE_COMBAT );
+        }
+    }
+}
+
+void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
+{
+    if ( !m_player || !sender || !msg || m_isBuffBot || m_isVendingBot ) return;
+
+    std::string text = msg;
+    for ( size_t i = 0; i < text.length(); i++ ) text[i] = tolower( text[i] );
+
+    char reply[256];
+    reply[0] = '\0';
+
+    if ( text.find( "where" ) != std::string::npos || text.find( "location" ) != std::string::npos || text.find( "pos" ) != std::string::npos )
+    {
+        snprintf( reply, sizeof(reply), "I'm currently at (%.0f, %.0f) on map %d! Feel free to join me.",
+                  m_player->Position->current.x, m_player->Position->current.y, m_player->Position->Map );
+    }
+    else if ( text.find( "party" ) != std::string::npos || text.find( "invite" ) != std::string::npos || text.find( "team" ) != std::string::npos )
+    {
+        if ( m_player->Party->party == NULL || m_player->Party->party->Members.size() < 4 )
+        {
+            snprintf( reply, sizeof(reply), "Sure! Target me and click twice to invite me to your party!" );
+        }
+        else
+        {
+            snprintf( reply, sizeof(reply), "Sorry, my party is full right now! Catch you on the next run." );
+        }
+    }
+    else if ( text.find( "duel" ) != std::string::npos || text.find( "fight" ) != std::string::npos || text.find( "pvp" ) != std::string::npos )
+    {
+        snprintf( reply, sizeof(reply), "You want to fight? Type '/duel %s' and let's go!", m_player->CharInfo->charname );
+    }
+    else if ( text.find( "hi" ) != std::string::npos || text.find( "hello" ) != std::string::npos || text.find( "hey" ) != std::string::npos )
+    {
+        snprintf( reply, sizeof(reply), "Hey %s! Good to see you out here. Good luck grinding!", sender->CharInfo->charname );
+    }
+    else
+    {
+        const char* defaultReplies[] = {
+            "Sounds good! Let's keep pushing ahead.",
+            "Haha nice! See you around!",
+            "Good luck with your quest!"
+        };
+        snprintf( reply, sizeof(reply), "%s", defaultReplies[rand() % 3] );
+    }
+
+    if ( reply[0] != '\0' )
+    {
+        WhisperPlayer( sender, reply );
+    }
+}
+
+void CPlayerBot::TrackPvpResult( UINT playerCharId, bool won )
+{
+    if ( won )
+        m_pvpRecord[playerCharId]++;
+    else
+        m_pvpRecord[playerCharId]--;
 }
 
 bool CPlayerBot::NeedsBuffs( )

@@ -2374,12 +2374,18 @@ bool CWorldServer::pakWhisper ( CPlayer* thisclient, CPacket* P )
 	CPlayer* otherclient = GetClientByCharNameCI( msgto );
 	if(otherclient!=NULL)
 	{
+	   if ( otherclient->is_bot && otherclient->bot_ai )
+	   {
+	       CPlayerBot* botAI = reinterpret_cast<CPlayerBot*>( otherclient->bot_ai );
+	       botAI->ProcessIncomingWhisper( thisclient, (char*)&P->Buffer[strlen(msgto)+1] );
+	       return true;
+	   }
 	   BEGINPACKET( pak, 0x0784 );
 	   ADDSTRING( pak, thisclient->CharInfo->charname );
 	   ADDBYTE( pak, 0 );
 	   ADDSTRING( pak, &P->Buffer[strlen(msgto)+1] );
 	   ADDBYTE( pak, 0 );
-	   otherclient->client->SendPacket( &pak );
+	   if ( otherclient->client ) otherclient->client->SendPacket( &pak );
 	   return true;
 	}
 
