@@ -125,6 +125,7 @@ bool CCharServer::OnServerReady( )
         	ADDWORD    ( pak, Config.CharPort );
     		cryptPacket( (char*)&pak, NULL );
     		send( lsock, (char*)&pak, pak.Size, 0 );
+            DB->QExecute( "UPDATE channels SET connected=1 WHERE id=%u AND type=1", Config.ServerID );
     	}
     }
 	// Load all our clans

@@ -2632,6 +2632,7 @@ void CPlayerBot::Update( )
         case BOT_STATE_MIGRATE:     HandleMigrate( );     break;
         case BOT_STATE_DUEL:        HandleDuel( );        break;
         case BOT_STATE_TOWN_REPAIR: HandleTownRepair( );  break;
+        case BOT_STATE_LFG_SHOUT:   break;
     }
 }
 
@@ -3119,11 +3120,12 @@ void CPlayerBot::CheckLfgShouts( )
                   4 - (int)m_player->Party->party->Members.size(), lvl - 5 );
     }
 
-    BEGINPACKET( pak, 0x783 );
-    ADDWORD    ( pak, m_player->clientid );
+    BEGINPACKET( pak, 0x0785 );
+    ADDSTRING  ( pak, m_player->CharInfo->charname );
+    ADDBYTE    ( pak, 0 );
     ADDSTRING  ( pak, msg );
     ADDBYTE    ( pak, 0 );
-    GServer->SendToVisible( &pak, m_player );
+    GServer->SendToMap( &pak, m_player->Position->Map );
 }
 
 void CPlayerBot::CheckWorldBossRaids( )
@@ -3142,11 +3144,12 @@ void CPlayerBot::CheckWorldBossRaids( )
             snprintf( msg, sizeof(msg), "WORLD BOSS ALERT: Boss spotted near (%.0f, %.0f)! Assemble raid!",
                       boss->Position->current.x, boss->Position->current.y );
 
-            BEGINPACKET( pak, 0x783 );
-            ADDWORD    ( pak, m_player->clientid );
+            BEGINPACKET( pak, 0x0785 );
+            ADDSTRING  ( pak, m_player->CharInfo->charname );
+            ADDBYTE    ( pak, 0 );
             ADDSTRING  ( pak, msg );
             ADDBYTE    ( pak, 0 );
-            GServer->SendToVisible( &pak, m_player );
+            GServer->SendToMap( &pak, m_player->Position->Map );
 
             AttackTarget( boss );
             SetState( BOT_STATE_COMBAT );
