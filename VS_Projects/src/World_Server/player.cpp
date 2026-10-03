@@ -647,9 +647,9 @@ bool CPlayer::SpawnToPlayer( CPlayer* player, CPlayer* otherclient )
 	   ADDBYTE( pak, 0x00);       //LMA 139+
     }
 
+    ADDDWORD( pak, Clan->clanid );
     if(Clan->clanid!=0)
     {
-        ADDDWORD( pak, Clan->clanid );
         ADDWORD( pak, Clan->back);
         ADDWORD( pak, Clan->logo);
         ADDBYTE( pak, Clan->grade);

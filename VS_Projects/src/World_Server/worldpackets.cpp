@@ -383,11 +383,13 @@ bool CWorldServer::pakDoIdentify( CPlayer *thisclient, CPacket *P )
     pakInventory(thisclient);
     pakQuestData(thisclient);
 
-    //LMA: Jrose unlimited (zrose)
+    //LMA: Jrose unlimited (zrose) - disabled for iROSE/Evo client compatibility
+    /*
     RESETPACKET( pak, 0x7de );
     ADDWORD ( pak, 0x1001 ); // 0x1001 to 0x1013 (game plan?)
     ADDDWORD ( pak, 2 ); // options (plan time?) [2 = unlimited]
     thisclient->client->SendPacket( &pak );
+    */
 
 	RESETPACKET( pak, 0x702 );
 	ADDSTRING  ( pak, Config.WELCOME_MSG );
