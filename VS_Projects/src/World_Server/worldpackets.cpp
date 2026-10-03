@@ -4121,19 +4121,11 @@ void CWorldServer::pakQuestData( CPlayer *thisclient )
         for(dword j = 0; j < 4; j++) ADDBYTE( pak, thisclient->quest.quests[i].Switches[j]);
         for(dword j = 0; j < 6; j++) {
             if (thisclient->quest.quests[i].Items[j].itemnum != 0) {
-                //ADDWORD( pak,  thisclient->quest.quests[i].Items[j].GetPakHeader() );
-                //ADDDWORD( pak,  thisclient->quest.quests[i].Items[j].GetPakData() );
                 ADDDWORD( pak, BuildItemHead( &thisclient->quest.quests[i].Items[j] ) );
-                ADDDWORD( pak, BuildItemData( &thisclient->quest.quests[i].Items[j] ) );
-                ADDDWORD( pak, 0x00000000 );
-                ADDWORD ( pak, 0x0000 );
+                ADDWORD ( pak, (WORD)BuildItemData( &thisclient->quest.quests[i].Items[j] ) );
             } else {
-                //ADDWORD( pak,  0 );
-                //ADDDWORD( pak, 0 );
                 ADDDWORD( pak, 0 );
-                ADDDWORD( pak, 0 );
-                ADDDWORD( pak, 0x00000000 );
-                ADDWORD ( pak, 0x0000 );
+                ADDWORD ( pak, 0 );
             }
         }
     }

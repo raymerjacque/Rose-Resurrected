@@ -2159,21 +2159,13 @@ void CPlayer::SendQuestUpdate()
         {
             if (quest.quests[i].Items[j].itemnum != 0)
             {
-                //ADDWORD( pak,  thisclient->quest.quests[i].Items[j].GetPakHeader() );
-                //ADDDWORD( pak,  thisclient->quest.quests[i].Items[j].GetPakData() );
                 ADDDWORD( pak, GServer->BuildItemHead( &quest.quests[i].Items[j] ) );
-                ADDDWORD( pak, GServer->BuildItemData( &quest.quests[i].Items[j] ) );
-                ADDDWORD( pak, 0x00000000 );
-                ADDWORD ( pak, 0x0000 );
+                ADDWORD ( pak, (WORD)GServer->BuildItemData( &quest.quests[i].Items[j] ) );
             }
             else
             {
-                //ADDWORD( pak,  0 );
-                //ADDDWORD( pak, 0 );
                 ADDDWORD( pak, 0 );
-                ADDDWORD( pak, 0 );
-                ADDDWORD( pak, 0x00000000 );
-                ADDWORD ( pak, 0x0000 );
+                ADDWORD ( pak, 0 );
             }
         }
     }
