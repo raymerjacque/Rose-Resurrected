@@ -1,5 +1,7 @@
 #include "VendingCatalog.h"
 #include <vector>
+#include <algorithm>
+#include <cstdlib>
 
 bool PopulateVendingInventory( CPlayer* bot, int category )
 {
@@ -456,4 +458,438 @@ const char* GetVendingPromoMessage( int category )
         default:
             return "Welcome! Take a look at my shop!";
     }
+}
+
+static void GetVendingBuyPool( int category, std::vector<SBuyItemDef>& popular, std::vector<SBuyItemDef>& variablePool )
+{
+    popular.clear( );
+    variablePool.clear( );
+
+    switch ( category )
+    {
+        case VEND_CAT_WEAPONS_HIGH:
+            popular = {
+                { WEAPON, 101, 1,  65000 }, // Haedong Sword
+                { WEAPON, 103, 1, 120000 }, // Sword of Hardship
+                { WEAPON, 121, 1, 200000 }, // Caliburn
+                { WEAPON, 221, 1, 110000 }, // Centauri Bow
+                { WEAPON, 241, 1, 160000 }, // Justice Cannon
+                { WEAPON, 305, 1, 140000 }  // White Staff
+            };
+            variablePool = {
+                { WEAPON, 123, 1, 140000 }, // Bastard Sword
+                { WEAPON,  23, 1, 175000 }, // Blade of Saint Kreuz
+                { WEAPON,  27, 1, 250000 }, // Death Bringer
+                { WEAPON, 223, 1, 210000 }, // Infernal Bow
+                { WEAPON, 243, 1, 220000 }, // Piercing Gun
+                { WEAPON, 303, 1,  90000 }, // Animal Rod
+                { WEAPON,  45, 1, 130000 }, // Great Hammer
+                { WEAPON, 188, 1, 190000 }  // Fury Spantun
+            };
+            break;
+
+        case VEND_CAT_ARMOR_HIGH:
+            popular = {
+                { BODY,       29, 1,  35000 }, // Nomadic Suit
+                { BODY,       34, 1,  85000 }, // Knight Plate
+                { BODY,       37, 1, 140000 }, // Holy Body
+                { BODY,       66, 1,  75000 }, // Mage Robe
+                { BODY,       71, 1, 110000 }, // Cleric Robe
+                { BODY,      126, 1, 125000 }, // Raider Armor
+                { SUBWEAPON,  10, 1,  95000 }  // Plate Shield
+            };
+            variablePool = {
+                { CAP,        34, 1,  38000 }, // Knight Helm
+                { GLOVE,      34, 1,  28000 }, // Knight Gauntlets
+                { SHOE,       34, 1,  28000 }, // Knight Boots
+                { CAP,        37, 1,  65000 }, // Holy Helm
+                { GLOVE,      37, 1,  48000 }, // Holy Gauntlets
+                { SHOE,       37, 1,  48000 }, // Holy Boots
+                { SUBWEAPON,   7, 1,  42000 }  // Kite Shield
+            };
+            break;
+
+        case VEND_CAT_GEMS:
+            popular = {
+                { JEM, 314, 100,  38000 }, // Ruby [4]
+                { JEM, 315,  50,  90000 }, // Ruby [5]
+                { JEM, 324, 100,  38000 }, // Sapphire [4]
+                { JEM, 325,  50,  90000 }, // Sapphire [5]
+                { JEM, 334, 100,  38000 }, // Topaz [4]
+                { JEM, 335,  50,  90000 }, // Topaz [5]
+                { JEM, 364,  50,  58000 }, // Diamond [4]
+                { JEM, 365,  25, 140000 }  // Diamond [5]
+            };
+            variablePool = {
+                { JEM, 316,  20, 230000 }, // Ruby [6]
+                { JEM, 326,  20, 230000 }, // Sapphire [6]
+                { JEM, 336,  20, 230000 }, // Topaz [6]
+                { JEM, 354, 100,  38000 }, // Peridot [4]
+                { JEM, 355,  50,  90000 }, // Peridot [5]
+                { JEM, 366,  15, 350000 }  // Diamond [6]
+            };
+            break;
+
+        case VEND_CAT_REFINE:
+            popular = {
+                { NATURAL,  74, 200,  11000 }, // 4th Grade Talisman
+                { NATURAL,  75, 100,  22000 }, // 5th Grade Talisman
+                { NATURAL,  76,  50,  45000 }, // 6th Grade Talisman
+                { NATURAL,  84, 200,   7500 }, // 4th Grade Bindrune
+                { NATURAL,  85, 100,  15000 }, // 5th Grade Bindrune
+                { NATURAL, 445,  50,  60000 }, // Venurune
+                { NATURAL, 446,  50,  90000 }  // Mercurune
+            };
+            variablePool = {
+                { NATURAL,  77,  30,  90000 }, // 7th Grade Talisman
+                { NATURAL,  78,  15, 180000 }, // 8th Grade Talisman
+                { NATURAL,  86,  50,  30000 }, // 6th Grade Bindrune
+                { NATURAL,  87,  30,  60000 }, // 7th Grade Bindrune
+                { NATURAL, 375,  50,  22000 }, // 5th Grade Apotrope
+                { NATURAL, 376,  30,  45000 }, // 6th Grade Apotrope
+                { NATURAL, 456,  30, 110000 }, // Nepturune
+                { NATURAL, 448,  20, 150000 }, // Jupiterune
+                { NATURAL, 449,  15, 190000 }  // Saturune
+            };
+            break;
+
+        case VEND_CAT_MATERIALS:
+            popular = {
+                { NATURAL,   5, 500,   1100 }, // Iron
+                { NATURAL,   7, 300,   4500 }, // Steel
+                { NATURAL,  43, 500,   1500 }, // Smooth Leather
+                { NATURAL,  44, 300,   2200 }, // Rough Leather
+                { NATURAL, 112, 300,   2200 }, // Silver Thread
+                { NATURAL, 113, 200,   4500 }, // Gold Thread
+                { NATURAL, 261, 500,   1800 }, // Wolf Claw
+                { NATURAL, 295, 100,  15000 }, // Water Spirit Stone
+                { NATURAL, 298, 100,  15000 }  // Fire Spirit Stone
+            };
+            variablePool = {
+                { NATURAL,   6, 400,   2600 }, // Silver Iron
+                { NATURAL,  10, 150,  11000 }, // Damascus
+                { NATURAL,  45, 200,   3800 }, // Soft Leather
+                { NATURAL, 114, 100,   9000 }, // Platinum Thread
+                { NATURAL, 196, 500,    750 }, // Bird Feather
+                { NATURAL, 197, 300,   3000 }, // Fairy Powder
+                { NATURAL, 201, 300,   2200 }, // Steam Oil
+                { NATURAL, 205, 200,   3800 }, // Mana Oil
+                { NATURAL, 275, 300,   2600 }, // Spider Web
+                { NATURAL, 297, 100,  15000 }, // Earth Spirit Stone
+                { NATURAL, 296, 100,  15000 }  // Wind Spirit Stone
+            };
+            break;
+
+        case VEND_CAT_POTIONS_SCROLLS:
+            popular = {
+                { CONSUMIBLE,   5, 999,    450 }, // Health Bottle (M)
+                { CONSUMIBLE,   6, 999,    900 }, // Health Bottle (L)
+                { CONSUMIBLE,  25, 999,    600 }, // Mana Bottle (M)
+                { CONSUMIBLE,  14, 999,    600 }, // Red Potion
+                { CONSUMIBLE,  33, 999,    750 }, // Blue Potion
+                { CONSUMIBLE, 351, 200,    750 }, // Zant Return Scroll
+                { CONSUMIBLE, 352, 200,   1100 }, // Junon Polis Return Scroll
+                { CONSUMIBLE, 963, 100,  13500 }  // Speed Booster
+            };
+            variablePool = {
+                { CONSUMIBLE,  12, 300,   1800 }, // Vital Water (L)
+                { CONSUMIBLE,  32, 200,   2600 }, // Spiritual Water (XL)
+                { CONSUMIBLE,  81, 150,   3800 }, // Max MP Potion
+                { CONSUMIBLE,  82, 200,   2200 }, // Purify Potion
+                { CONSUMIBLE,  90, 100,   6000 }, // Attack Speed Potion
+                { CONSUMIBLE, 353, 100,   2200 }, // Eucar Return Scroll
+                { CONSUMIBLE, 354, 100,   2200 }, // Xita Return Scroll
+                { CONSUMIBLE, 313,  50,  11000 }, // Advanced HP Scroll
+                { CONSUMIBLE, 314,  50,  11000 }  // Advanced MP Scroll
+            };
+            break;
+
+        case VEND_CAT_AMMO:
+            popular = {
+                { NATURAL, 305, 999,   4 }, // Metal Arrow
+                { NATURAL, 306, 999,   6 }, // Gilded Arrow
+                { NATURAL, 323, 999,   6 }, // Lead Bullet
+                { NATURAL, 325, 999,   9 }, // Silver Bullet
+                { NATURAL, 341, 999,  11 }, // Cannon Shell
+                { NATURAL, 342, 999,  19 }  // Lead Shell
+            };
+            variablePool = {
+                { NATURAL, 307, 999,   9 }, // Platinum Arrow
+                { NATURAL, 311, 999,  11 }, // Fire Arrow
+                { NATURAL, 316, 999,  15 }, // Lightning Arrow
+                { NATURAL, 322, 999,   4 }, // Gun Bullet
+                { NATURAL, 326, 999,  12 }, // Gold Bullet
+                { NATURAL, 331, 999,  15 }, // Fire Bullet
+                { NATURAL, 344, 999,  30 }, // Bumper Shell
+                { NATURAL, 345, 999,  38 }  // Fire Shell
+            };
+            break;
+
+        case VEND_CAT_ACCESSORIES:
+            popular = {
+                { JEWEL, 11, 1, 33000 }, // Ring of Strength
+                { JEWEL, 12, 1, 42000 }, // Ring of Dexterity
+                { JEWEL, 13, 1, 38000 }, // Ring of Wisdom
+                { JEWEL, 22, 1, 58000 }, // Ruby Necklace
+                { JEWEL, 33, 1, 52000 }  // Gold Earrings
+            };
+            variablePool = {
+                { JEWEL, 14, 1, 30000 }, // Ring of Health
+                { JEWEL, 15, 1, 45000 }, // Ring of Critical
+                { JEWEL, 23, 1, 58000 }, // Sapphire Necklace
+                { JEWEL, 24, 1, 58000 }, // Emerald Necklace
+                { JEWEL, 25, 1, 70000 }, // Diamond Necklace
+                { JEWEL, 32, 1, 30000 }, // Silver Earrings
+                { JEWEL, 34, 1, 90000 }  // Platinum Earrings
+            };
+            break;
+
+        case VEND_CAT_WINGS:
+            popular = {
+                { BACK, 221, 1, 110000 }, // Fairy Wings
+                { BACK, 222, 1, 135000 }, // Nymph Wings
+                { BACK, 227, 1, 340000 }, // Angel Wings
+                { BACK, 228, 1, 340000 }, // Devil Wings
+                { BACK, 206, 1,  38000 }  // Cutie Bag
+            };
+            variablePool = {
+                { BACK, 223, 1, 165000 }, // Butterfly Wings
+                { BACK, 224, 1, 210000 }, // Little Angel Wings
+                { BACK, 225, 1, 210000 }, // Little Devil Wings
+                { BACK, 231, 1, 420000 }, // Worm Dragon Wings
+                { BACK, 241, 1,  90000 }, // Turtle Backshield
+                { BACK, 244, 1, 120000 }, // Guard Backshield
+                { BACK, 211, 1,  85000 }  // Ferrell Bag
+            };
+            break;
+
+        case VEND_CAT_PAT:
+            popular = {
+                { PAT,   1, 1,  45000 }, // Woodlive Frame
+                { PAT,   5, 1, 260000 }, // Sporty Frame
+                { PAT,  31, 1,  30000 }, // Wood Stock Core
+                { PAT, 101, 1,  38000 }, // First Engine
+                { PAT, 102, 1,  85000 }  // Second Engine
+            };
+            variablePool = {
+                { PAT,   2, 1,  90000 }, // Wood Carbon Frame
+                { PAT,   3, 1, 150000 }, // Corman Di Frame
+                { PAT,  32, 1,  60000 }, // Hard Stock Core
+                { PAT,  33, 1, 110000 }, // Basilisk Core
+                { PAT,  35, 1, 210000 }, // Saint Core
+                { PAT, 103, 1, 165000 }  // Dural Engine
+            };
+            break;
+
+        case VEND_CAT_DUAL_KATARS:
+            popular = {
+                { WEAPON, 403, 1,  50000 }, // Katar
+                { WEAPON, 411, 1, 140000 }, // Assassin Katar
+                { WEAPON, 433, 1, 105000 }, // Dual Bushido
+                { WEAPON, 439, 1, 180000 }, // Dual Katana
+                { WEAPON, 448, 1, 280000 }  // Dual Panther Blades
+            };
+            variablePool = {
+                { WEAPON, 409, 1,  90000 }, // Dual Patar
+                { WEAPON, 436, 1, 135000 }, // Dual Ocean Swords
+                { WEAPON, 441, 1, 220000 }, // Dual Flare Swords
+                { WEAPON, 449, 1, 340000 }  // Dual Blades of Saint Kreuz
+            };
+            break;
+
+        case VEND_CAT_ZANT_STARTER:
+            popular = {
+                { CONSUMIBLE,   1, 999,   75 }, // Health Vial (S)
+                { CONSUMIBLE,   2, 999,  180 }, // Health Vial (M)
+                { CONSUMIBLE,   3, 999,  380 }, // Health Vial (L)
+                { CONSUMIBLE,  21, 999,  110 }, // Mana Vial (S)
+                { CONSUMIBLE,  22, 999,  260 }, // Mana Vial (M)
+                { CONSUMIBLE, 351, 200,  450 }  // Zant Return Scroll
+            };
+            variablePool = {
+                { CONSUMIBLE,   7, 300,  110 }, // Herbal Medicine (S)
+                { CONSUMIBLE,  23, 500,  520 }, // Mana Vial (L)
+                { CONSUMIBLE, 350, 100,  300 }, // Adventure Plains Return Scroll
+                { CONSUMIBLE, 306,  50, 2200 }, // HP Scroll (Solo)
+                { CONSUMIBLE, 307,  50, 2200 }, // MP Scroll (Solo)
+                { CONSUMIBLE, 308,  50, 3000 }, // Dexterity Scroll (Solo)
+                { CONSUMIBLE, 309,  50, 3000 }  // Strength Scroll (Solo)
+            };
+            break;
+
+        case VEND_CAT_ZANT_WEAPONS:
+            popular = {
+                { WEAPON,     1, 1,   750 }, // Wooden Sword
+                { WEAPON,     2, 1,  2600 }, // Short Sword
+                { WEAPON,     5, 1, 18000 }, // Long Sword
+                { WEAPON,   202, 1,  3800 }, // Short Bow
+                { WEAPON,   301, 1,  1500 }, // Baobab Rod
+                { SUBWEAPON,  3, 1,  4500 }  // Round Shield
+            };
+            variablePool = {
+                { WEAPON,     3, 1,  6000 }, // Rapier
+                { WEAPON,     4, 1, 11000 }, // Khukuri
+                { WEAPON,   201, 1,  1100 }, // Toy Bow
+                { WEAPON,   203, 1,  9000 }, // Long Bow
+                { WEAPON,   302, 1,  4500 }, // Lemmings Rod
+                { WEAPON,   303, 1, 10000 }, // Animal Rod
+                { WEAPON,    41, 1,  3000 }, // Pony Hammer
+                { SUBWEAPON,  1, 1,  1100 }  // Wooden Shield
+            };
+            break;
+
+        case VEND_CAT_ZANT_ARMOR:
+            popular = {
+                { CAP,       31, 1, 1100 }, // Novice Cap
+                { BODY,      31, 1, 2200 }, // Novice Suit
+                { CAP,       32, 1, 3000 }, // Leather Cap
+                { BODY,      32, 1, 6000 }  // Leather Armor
+            };
+            variablePool = {
+                { GLOVE,     31, 1,  900 }, // Novice Gloves
+                { SHOE,      31, 1,  900 }, // Novice Shoes
+                { GLOVE,     32, 1, 2200 }, // Leather Gloves
+                { SHOE,      32, 1, 2200 }, // Leather Boots
+                { SUBWEAPON,  3, 1, 4500 }  // Round Shield
+            };
+            break;
+
+        case VEND_CAT_ZANT_GEMS:
+            popular = {
+                { JEM,     301, 100,  1500 }, // Garnet [1]
+                { JEM,     302,  50,  3800 }, // Garnet [2]
+                { JEM,     311, 100,  2200 }, // Ruby [1]
+                { JEM,     312,  50,  5200 }, // Ruby [2]
+                { JEM,     321, 100,  2200 }, // Sapphire [1]
+                { JEM,     322,  50,  5200 }, // Sapphire [2]
+                { NATURAL,  71, 200,  1500 }, // 1st Grade Talisman
+                { NATURAL,  72, 100,  3800 }  // 2nd Grade Talisman
+            };
+            variablePool = {
+                { JEM,     303,  25,  9000 }, // Garnet [3]
+                { JEM,     313,  25, 11000 }, // Ruby [3]
+                { JEM,     323,  25, 11000 }, // Sapphire [3]
+                { JEM,     331, 100,  2200 }, // Topaz [1]
+                { JEM,     332,  50,  5200 }, // Topaz [2]
+                { JEM,     333,  25, 11000 }, // Topaz [3]
+                { NATURAL,  73,  50,  7500 }, // 3rd Grade Talisman
+                { NATURAL,  81, 200,  1100 }, // 1st Grade Bindrune
+                { NATURAL,  82, 100,  2600 }, // 2nd Grade Bindrune
+                { NATURAL,  83,  50,  5200 }  // 3rd Grade Bindrune
+            };
+            break;
+
+        case VEND_CAT_ZANT_MATERIALS:
+            popular = {
+                { NATURAL,   1, 500,   220 }, // Rusted Iron
+                { NATURAL,   5, 500,   900 }, // Iron
+                { NATURAL,  41, 500,   300 }, // Old Leather
+                { NATURAL,  42, 300,   650 }, // Thin Leather
+                { NATURAL, 111, 300,   600 }, // Iron Thread
+                { NATURAL, 261, 500,  1100 }  // Wolf Claw
+            };
+            variablePool = {
+                { NATURAL, 181, 500,   220 }, // Flower Pollen
+                { NATURAL, 196, 500,   380 }, // Bird Feather
+                { NATURAL, 201, 200,  1800 }, // Steam Oil
+                { NATURAL, 275, 300,  1500 }  // Spider Web
+            };
+            break;
+
+        case VEND_CAT_ZANT_ACCESSORIES:
+            popular = {
+                { JEWEL,   1, 1,  3800 }, // Sparkling Ring
+                { JEWEL,   2, 1,  6000 }, // Heavy Ring
+                { BACK,  202, 1, 18000 }, // Leather Bag
+                { BACK,  206, 1, 34000 }  // Cutie Bag
+            };
+            variablePool = {
+                { JEWEL,   3, 1,  3000 }, // Dim Ring
+                { JEWEL,   4, 1,  4500 }, // Simple Ring
+                { JEWEL,  10, 1, 11000 }, // Sturdy Ring
+                { BACK,  203, 1, 26000 }  // Wooden Chest
+            };
+            break;
+
+        case VEND_CAT_ZANT_AMMO:
+            popular = {
+                { NATURAL, 301, 999,   1 }, // Wooden Arrow
+                { NATURAL, 302, 999,   1 }, // Bone Arrow
+                { NATURAL, 303, 999,   2 }, // Stone Arrow
+                { NATURAL, 321, 999,   1 }, // Bean Bullet
+                { NATURAL, 322, 999,   2 }, // Gun Bullet
+                { NATURAL, 341, 999,   7 }  // Cannon Shell
+            };
+            variablePool = {
+                { NATURAL, 305, 999,   4 }, // Metal Arrow
+                { NATURAL, 323, 999,   4 }, // Lead Bullet
+                { NATURAL, 342, 999,  13 }  // Lead Shell
+            };
+            break;
+
+        default:
+            break;
+    }
+}
+
+bool PopulateVendingBuyList( CPlayer* bot, int category )
+{
+    if ( !bot || !bot->Shop ) return false;
+
+    for ( int i = 0; i < 30; i++ )
+    {
+        bot->Shop->BuyingList[i].slot = 0;
+        bot->Shop->BuyingList[i].count = 0;
+        bot->Shop->BuyingList[i].price = 0;
+        bot->Shop->BuyingList[i].item.Clear( );
+    }
+
+    std::vector<SBuyItemDef> popular;
+    std::vector<SBuyItemDef> variablePool;
+
+    GetVendingBuyPool( category, popular, variablePool );
+
+    if ( popular.empty( ) && variablePool.empty( ) ) return false;
+
+    std::vector<SBuyItemDef> selected;
+    for ( size_t i = 0; i < popular.size( ); i++ )
+    {
+        selected.push_back( popular[i] );
+    }
+
+    if ( !variablePool.empty( ) )
+    {
+        std::vector<SBuyItemDef> pool = variablePool;
+        std::random_shuffle( pool.begin( ), pool.end( ) );
+        size_t toAdd = 3 + ( rand( ) % 3 ); // Pick 3, 4, or 5 variable items
+        if ( toAdd > pool.size( ) ) toAdd = pool.size( );
+        for ( size_t i = 0; i < toAdd; i++ )
+        {
+            selected.push_back( pool[i] );
+        }
+    }
+
+    UINT numBuy = (UINT)selected.size( );
+    if ( numBuy > 30 ) numBuy = 30;
+
+    bot->Shop->Buying = numBuy;
+    bot->CharInfo->Zulies = 500000000; // Give bot 500M Zulies to purchase items from players
+
+    for ( UINT i = 0; i < numBuy; i++ )
+    {
+        const SBuyItemDef& def = selected[i];
+        bot->Shop->BuyingList[i].slot  = i;
+        bot->Shop->BuyingList[i].count = def.count;
+        bot->Shop->BuyingList[i].price = def.price;
+
+        bot->Shop->BuyingList[i].item.Clear( );
+        bot->Shop->BuyingList[i].item.itemtype   = def.itemType;
+        bot->Shop->BuyingList[i].item.itemnum    = def.itemNum;
+        bot->Shop->BuyingList[i].item.count      = def.count;
+        bot->Shop->BuyingList[i].item.durability = 50;
+        bot->Shop->BuyingList[i].item.lifespan   = 100;
+        bot->Shop->BuyingList[i].item.appraised  = true;
+    }
+
+    return true;
 }

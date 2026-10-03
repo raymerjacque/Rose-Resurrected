@@ -33,7 +33,15 @@ struct SVendingItemDef {
     UINT refine;
 };
 
+struct SBuyItemDef {
+    UINT itemType;
+    UINT itemNum;
+    UINT count;
+    DWORD price;
+};
+
 bool PopulateVendingInventory( CPlayer* bot, int category );
+bool PopulateVendingBuyList( CPlayer* bot, int category );
 const char* GetVendingPromoMessage( int category );
 
 #endif

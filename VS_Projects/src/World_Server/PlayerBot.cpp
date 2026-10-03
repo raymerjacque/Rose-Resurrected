@@ -1052,6 +1052,7 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_duelStartTime( 0 ),
       m_personality( (BotPersonality)( rand( ) % 4 ) ),
       m_lastShopBrowseTime( 0 ),
+      m_lastBuyListRefreshTime( 0 ),
       m_lastWhisperTime( 0 ),
       m_lastArenaQueueTime( 0 ),
       m_lastDungeonCheckTime( 0 )
@@ -3621,9 +3622,11 @@ void CPlayerBot::SetupVendingShop( const char* shopTitle, int category )
 
     strncpy( m_player->Shop->name, shopTitle ? shopTitle : "Shop", sizeof(m_player->Shop->name) - 1 );
     m_player->Shop->name[sizeof(m_player->Shop->name) - 1] = '\0';
-    m_player->Shop->ShopType = 0; // Selling shop
+    m_player->Shop->ShopType = 0; // Standard shop
 
     PopulateVendingInventory( m_player, category );
+    PopulateVendingBuyList( m_player, category );
+    m_lastBuyListRefreshTime = clock( );
 
     m_player->Status->Stance = 1; // Sitting stance
 
@@ -3671,6 +3674,23 @@ void CPlayerBot::HandleVendingBot( )
         {
             Say( promo );
         }
+    }
+
+    // Periodic Buy List Refresh & Rotation (Every 2 Hours = 7200 seconds)
+    if ( m_lastBuyListRefreshTime == 0 || ( now - m_lastBuyListRefreshTime ) > ( (clock_t)7200 * CLOCKS_PER_SEC ) )
+    {
+        m_lastBuyListRefreshTime = now;
+        PopulateVendingBuyList( m_player, m_vendingCategory );
+
+        BEGINPACKET( pak, 0x7c2 );
+        ADDWORD    ( pak, m_player->clientid );
+        ADDWORD    ( pak, m_player->Shop->ShopType );
+        ADDSTRING  ( pak, m_player->Shop->name );
+        ADDBYTE    ( pak, 0x00 );
+        GServer->SendToVisible( &pak, m_player );
+
+        Log( MSG_INFO, "Vending Bot '%s' refreshed & randomized Buy List (Category %d)",
+             m_player->CharInfo->charname, m_vendingCategory );
     }
 }
 

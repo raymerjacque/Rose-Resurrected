@@ -194,6 +194,7 @@ private:
     int m_vendingCategory;
     std::string m_shopTitle;
     clock_t m_lastVendingSay;
+    clock_t m_lastBuyListRefreshTime;
 
     // Dynamic Spawner & Lifecycle
     bool m_isDynamic;
