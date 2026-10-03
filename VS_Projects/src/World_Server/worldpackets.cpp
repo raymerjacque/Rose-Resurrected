@@ -4158,10 +4158,8 @@ void CWorldServer::pakQuestData( CPlayer *thisclient )
 
     for (unsigned i = 0; i < MAX_WISHLIST; i++)
     {
-        ADDDWORD( pak, thisclient->wishlistitems[i].head);
-        ADDDWORD( pak, thisclient->wishlistitems[i].data );
-        ADDDWORD( pak, 0x00 );
-        ADDWORD( pak, 0x00 );
+        ADDDWORD( pak, thisclient->wishlistitems[i].head );
+        ADDWORD ( pak, (WORD)thisclient->wishlistitems[i].data );
     }
 
 
