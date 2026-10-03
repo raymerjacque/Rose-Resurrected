@@ -6870,6 +6870,17 @@ bool CWorldServer::pakShowShop( CPlayer* thisclient, CPacket* P )
     CPlayer* otherclient = GetClientByID ( otherclientid, thisclient->Position->Map );
     if(otherclient==NULL)
         return true;
+
+    BYTE numBuying = 0;
+    for(unsigned int i = 0; i < 30; i++)
+    {
+        if(otherclient->Shop->BuyingList[i].count > 0 && otherclient->Shop->BuyingList[i].item.itemtype != 0)
+        {
+            numBuying++;
+        }
+    }
+    otherclient->Shop->Buying = numBuying;
+
     BEGINPACKET( pak, 0x7c4 );
     ADDBYTE    ( pak, otherclient->Shop->Selling );
     ADDBYTE    ( pak, otherclient->Shop->Buying );
@@ -6886,7 +6897,7 @@ bool CWorldServer::pakShowShop( CPlayer* thisclient, CPacket* P )
     }
     for(unsigned int i = 0; i<30;i++)
     {
-        if(otherclient->Shop->BuyingList[i].count > 0)
+        if(otherclient->Shop->BuyingList[i].count > 0 && otherclient->Shop->BuyingList[i].item.itemtype != 0)
         {
             CItem thisitem = otherclient->Shop->BuyingList[i].item;
             ADDBYTE     ( pak, i );
