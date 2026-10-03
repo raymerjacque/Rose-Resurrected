@@ -20,6 +20,7 @@
 */
 
 #include "party.h"
+#include "PlayerBot.h"
 
 CParty::CParty( )
 {
@@ -147,6 +148,10 @@ bool CParty::RemovePlayer( CPlayer* player )			/// Player leaves a party or is k
             Members.erase( Members.begin( )+i );		// remove from members vector
             player->Party->IsMaster = true;
             player->Party->party = NULL;				// set party to NULL
+            if ( player && player->is_bot && player->bot_ai )
+            {
+                CBotManager::GetInstance()->CheckAndRelocateUninvitedBot( player );
+            }
             return true;
         }
     }

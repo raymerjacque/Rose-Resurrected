@@ -196,8 +196,7 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                     thismember->Party->IsMaster = true;
                     if( thismember->is_bot && thismember->bot_ai )
                     {
-                        thismember->bot_ai->SetFollowTarget( NULL );
-                        thismember->bot_ai->SetState( BOT_STATE_IDLE );
+                        CBotManager::GetInstance()->CheckAndRelocateUninvitedBot( thismember );
                     }
                 }
                 RemoveParty( party );
@@ -252,9 +251,8 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                 return true;
             if( thismember->is_bot && thismember->bot_ai )
             {
-                thismember->bot_ai->SetFollowTarget( NULL );
-                thismember->bot_ai->SetState( BOT_STATE_IDLE );
                 thismember->bot_ai->Say( "Leaving party now. Good luck!" );
+                CBotManager::GetInstance()->CheckAndRelocateUninvitedBot( thismember );
             }
             if(party->Members.size()>1)
             {
@@ -285,8 +283,7 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                     othermember->Party->IsMaster = true;
                     if( othermember->is_bot && othermember->bot_ai )
                     {
-                        othermember->bot_ai->SetFollowTarget( NULL );
-                        othermember->bot_ai->SetState( BOT_STATE_IDLE );
+                        CBotManager::GetInstance()->CheckAndRelocateUninvitedBot( othermember );
                     }
                 }
                 RemoveParty( party );

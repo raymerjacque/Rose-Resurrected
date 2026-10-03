@@ -534,6 +534,184 @@ CPlayerBot* CBotManager::FindNearbyBuffBot( UINT mapId, fPoint pos, float radius
     return bestBot;
 }
 
+void CBotManager::GetZoneLevelRange( UINT mapId, int& minLvl, int& maxLvl, bool& isCity )
+{
+    isCity = false;
+    minLvl = 1;
+    maxLvl = 150;
+
+    switch ( mapId )
+    {
+        // Cities & Main Towns (Wide variety of level ranges)
+        case 1:  // Zant City & Outskirts
+        case 2:  // Junon Polis City
+        case 3:  // Eucar City
+        case 4:  // Eldeon City
+            isCity = true;
+            minLvl = 1;
+            maxLvl = 120;
+            break;
+
+        // Junon Grinding Zones
+        case 22: // Adventurer Plains
+            minLvl = 2;
+            maxLvl = 12;
+            break;
+
+        case 21: // Luxem Tower / El Verco
+            minLvl = 14;
+            maxLvl = 28;
+            break;
+
+        case 23: // Breezy Hills
+            minLvl = 22;
+            maxLvl = 38;
+            break;
+
+        case 24: // Forest of Wisdom
+            minLvl = 28;
+            maxLvl = 45;
+            break;
+
+        case 25: // Anima Lake
+            minLvl = 32;
+            maxLvl = 52;
+            break;
+
+        case 26: // Kenji Beach
+            minLvl = 48;
+            maxLvl = 68;
+            break;
+
+        // Dungeons
+        case 51: // Goblin Cave
+            minLvl = 15;
+            maxLvl = 35;
+            break;
+
+        case 52: // Marsh of Ghosts
+            minLvl = 35;
+            maxLvl = 55;
+            break;
+
+        case 53: // Pyramids
+            minLvl = 50;
+            maxLvl = 75;
+            break;
+
+        case 61: // Crystal Cave
+            minLvl = 60;
+            maxLvl = 85;
+            break;
+
+        // Luna & High Maps
+        case 31:
+        case 32:
+        case 33:
+            minLvl = 70;
+            maxLvl = 110;
+            break;
+
+        default:
+        {
+            if ( mapId < (UINT)GServer->MapList.max )
+            {
+                CMap* map = GServer->MapList.Index[mapId];
+                if ( map && !map->MonsterList.empty( ) )
+                {
+                    int lowest = 200, highest = 1;
+                    for ( size_t m = 0; m < map->MonsterList.size( ); m++ )
+                    {
+                        CMonster* mob = map->MonsterList[m];
+                        if ( mob && mob->Stats && mob->Stats->Level > 0 )
+                        {
+                            if ( mob->Stats->Level < lowest ) lowest = mob->Stats->Level;
+                            if ( mob->Stats->Level > highest ) highest = mob->Stats->Level;
+                        }
+                    }
+                    if ( highest >= lowest )
+                    {
+                        minLvl = lowest;
+                        maxLvl = highest + 5;
+                    }
+                }
+            }
+            break;
+        }
+    }
+}
+
+bool CBotManager::GetMapForLevel( int botLvl, UINT& targetMapId, fPoint& spawnPos )
+{
+    if ( botLvl <= 12 )
+    {
+        targetMapId = 22; // Adventurer Plains
+        spawnPos = { 5303.62f, 5099.92f, 0 };
+        return true;
+    }
+    else if ( botLvl <= 25 )
+    {
+        targetMapId = 21; // Luxem Tower
+        spawnPos = { 5102.48f, 5063.67f, 0 };
+        return true;
+    }
+    else if ( botLvl <= 38 )
+    {
+        targetMapId = 23; // Breezy Hills
+        spawnPos = { 5096.35f, 4905.92f, 0 };
+        return true;
+    }
+    else if ( botLvl <= 52 )
+    {
+        targetMapId = 25; // Anima Lake
+        spawnPos = { 5379.49f, 5184.52f, 0 };
+        return true;
+    }
+    else
+    {
+        targetMapId = 26; // Kenji Beach / High Map
+        spawnPos = { 5655.32f, 5238.22f, 0 };
+        return true;
+    }
+}
+
+void CBotManager::CheckAndRelocateUninvitedBot( CPlayer* bot )
+{
+    if ( !bot || !bot->is_bot || !bot->bot_ai || !bot->Position ) return;
+
+    CPlayerBot* botAi = reinterpret_cast<CPlayerBot*>( bot->bot_ai );
+    if ( botAi->IsBuffBot( ) || botAi->IsVendingBot( ) ) return;
+
+    int botLvl = bot->Stats->Level;
+    UINT currentMap = bot->Position->Map;
+
+    int minLvl = 1, maxLvl = 200;
+    bool isCity = false;
+    GetZoneLevelRange( currentMap, minLvl, maxLvl, isCity );
+
+    if ( isCity || ( botLvl >= ( minLvl - 5 ) && botLvl <= ( maxLvl + 10 ) ) )
+    {
+        botAi->SetFollowTarget( NULL );
+        botAi->SetState( BOT_STATE_IDLE );
+        return;
+    }
+
+    UINT targetMapId = currentMap;
+    fPoint spawnPos = bot->Position->current;
+    if ( GetMapForLevel( botLvl, targetMapId, spawnPos ) )
+    {
+        Log( MSG_INFO, "Uninvited Bot '%s' (Lvl %d) relocating from Map %u (Zone Lvl %d-%d) to Map %u for grinding",
+             bot->CharInfo->charname, botLvl, currentMap, minLvl, maxLvl, targetMapId );
+
+        botAi->SetFollowTarget( NULL );
+        botAi->SetState( BOT_STATE_IDLE );
+        if ( targetMapId < (UINT)GServer->MapList.max && GServer->MapList.Index[targetMapId] )
+        {
+            GServer->MapList.Index[targetMapId]->TeleportPlayer( bot, spawnPos, false );
+        }
+    }
+}
+
 void CBotManager::CheckProximitySpawns( )
 {
     clock_t now = clock( );
@@ -583,9 +761,23 @@ void CBotManager::CheckProximitySpawns( )
                 int toSpawn = ( targetBots - nearbyBotCount > 2 ) ? 2 : ( targetBots - nearbyBotCount );
                 for ( int s = 0; s < toSpawn; s++ )
                 {
-                    // Level within +- 4 of player
-                    int delta = ( rand( ) % 9 ) - 4;
-                    int botLvl = rp->Stats->Level + delta;
+                    int botLvl = 1;
+                    int minLvl = 1, maxLvl = 200;
+                    bool isCity = false;
+                    GetZoneLevelRange( map->id, minLvl, maxLvl, isCity );
+
+                    if ( isCity )
+                    {
+                        // Cities spawn a rich variety of level ranges (Level 1 to 115)
+                        botLvl = 1 + ( rand( ) % 115 );
+                    }
+                    else
+                    {
+                        // Grinding zones spawn STRICTLY within the zone level bounds, regardless of player level
+                        int span = ( maxLvl >= minLvl ) ? ( maxLvl - minLvl + 1 ) : 1;
+                        botLvl = minLvl + ( rand( ) % span );
+                    }
+
                     if ( botLvl < 1 ) botLvl = 1;
                     if ( botLvl > 200 ) botLvl = 200;
 

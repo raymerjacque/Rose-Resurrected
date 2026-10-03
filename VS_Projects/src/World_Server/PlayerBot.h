@@ -265,6 +265,11 @@ public:
     bool HasRealPlayerNearby( CPlayer* bot, float radius );
     bool HasRealPlayerInParty( CPlayer* bot );
 
+    // Zone & Party Teleportation Helpers
+    static void GetZoneLevelRange( UINT mapId, int& minLvl, int& maxLvl, bool& isCity );
+    static bool GetMapForLevel( int botLvl, UINT& mapId, fPoint& spawnPos );
+    void CheckAndRelocateUninvitedBot( CPlayer* bot );
+
 private:
     CBotManager( );
     ~CBotManager( );
