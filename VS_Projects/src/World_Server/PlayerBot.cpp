@@ -1062,13 +1062,19 @@ CPlayerBot::CPlayerBot( CPlayer* player )
     m_lastSkillCastTime = clock( );
     m_lastPlayerNearby = clock( );
 
-    // Stagger initial social timers to prevent packet flooding on client login
+    // Stagger initial social and activity timers to prevent packet flooding on client login
     clock_t now = clock( );
     m_lastWhisperTime = now + ( ( 120 + ( rand( ) % 360 ) ) * CLOCKS_PER_SEC );
     m_lastGreetingTime = now + ( ( 45 + ( rand( ) % 180 ) ) * CLOCKS_PER_SEC );
     m_lastChatterTime = now + ( ( 60 + ( rand( ) % 240 ) ) * CLOCKS_PER_SEC );
     m_lastVendingSay = now + ( ( 30 + ( rand( ) % 120 ) ) * CLOCKS_PER_SEC );
     m_lastPartyInviteTime = now + ( ( 90 + ( rand( ) % 300 ) ) * CLOCKS_PER_SEC );
+    m_lastLfgShoutTime = now + ( ( 120 + ( rand( ) % 480 ) ) * CLOCKS_PER_SEC );
+    m_lastBossRaidCheckTime = now + ( ( 180 + ( rand( ) % 600 ) ) * CLOCKS_PER_SEC );
+    m_lastTownRepairTime = now + ( ( 180 + ( rand( ) % 600 ) ) * CLOCKS_PER_SEC );
+    m_lastArenaQueueTime = now + ( ( 180 + ( rand( ) % 600 ) ) * CLOCKS_PER_SEC );
+    m_lastDungeonCheckTime = now + ( ( 180 + ( rand( ) % 600 ) ) * CLOCKS_PER_SEC );
+    m_lastShopBrowseTime = now + ( ( 120 + ( rand( ) % 300 ) ) * CLOCKS_PER_SEC );
 
     if ( m_player )
     {
@@ -3181,8 +3187,11 @@ void CPlayerBot::CheckLfgShouts( )
 {
     if ( !m_player || m_isBuffBot || m_isVendingBot ) return;
     clock_t now = clock( );
-    if ( ( now - m_lastLfgShoutTime ) < ( 90 * CLOCKS_PER_SEC ) ) return;
+    if ( ( now - m_lastLfgShoutTime ) < (clock_t)( ( 240 + ( rand( ) % 360 ) ) * CLOCKS_PER_SEC ) ) return;
     m_lastLfgShoutTime = now;
+
+    // 15% chance to shout when timer expires
+    if ( rand( ) % 100 >= 15 ) return;
 
     if ( m_player->Party->party != NULL && m_player->Party->party->Members.size() >= 4 ) return;
 
