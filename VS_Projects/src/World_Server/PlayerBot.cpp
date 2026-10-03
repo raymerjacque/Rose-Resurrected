@@ -1033,6 +1033,7 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_lastBuffSay( 0 ),
       m_lastBuffCastTime( 0 ),
       m_lastBuffSeekTime( 0 ),
+      m_nextBuffCandidateIndex( 0 ),
       m_isVendingBot( false ),
       m_vendingCategory( 0 ),
       m_lastVendingSay( 0 ),
@@ -3475,23 +3476,32 @@ void CPlayerBot::HandleBuffBot( )
         return;
     }
 
-    // Collect candidates within 16 meters: prioritize real players, then bots
-    CPlayer* bestTarget = NULL;
-    bool targetIsPlayer = false;
+    // Collect candidates within 16 meters: both real players AND player bots needing buffs
+    std::vector<CPlayer*> candidates;
 
-    // Scan real players first
     for ( size_t i = 0; i < map->PlayerList.size( ); i++ )
     {
         CPlayer* p = map->PlayerList[i];
         if ( !p || p == m_player || p->IsDead( ) ) continue;
-        if ( p->Session == NULL || !p->Session->inGame ) continue;
-        if ( p->bot_ai != NULL ) continue; // real player only
+
+        if ( p->bot_ai != NULL )
+        {
+            CPlayerBot* bAi = reinterpret_cast<CPlayerBot*>( p->bot_ai );
+            if ( bAi && bAi->IsBuffBot( ) ) continue; // Don't buff other buff bots
+        }
+        else
+        {
+            if ( p->Session == NULL || !p->Session->inGame ) continue;
+        }
 
         float dist = GServer->distance( m_player->Position->current, p->Position->current );
         if ( dist <= 16.0f )
         {
             bool needsHelp = false;
-            if ( p->Stats->HP < ( p->Stats->MaxHP * 85 / 100 ) ) needsHelp = true;
+            if ( p->Stats->HP < ( p->Stats->MaxHP * 85 / 100 ) )
+            {
+                needsHelp = true;
+            }
             else if ( p->Status->Dash_up == 0xff ||
                       p->Status->Haste_up == 0xff ||
                       p->Status->Attack_up == 0xff ||
@@ -3505,51 +3515,22 @@ void CPlayerBot::HandleBuffBot( )
 
             if ( needsHelp )
             {
-                bestTarget = p;
-                targetIsPlayer = true;
-                break;
+                candidates.push_back( p );
             }
         }
     }
 
-    // If no real player needs buffs, check nearby bots
-    if ( !bestTarget )
+    if ( candidates.empty( ) ) return;
+
+    // Fair Round-Robin Queue: cycle through candidate list so every player & bot gets buffed equally
+    if ( m_nextBuffCandidateIndex >= candidates.size( ) )
     {
-        for ( size_t i = 0; i < map->PlayerList.size( ); i++ )
-        {
-            CPlayer* p = map->PlayerList[i];
-            if ( !p || p == m_player || p->IsDead( ) ) continue;
-            if ( p->bot_ai == NULL ) continue;
-            CPlayerBot* bAi = reinterpret_cast<CPlayerBot*>( p->bot_ai );
-            if ( bAi && bAi->IsBuffBot( ) ) continue; // Don't buff other buff bots
-
-            float dist = GServer->distance( m_player->Position->current, p->Position->current );
-            if ( dist <= 16.0f )
-            {
-                bool needsHelp = false;
-                if ( p->Stats->HP < ( p->Stats->MaxHP * 85 / 100 ) ) needsHelp = true;
-                else if ( p->Status->Dash_up == 0xff ||
-                          p->Status->Haste_up == 0xff ||
-                          p->Status->Attack_up == 0xff ||
-                          p->Status->Defense_up == 0xff ||
-                          p->Status->Accuracy_up == 0xff ||
-                          p->Status->Critical_up == 0xff ||
-                          p->Status->ExtraDamage_up == 0xff )
-                {
-                    needsHelp = true;
-                }
-
-                if ( needsHelp )
-                {
-                    bestTarget = p;
-                    targetIsPlayer = false;
-                    break;
-                }
-            }
-        }
+        m_nextBuffCandidateIndex = 0;
     }
 
-    if ( !bestTarget ) return;
+    CPlayer* bestTarget = candidates[m_nextBuffCandidateIndex];
+    m_nextBuffCandidateIndex = ( m_nextBuffCandidateIndex + 1 ) % candidates.size( );
+    bool targetIsPlayer = ( bestTarget->bot_ai == NULL );
 
     // Decide which buff or heal to cast based on exact active status effects
     UINT skillToCast = 0;

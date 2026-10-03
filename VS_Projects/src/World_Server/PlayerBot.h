@@ -188,6 +188,7 @@ private:
     clock_t m_lastBuffSay;
     clock_t m_lastBuffCastTime;
     clock_t m_lastBuffSeekTime;
+    size_t m_nextBuffCandidateIndex;
 
     // Vending Bot
     bool m_isVendingBot;
