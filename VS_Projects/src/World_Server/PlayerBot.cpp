@@ -2140,76 +2140,74 @@ bool CPlayerBot::CheckProximityBuffs( )
     UINT skillToCast = 0;
     const char* buffName = NULL;
 
-    for ( size_t i = 0; i < map->PlayerList.size( ); i++ )
+    // Scan candidates: real players first, then player bots
+    for ( int pass = 0; pass < 2 && !targetToBuff; pass++ )
     {
-        CPlayer* p = map->PlayerList[i];
-        if ( !p || p == m_player || p->IsDead( ) ) continue;
-        if ( p->Session == NULL || !p->Session->inGame ) continue;
-        if ( p->bot_ai != NULL ) continue; // Target real players
+        for ( size_t i = 0; i < map->PlayerList.size( ); i++ )
+        {
+            CPlayer* p = map->PlayerList[i];
+            if ( !p || p == m_player || p->IsDead( ) ) continue;
+            if ( p->Session == NULL || !p->Session->inGame ) continue;
 
-        // 1. MUST BE STANDING STILL (do not run after moving players)
-        if ( p->IsMoving( ) ) continue;
+            // Pass 0: real players only; Pass 1: player bots (excluding other buff bots)
+            if ( pass == 0 && p->bot_ai != NULL ) continue;
+            if ( pass == 1 && ( p->bot_ai == NULL || ( reinterpret_cast<CPlayerBot*>( p->bot_ai )->IsBuffBot( ) ) ) ) continue;
 
-        // 2. MUST BE WITHIN SPELL CAST RANGE (max 15.0m - no chasing!)
-        float dist = GServer->distance( m_player->Position->current, p->Position->current );
-        if ( dist > 15.0f ) continue;
+            // MUST BE WITHIN SPELL CAST RANGE (max 16.0m)
+            float dist = GServer->distance( m_player->Position->current, p->Position->current );
+            if ( dist > 16.0f ) continue;
 
-        // 3. Priority checks for missing buffs or healing
-        if ( p->Stats->HP < ( p->Stats->MaxHP * 85 / 100 ) )
-        {
-            targetToBuff = p;
-            skillToCast = 985; // Recovery
-            buffName = "Heal";
-            break;
-        }
-        else if ( p->Status->Dash_up == 0xff )
-        {
-            targetToBuff = p;
-            skillToCast = 930; // Hustle Charm (Move Speed)
-            buffName = "Hustle";
-            break;
-        }
-        else if ( p->Status->Haste_up == 0xff )
-        {
-            targetToBuff = p;
-            skillToCast = 1254; // Battle Charm (Attack Speed)
-            buffName = "Battle Charm";
-            break;
-        }
-        else if ( p->Status->Attack_up == 0xff )
-        {
-            targetToBuff = p;
-            skillToCast = 1270; // Clobber Charm (Attack Power)
-            buffName = "Clobber Charm";
-            break;
-        }
-        else if ( p->Status->Defense_up == 0xff )
-        {
-            targetToBuff = p;
-            skillToCast = 1004; // Resilience Charm (Defense)
-            buffName = "Resilience";
-            break;
-        }
-        else if ( p->Status->Accuracy_up == 0xff )
-        {
-            targetToBuff = p;
-            skillToCast = 1019; // Precision Charm (Accuracy)
-            buffName = "Precision";
-            break;
-        }
-        else if ( p->Status->Critical_up == 0xff )
-        {
-            targetToBuff = p;
-            skillToCast = 1284; // Critical Charm (Crit Rate)
-            buffName = "Critical Charm";
-            break;
-        }
-        else if ( p->Status->ExtraDamage_up == 0xff )
-        {
-            targetToBuff = p;
-            skillToCast = 1294; // Valkyrie Charm (Extra Damage)
-            buffName = "Valkyrie Charm";
-            break;
+            // 3. Priority checks for missing buffs or healing
+            if ( p->Stats->HP < ( p->Stats->MaxHP * 85 / 100 ) )
+            {
+                targetToBuff = p;
+                skillToCast = 985; // Recovery
+                buffName = "Heal";
+            }
+            else if ( p->Status->Dash_up == 0xff )
+            {
+                targetToBuff = p;
+                skillToCast = 930; // Hustle Charm (Move Speed)
+                buffName = "Hustle";
+            }
+            else if ( p->Status->Haste_up == 0xff )
+            {
+                targetToBuff = p;
+                skillToCast = 1254; // Battle Charm (Attack Speed)
+                buffName = "Battle Charm";
+            }
+            else if ( p->Status->Attack_up == 0xff )
+            {
+                targetToBuff = p;
+                skillToCast = 1270; // Clobber Charm (Attack Power)
+                buffName = "Clobber Charm";
+            }
+            else if ( p->Status->Defense_up == 0xff )
+            {
+                targetToBuff = p;
+                skillToCast = 1004; // Resilience Charm (Defense)
+                buffName = "Resilience";
+            }
+            else if ( p->Status->Accuracy_up == 0xff )
+            {
+                targetToBuff = p;
+                skillToCast = 1019; // Precision Charm (Accuracy)
+                buffName = "Precision";
+            }
+            else if ( p->Status->Critical_up == 0xff )
+            {
+                targetToBuff = p;
+                skillToCast = 1284; // Critical Charm (Crit Rate)
+                buffName = "Critical Charm";
+            }
+            else if ( p->Status->ExtraDamage_up == 0xff )
+            {
+                targetToBuff = p;
+                skillToCast = 1294; // Valkyrie Charm (Extra Damage)
+                buffName = "Valkyrie Charm";
+            }
+
+            if ( targetToBuff ) break;
         }
     }
 
@@ -3482,7 +3480,6 @@ void CPlayerBot::HandleBuffBot( )
         float dist = GServer->distance( m_player->Position->current, p->Position->current );
         if ( dist <= 16.0f )
         {
-            if ( p->IsMoving( ) ) continue; // Require player to stand still
             bool needsHelp = false;
             if ( p->Stats->HP < ( p->Stats->MaxHP * 85 / 100 ) ) needsHelp = true;
             else if ( p->Status->Dash_up == 0xff ||
@@ -3519,7 +3516,6 @@ void CPlayerBot::HandleBuffBot( )
             float dist = GServer->distance( m_player->Position->current, p->Position->current );
             if ( dist <= 16.0f )
             {
-                if ( p->IsMoving( ) ) continue; // Require bot to stand still
                 bool needsHelp = false;
                 if ( p->Stats->HP < ( p->Stats->MaxHP * 85 / 100 ) ) needsHelp = true;
                 else if ( p->Status->Dash_up == 0xff ||
