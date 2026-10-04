@@ -29,7 +29,8 @@ enum BotState {
     BOT_STATE_RALLY_RAID,
     BOT_STATE_VENDOR_RUN,
     BOT_STATE_QUEST_RETURN,
-    BOT_STATE_CLAN_HANGOUT
+    BOT_STATE_CLAN_HANGOUT,
+    BOT_STATE_SIEGE_UNIT
 };
 
 struct BotBounty {
@@ -46,7 +47,11 @@ enum BotPersonality {
     BOT_PERSONALITY_RIVAL,
     BOT_PERSONALITY_HELPER,
     BOT_PERSONALITY_MERCHANT,
-    BOT_PERSONALITY_BRAWLER
+    BOT_PERSONALITY_BRAWLER,
+    BOT_PERSONALITY_SPEEDRUNNER,
+    BOT_PERSONALITY_SOCIAL,
+    BOT_PERSONALITY_CASUAL,
+    BOT_PERSONALITY_TYCOON
 };
 
 class CPlayerBot {
@@ -79,6 +84,7 @@ public:
     void TriggerVendorRun( );
     void HandleQuestReturn( );
     void HandleClanHangout( );
+    void HandleSiegeUnit( );
     void StartDuel( CPlayer* challenger );
     void CheckPlayerGreetings( );
     void AssignClanTag( );
@@ -88,6 +94,15 @@ public:
     void AssignNewBounty( );
     void CheckBountyProgress( CMonster* mob );
     const BotBounty* GetBounty( ) const { return &m_bounty; }
+
+    void RecordGratitude( CPlayer* player, int points = 1 );
+    void RecordNemesis( CPlayer* player, int points = 1 );
+    bool IsFriend( CPlayer* player ) const;
+    bool IsNemesis( CPlayer* player ) const;
+    void CheckNemesisRevenge( CPlayer* player );
+    void CheckClanRecruitmentShout( );
+    void HandleClanInviteRequest( CPlayer* sender );
+    void HandleTradeRequest( CPlayer* sender );
 
     void CheckPlayerShops( );
     void CheckWhispers( );
@@ -276,6 +291,12 @@ private:
     // Dynamic Questing & Daily Bounties
     BotBounty m_bounty;
     clock_t m_lastBountyCheckTime;
+
+    // Social Memory Engine
+    std::map<UINT, int> m_friendMemory;  // Player CharID -> Gratitude Score
+    std::map<UINT, int> m_nemesisMemory; // Player CharID -> Nemesis Score
+    clock_t m_lastRecruitmentShoutTime;
+    clock_t m_lastCasualChatterTime;
 };
 
 class CBotManager {

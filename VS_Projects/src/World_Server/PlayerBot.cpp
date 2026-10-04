@@ -1243,7 +1243,7 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_lastGreetingTime( 0 ),
       m_duelTargetCid( 0 ),
       m_duelStartTime( 0 ),
-      m_personality( (BotPersonality)( rand( ) % 4 ) ),
+      m_personality( (BotPersonality)( rand( ) % 8 ) ),
       m_lastShopBrowseTime( 0 ),
       m_lastBuyListRefreshTime( 0 ),
       m_lastWhisperTime( 0 ),
@@ -1254,7 +1254,9 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_lastVendorRunTime( 0 ),
       m_lastHaggleTime( 0 ),
       m_lastClanRivalryTime( 0 ),
-      m_lastBountyCheckTime( 0 )
+      m_lastBountyCheckTime( 0 ),
+      m_lastRecruitmentShoutTime( 0 ),
+      m_lastCasualChatterTime( 0 )
 {
     m_lastAiTick = clock( );
     m_stateTimer = clock( );
@@ -1328,6 +1330,7 @@ const char* CPlayerBot::GetStateString( ) const
         case BOT_STATE_VENDOR_RUN:  return "VENDOR_RUN";
         case BOT_STATE_QUEST_RETURN: return "QUEST_RETURN";
         case BOT_STATE_CLAN_HANGOUT: return "CLAN_HANGOUT";
+        case BOT_STATE_SIEGE_UNIT:   return "SIEGE_UNIT";
         default:                   return "UNKNOWN";
     }
 }
@@ -2897,9 +2900,10 @@ void CPlayerBot::Update( )
     // Dungeon Crawling & Raids
     CheckDungeonRuns( );
 
-    // Phase 4 Realism: LFG Shouts & World Boss Raids
+    // Phase 4 Realism: LFG Shouts & World Boss Raids & Clan Recruitment Shouts
     CheckLfgShouts( );
     CheckWorldBossRaids( );
+    CheckClanRecruitmentShout( );
 
     // Proximity buffing: buff nearby unbuffed stationary real players (without chasing/moving toward them)
     if ( CheckProximityBuffs( ) ) return;
@@ -2947,6 +2951,7 @@ void CPlayerBot::Update( )
         case BOT_STATE_VENDOR_RUN:   HandleVendorRun( );   break;
         case BOT_STATE_QUEST_RETURN: HandleQuestReturn( );  break;
         case BOT_STATE_CLAN_HANGOUT: HandleClanHangout( );  break;
+        case BOT_STATE_SIEGE_UNIT:   HandleSiegeUnit( );   break;
     }
 }
 
@@ -3510,6 +3515,16 @@ void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
         {
             snprintf( reply, sizeof(reply), "Sorry, my party is full right now! Catch you on the next run." );
         }
+    }
+    else if ( text.find( "join" ) != std::string::npos || text.find( "clan" ) != std::string::npos || text.find( "guild" ) != std::string::npos )
+    {
+        HandleClanInviteRequest( sender );
+        return;
+    }
+    else if ( text.find( "trade" ) != std::string::npos )
+    {
+        HandleTradeRequest( sender );
+        return;
     }
     else if ( text.find( "duel" ) != std::string::npos || text.find( "fight" ) != std::string::npos || text.find( "pvp" ) != std::string::npos )
     {
@@ -4506,4 +4521,159 @@ void CPlayerBot::HandleQuestReturn( )
     EquipTieredGear( true );
     AssignNewBounty( );
     SetState( BOT_STATE_ROAM );
+}
+
+// -------------------------------------------------------------
+// Advanced Feature 1 & 2: Social Memory Engine (Gratitude & Nemesis)
+// -------------------------------------------------------------
+void CPlayerBot::RecordGratitude( CPlayer* player, int points )
+{
+    if ( !player || player->is_bot || !player->CharInfo ) return;
+    m_friendMemory[player->CharInfo->charid] += points;
+
+    if ( m_friendMemory[player->CharInfo->charid] == points )
+    {
+        char msg[128];
+        snprintf( msg, sizeof(msg), "Thanks @%s! I won't forget your help!", player->CharInfo->charname );
+        Say( msg );
+    }
+}
+
+void CPlayerBot::RecordNemesis( CPlayer* player, int points )
+{
+    if ( !player || player->is_bot || !player->CharInfo ) return;
+    m_nemesisMemory[player->CharInfo->charid] += points;
+}
+
+bool CPlayerBot::IsFriend( CPlayer* player ) const
+{
+    if ( !player || !player->CharInfo ) return false;
+    std::map<UINT, int>::const_iterator it = m_friendMemory.find( player->CharInfo->charid );
+    return ( it != m_friendMemory.end( ) && it->second > 0 );
+}
+
+bool CPlayerBot::IsNemesis( CPlayer* player ) const
+{
+    if ( !player || !player->CharInfo ) return false;
+    std::map<UINT, int>::const_iterator it = m_nemesisMemory.find( player->CharInfo->charid );
+    return ( it != m_nemesisMemory.end( ) && it->second > 0 );
+}
+
+void CPlayerBot::CheckNemesisRevenge( CPlayer* player )
+{
+    if ( !player || !player->CharInfo || m_state == BOT_STATE_DEAD || m_state == BOT_STATE_DUEL ) return;
+
+    if ( RollD20( ) >= 7 ) // ~70% chance to react to nemesis
+    {
+        char msg[128];
+        snprintf( msg, sizeof(msg), "You again, @%s! Time for paybacks!", player->CharInfo->charname );
+        Say( msg );
+        StartDuel( player );
+    }
+}
+
+// -------------------------------------------------------------
+// Advanced Feature 3: Player-Bot Guild Creation & Recruitment
+// -------------------------------------------------------------
+void CPlayerBot::CheckClanRecruitmentShout( )
+{
+    if ( !m_player || !m_player->Clan || m_player->Clan->clanid == 0 || m_isBuffBot || m_isVendingBot ) return;
+    if ( m_player->Clan->clanrank > 2 ) return; // Only Clan Leaders & Officers recruit
+
+    clock_t now = clock( );
+    if ( ( now - m_lastRecruitmentShoutTime ) < ( 180 * CLOCKS_PER_SEC ) ) return;
+    m_lastRecruitmentShoutTime = now;
+
+    if ( m_player->Position && ( m_player->Position->Map == 1 || m_player->Position->Map == 2 ) )
+    {
+        char msg[128];
+        snprintf( msg, sizeof(msg), "<<Clan #%d>> is recruiting active grinders LVL 30+! PST to join!", m_player->Clan->clanid );
+
+        BEGINPACKET( pak, 0x0785 );
+        ADDSTRING  ( pak, m_player->CharInfo->charname );
+        ADDBYTE    ( pak, 0 );
+        ADDSTRING  ( pak, msg );
+        ADDBYTE    ( pak, 0 );
+        GServer->SendToMap( &pak, m_player->Position->Map );
+    }
+}
+
+void CPlayerBot::HandleClanInviteRequest( CPlayer* sender )
+{
+    if ( !m_player || !sender || !sender->CharInfo || !m_player->Clan ) return;
+
+    if ( sender->Clan && sender->Clan->clanid != 0 )
+    {
+        WhisperPlayer( sender, "You are already in a clan! Leave your current clan first to join ours." );
+        return;
+    }
+
+    int lvl = sender->Stats ? sender->Stats->Level : 1;
+    if ( lvl < 20 )
+    {
+        WhisperPlayer( sender, "Sorry! We are currently looking for members level 20 or higher." );
+        return;
+    }
+
+    if ( RollD20( ) >= 8 ) // ~65% acceptance rate
+    {
+        sender->Clan->clanid = m_player->Clan->clanid;
+        sender->Clan->clanrank = 5; // Member rank
+
+        char msg[128];
+        snprintf( msg, sizeof(msg), "Welcome to Clan #%d, %s! Great to have you with us!", m_player->Clan->clanid, sender->CharInfo->charname );
+        WhisperPlayer( sender, msg );
+    }
+    else
+    {
+        WhisperPlayer( sender, "Thanks for applying! We will review your application soon." );
+    }
+}
+
+// -------------------------------------------------------------
+// Advanced Feature 4: Direct Player-to-Bot Trading Engine
+// -------------------------------------------------------------
+void CPlayerBot::HandleTradeRequest( CPlayer* sender )
+{
+    if ( !m_player || !sender || !sender->CharInfo || m_state == BOT_STATE_DEAD || m_isVendingBot ) return;
+
+    int chaMod = ( m_player && m_player->Attr ) ? ( m_player->Attr->Cha / 10 ) : 0;
+    int roll = RollD20( ) + chaMod;
+
+    if ( roll >= 10 )
+    {
+        long long offeredZulies = 10000 + ( rand( ) % 50000 );
+        if ( IsFriend( sender ) ) offeredZulies = offeredZulies * 115 / 100; // 15% bonus for friends
+
+        char msg[128];
+        snprintf( msg, sizeof(msg), "Trade accepted! I can offer up to %lld Zulies for your surplus gear. Place your items!", offeredZulies );
+        WhisperPlayer( sender, msg );
+    }
+    else
+    {
+        WhisperPlayer( sender, "Sorry, I'm not looking to trade right now!" );
+    }
+}
+
+// -------------------------------------------------------------
+// Advanced Feature 5: Clan War / Siege Unit AI
+// -------------------------------------------------------------
+void CPlayerBot::HandleSiegeUnit( )
+{
+    if ( !m_player || m_player->IsDead( ) ) return;
+
+    fPoint gatePos = { 5200.0f, 5200.0f, 0.0f };
+    float dist = GServer->distance( m_player->Position->current, gatePos );
+
+    if ( dist > 15.0f )
+    {
+        MoveTo( gatePos );
+        return;
+    }
+
+    CMonster* target = FindNearbyMonster( 25.0f );
+    if ( target )
+    {
+        AttackTarget( target );
+    }
 }
