@@ -19,6 +19,30 @@
     depeloped with Main erose/hrose source server + some change from the original eich source
 */
 #include "worldserver.h"
+#include "PlayerBot.h"
+
+// Helper for space-tolerant, case-insensitive character name comparisons
+static bool CompareCharNames( const char* name1, const char* name2 )
+{
+    if ( !name1 || !name2 ) return false;
+    while ( *name1 == ' ' ) name1++;
+    while ( *name2 == ' ' ) name2++;
+
+    for ( int i = 0; i < 16; i++ )
+    {
+        char c1 = name1[i];
+        char c2 = name2[i];
+        if ( c1 == ' ' || c1 == '\0' || c1 == '\r' || c1 == '\n' ) c1 = '\0';
+        if ( c2 == ' ' || c2 == '\0' || c2 == '\r' || c2 == '\n' ) c2 = '\0';
+
+        if ( tolower( (unsigned char)c1 ) != tolower( (unsigned char)c2 ) )
+            return false;
+
+        if ( c1 == '\0' )
+            return true;
+    }
+    return true;
+}
 
 // Build Item Head
 unsigned CWorldServer::BuildItemHead( CItem* thisitem )
@@ -799,62 +823,54 @@ CPlayer* CWorldServer::GetClientByCID( DWORD id, UINT map )
 }
 
 // Search a client by Charname
-CPlayer* CWorldServer::GetClientByCharName( char* name)
+CPlayer* CWorldServer::GetClientByCharName( char* name )
 {
-    if (name == NULL) return NULL;
-    for(UINT i=0;i<ClientList.size();i++)
-    {
-        if (ClientList.at(i) == NULL) continue;
-        CPlayer* thisclient = (CPlayer*) ClientList.at(i)->player;
-        if (thisclient == NULL || thisclient->CharInfo == NULL) continue;
-        if (strncmp(thisclient->CharInfo->charname,name, 16)==0)
-            return thisclient;
-	}
+    if ( name == NULL || name[0] == '\0' ) return NULL;
 
-    // Fallback: search all active maps for Player Bots
-    for(UINT m=0; m<MapList.Map.size(); m++)
+    for ( UINT i = 0; i < ClientList.size( ); i++ )
     {
-        CMap* pMap = MapList.Map.at(m);
-        if(!pMap || pMap == MapList.nullzone) continue;
-        for(UINT i=0; i<pMap->PlayerList.size(); i++)
+        if ( ClientList.at( i ) == NULL ) continue;
+        CPlayer* thisclient = (CPlayer*) ClientList.at( i )->player;
+        if ( thisclient == NULL || thisclient->CharInfo == NULL ) continue;
+        if ( CompareCharNames( thisclient->CharInfo->charname, name ) )
+            return thisclient;
+    }
+
+    // Fallback 1: search all active maps for Player Bots or unlisted players
+    for ( UINT m = 0; m < MapList.Map.size( ); m++ )
+    {
+        CMap* pMap = MapList.Map.at( m );
+        if ( !pMap || pMap == MapList.nullzone ) continue;
+        for ( UINT i = 0; i < pMap->PlayerList.size( ); i++ )
         {
-            CPlayer* p = pMap->PlayerList.at(i);
-            if(p && p->CharInfo && strncmp(p->CharInfo->charname, name, 16) == 0)
+            CPlayer* p = pMap->PlayerList.at( i );
+            if ( p && p->CharInfo && CompareCharNames( p->CharInfo->charname, name ) )
                 return p;
         }
     }
 
-	return NULL;
+    // Fallback 2: Direct lookup in CBotManager
+    CBotManager* botMgr = CBotManager::GetInstance( );
+    if ( botMgr )
+    {
+        std::vector<CPlayerBot*> bots = botMgr->GetBots( );
+        for ( size_t i = 0; i < bots.size( ); i++ )
+        {
+            if ( bots[i] && bots[i]->GetPlayer( ) && bots[i]->GetPlayer( )->CharInfo )
+            {
+                if ( CompareCharNames( bots[i]->GetPlayer( )->CharInfo->charname, name ) )
+                    return bots[i]->GetPlayer( );
+            }
+        }
+    }
+
+    return NULL;
 }
 
-
-//LMA: Search a client by Charname (Case insensitive search)
-CPlayer* CWorldServer::GetClientByCharNameCI( char* name  )
+// LMA: Search a client by Charname (Case insensitive search)
+CPlayer* CWorldServer::GetClientByCharNameCI( char* name )
 {
-    if (name == NULL) return NULL;
-    for(UINT i=0;i<ClientList.size();i++)
-    {
-        if (ClientList.at(i) == NULL) continue;
-        CPlayer* thisclient = (CPlayer*) ClientList.at(i)->player;
-        if (thisclient == NULL || thisclient->CharInfo == NULL) continue;
-        if (_strnicmp(thisclient->CharInfo->charname,name, 16) == 0)
-            return thisclient;
-	}
-
-    // Fallback: search all active maps for Player Bots
-    for(UINT m=0; m<MapList.Map.size(); m++)
-    {
-        CMap* pMap = MapList.Map.at(m);
-        if(!pMap || pMap == MapList.nullzone) continue;
-        for(UINT i=0; i<pMap->PlayerList.size(); i++)
-        {
-            CPlayer* p = pMap->PlayerList.at(i);
-            if(p && p->CharInfo && _strnicmp(p->CharInfo->charname, name, 16) == 0)
-                return p;
-        }
-    }
-
-	return NULL;
+    return GetClientByCharName( name );
 }
 
 // Get Spawn Area by ID

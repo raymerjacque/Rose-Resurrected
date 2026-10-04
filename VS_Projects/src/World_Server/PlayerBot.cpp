@@ -34,6 +34,29 @@ static const char* s_botNames[] = {
 };
 static const size_t s_botNamesCount = sizeof( s_botNames ) / sizeof( s_botNames[0] );
 
+// Helper for space-tolerant, case-insensitive character name comparisons
+static bool CompareCharNames( const char* name1, const char* name2 )
+{
+    if ( !name1 || !name2 ) return false;
+    while ( *name1 == ' ' ) name1++;
+    while ( *name2 == ' ' ) name2++;
+
+    for ( int i = 0; i < 16; i++ )
+    {
+        char c1 = name1[i];
+        char c2 = name2[i];
+        if ( c1 == ' ' || c1 == '\0' || c1 == '\r' || c1 == '\n' ) c1 = '\0';
+        if ( c2 == ' ' || c2 == '\0' || c2 == '\r' || c2 == '\n' ) c2 = '\0';
+
+        if ( tolower( (unsigned char)c1 ) != tolower( (unsigned char)c2 ) )
+            return false;
+
+        if ( c1 == '\0' )
+            return true;
+    }
+    return true;
+}
+
 // -------------------------------------------------------------
 // CBotManager Singleton Implementation
 // -------------------------------------------------------------
@@ -1160,9 +1183,9 @@ CPlayerBot* CBotManager::GetBot( const char* name )
     pthread_mutex_lock( &m_botMutex );
     for ( size_t i = 0; i < m_bots.size( ); i++ )
     {
-        if ( m_bots[i] && m_bots[i]->GetPlayer( ) )
+        if ( m_bots[i] && m_bots[i]->GetPlayer( ) && m_bots[i]->GetPlayer( )->CharInfo )
         {
-            if ( strncmp( m_bots[i]->GetPlayer( )->CharInfo->charname, name, 16 ) == 0 )
+            if ( CompareCharNames( m_bots[i]->GetPlayer( )->CharInfo->charname, name ) )
             {
                 CPlayerBot* result = m_bots[i];
                 pthread_mutex_unlock( &m_botMutex );
@@ -3534,13 +3557,78 @@ void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
     }
     else if ( text.find( "party" ) != std::string::npos || text.find( "invite" ) != std::string::npos || text.find( "team" ) != std::string::npos )
     {
-        if ( m_player->Party->party == NULL || m_player->Party->party->Members.size() < 4 )
+        if ( m_isBuffBot || m_isVendingBot )
         {
-            snprintf( reply, sizeof(reply), "Sure! Target me and click twice to invite me to your party!" );
+            snprintf( reply, sizeof(reply), "Sorry, static service bots cannot join parties." );
+        }
+        else if ( m_player->Party->party != NULL && m_player->Party->party != sender->Party->party )
+        {
+            snprintf( reply, sizeof(reply), "Sorry, I'm already in a party right now!" );
         }
         else
         {
-            snprintf( reply, sizeof(reply), "Sorry, my party is full right now! Catch you on the next run." );
+            CParty* party = sender->Party->party;
+            if ( party == NULL )
+            {
+                party = new CParty;
+                party->AddPlayer( sender );
+                GServer->AddParty( party );
+                sender->Party->IsMaster = true;
+            }
+
+            if ( m_player->Party->party == NULL )
+            {
+                // Send accepted packet 0x7d1 to inviter
+                BEGINPACKET( pak, 0x7d1 );
+                ADDBYTE    ( pak, 0x02 );
+                ADDWORD    ( pak, m_player->clientid );
+                ADDBYTE    ( pak, 0x00 );
+                if ( sender->client ) sender->client->SendPacket( &pak );
+
+                // Send party level and exp
+                RESETPACKET( pak, 0x7d4 );
+                ADDBYTE    ( pak, party->PartyLevel );
+                ADDDWORD   ( pak, party->Exp );
+                if ( sender->client ) sender->client->SendPacket( &pak );
+
+                m_player->Party->IsMaster = false;
+
+                // Send member info packet 0x7d2 to party members
+                RESETPACKET( pak, 0x7d2 );
+                ADDBYTE    ( pak, party->Option );
+                ADDBYTE    ( pak, 0x01 );
+                ADDDWORD   ( pak, m_player->CharInfo->charid );
+                ADDWORD    ( pak, m_player->clientid );
+                ADDWORD    ( pak, m_player->Stats->MaxHP );
+                ADDWORD    ( pak, m_player->Stats->HP );
+                ADDDWORD   ( pak, GServer->BuildBuffs( m_player ) );
+                ADDDWORD   ( pak, 0x1f40008c );
+                ADDWORD    ( pak, 0x1388 );
+                ADDSTRING  ( pak, m_player->CharInfo->charname );
+                ADDBYTE    ( pak, 0x00 );
+                party->SendToMembers( &pak );
+
+                party->AddPlayer( m_player );
+
+                // Teleport bot to player's side
+                if ( sender->Position != NULL && GServer->MapList.Index[sender->Position->Map] != NULL )
+                {
+                    CMap* pMap = GServer->MapList.Index[sender->Position->Map];
+                    fPoint spawnCoord = sender->Position->current;
+                    spawnCoord.x += ( ( rand() % 40 ) - 20 ) / 10.0f;
+                    spawnCoord.y += ( ( rand() % 40 ) - 20 ) / 10.0f;
+                    pMap->TeleportPlayer( m_player, spawnCoord, false );
+                }
+
+                SetFollowTarget( sender );
+                SetState( BOT_STATE_FOLLOW );
+
+                snprintf( reply, sizeof(reply), "I've joined your party! I'll follow you and fight by your side!" );
+            }
+            else
+            {
+                snprintf( reply, sizeof(reply), "I'm already in your party! Let me know if you need buffs or combat support." );
+            }
         }
     }
     else if ( text.find( "join" ) != std::string::npos || text.find( "clan" ) != std::string::npos || text.find( "guild" ) != std::string::npos )

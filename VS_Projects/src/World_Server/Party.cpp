@@ -32,6 +32,7 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
         case 0x01://invite a existent party
         {
             UINT clientid = GETWORD((*P),1);
+            DWORD charid = GETDWORD((*P),1);
             if(thisclient->Party->party!=NULL)
             {
                 //LMA: Refreshing Capacity if needed
@@ -44,9 +45,34 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
             }
             UINT targetMap = ( thisclient->Position != NULL ) ? thisclient->Position->Map : 0;
             CPlayer* otherclient = GetClientByID( clientid, targetMap );
+            if ( otherclient == NULL ) otherclient = GetClientByID( clientid, 0 );
+            if ( otherclient == NULL ) otherclient = GetClientByCID( charid, targetMap );
+            if ( otherclient == NULL ) otherclient = GetClientByCID( charid, 0 );
+            if ( otherclient == NULL && thisclient->lastTargetPlayerId != 0 )
+            {
+                otherclient = GetClientByID( thisclient->lastTargetPlayerId, targetMap );
+                if ( otherclient == NULL ) otherclient = GetClientByID( thisclient->lastTargetPlayerId, 0 );
+            }
             if ( otherclient == NULL )
             {
-                otherclient = GetClientByID( clientid, 0 );
+                CBotManager* botMgr = CBotManager::GetInstance( );
+                if ( botMgr )
+                {
+                    std::vector<CPlayerBot*> bots = botMgr->GetBots( );
+                    for ( size_t i = 0; i < bots.size( ); i++ )
+                    {
+                        if ( bots[i] && bots[i]->GetPlayer( ) )
+                        {
+                            CPlayer* pBot = bots[i]->GetPlayer( );
+                            if ( pBot->clientid == clientid || pBot->clientid == thisclient->lastTargetPlayerId ||
+                                 ( pBot->CharInfo && ( pBot->CharInfo->charid == charid || pBot->CharInfo->charid == (DWORD)clientid ) ) )
+                            {
+                                otherclient = pBot;
+                                break;
+                            }
+                        }
+                    }
+                }
             }
             if(otherclient==NULL)
             {
