@@ -201,7 +201,7 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                     ADDWORD    ( pak, (WORD)otherclient->Stats->MaxHP );
                     ADDWORD    ( pak, (WORD)otherclient->Stats->HP );
                     ADDDWORD   ( pak, BuildBuffs( otherclient ) );
-                    ADDDWORD   ( pak, 0x7200005b );
+                    ADDDWORD   ( pak, 0x1f40008c );
                     ADDWORD    ( pak, 0x1388 );
                     ADDSTRING  ( pak, otherclient->CharInfo->charname );
                     ADDBYTE    ( pak, 0x00 );
@@ -227,7 +227,8 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                     }
 
                     // Explicitly spawn 3D entity on leader's screen & add to VisiblePlayers
-                    otherclient->SpawnToPlayer( otherclient, thisclient );
+                    otherclient->SpawnToPlayer( thisclient, otherclient );
+                    thisclient->SpawnToPlayer( otherclient, thisclient );
 
                     bool foundV = false;
                     for ( size_t v = 0; v < thisclient->VisiblePlayers.size( ); v++ )
@@ -235,6 +236,13 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                         if ( thisclient->VisiblePlayers[v] == otherclient ) { foundV = true; break; }
                     }
                     if ( !foundV ) thisclient->VisiblePlayers.push_back( otherclient );
+
+                    bool foundB = false;
+                    for ( size_t v = 0; v < otherclient->VisiblePlayers.size( ); v++ )
+                    {
+                        if ( otherclient->VisiblePlayers[v] == thisclient ) { foundB = true; break; }
+                    }
+                    if ( !foundB ) otherclient->VisiblePlayers.push_back( thisclient );
                 }
 
                 // Update bot AI state

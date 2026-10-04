@@ -2706,24 +2706,35 @@ void CPlayerBot::Respawn( )
     if ( map )
     {
         fPoint respawnPos = m_player->Position->current;
-        if ( m_followTarget && m_followTarget->Position && m_followTarget->Position->Map == m_player->Position->Map )
+        if ( m_followTarget && m_followTarget->Position )
         {
-            respawnPos = m_followTarget->Position->current;
-            respawnPos.x += ( ( rand( ) % 40 ) - 20 ) / 10.0f;
-            respawnPos.y += ( ( rand( ) % 40 ) - 20 ) / 10.0f;
+            CMap* targetMap = GServer->MapList.Index[m_followTarget->Position->Map];
+            if ( targetMap )
+            {
+                respawnPos = m_followTarget->Position->current;
+                respawnPos.x += ( ( rand( ) % 40 ) - 20 ) / 10.0f;
+                respawnPos.y += ( ( rand( ) % 40 ) - 20 ) / 10.0f;
+                m_roamCenter = respawnPos;
+                targetMap->TeleportPlayer( m_player, respawnPos, false );
+            }
+            else
+            {
+                map->TeleportPlayer( m_player, respawnPos, false );
+            }
         }
         else if ( !m_isBuffBot && !m_isVendingBot )
         {
             // Respawn right where the bot died (with slight offset so bots don't overlap)
             respawnPos.x += ( ( rand( ) % 40 ) - 20 ) / 10.0f;
             respawnPos.y += ( ( rand( ) % 40 ) - 20 ) / 10.0f;
+            m_roamCenter = respawnPos;
+            map->TeleportPlayer( m_player, respawnPos, false );
         }
         else
         {
             respawnPos = m_roamCenter;
+            map->TeleportPlayer( m_player, respawnPos, false );
         }
-        m_roamCenter = respawnPos;
-        map->TeleportPlayer( m_player, respawnPos, false );
     }
 
     StandUp( );
@@ -2992,8 +3003,17 @@ void CPlayerBot::Update( )
         if ( leader )
         {
             m_followTarget = leader;
-            if ( m_state == BOT_STATE_IDLE || m_state == BOT_STATE_ROAM || m_state == BOT_STATE_TOWN_STROLL || m_state == BOT_STATE_SEEK_BUFF )
+            float distToLeader = ( m_player->Position->Map == leader->Position->Map ) ?
+                GServer->distance( m_player->Position->current, leader->Position->current ) : 9999.0f;
+
+            if ( distToLeader > 25.0f || m_state == BOT_STATE_IDLE || m_state == BOT_STATE_ROAM || m_state == BOT_STATE_TOWN_STROLL || m_state == BOT_STATE_SEEK_BUFF || m_state == BOT_STATE_REST )
             {
+                if ( m_state == BOT_STATE_COMBAT || m_state == BOT_STATE_LOOT || m_state == BOT_STATE_REST )
+                {
+                    ClearBattle( m_player->Battle );
+                    m_targetMobCid = 0;
+                    if ( m_state == BOT_STATE_REST ) StandUp( );
+                }
                 SetState( BOT_STATE_FOLLOW );
             }
         }
@@ -3349,9 +3369,9 @@ void CPlayerBot::HandleFollow( )
     }
     m_followTarget = leader;
 
-    // 1. Teleport follow: If party leader changed maps or moved far away (> 35m), follow leader instantly
+    // 1. Teleport follow: If party leader changed maps or moved far away (> 25m), follow leader instantly
     if ( m_player->Position->Map != m_followTarget->Position->Map ||
-         GServer->distance( m_player->Position->current, m_followTarget->Position->current ) > 35.0f )
+         GServer->distance( m_player->Position->current, m_followTarget->Position->current ) > 25.0f )
     {
         CMap* targetMap = GServer->MapList.Index[m_followTarget->Position->Map];
         if ( targetMap != NULL && targetMap != GServer->MapList.nullzone )
@@ -3360,6 +3380,26 @@ void CPlayerBot::HandleFollow( )
             targetPos.x += ( ( rand() % 40 ) - 20 ) / 10.0f;
             targetPos.y += ( ( rand() % 40 ) - 20 ) / 10.0f;
             targetMap->TeleportPlayer( m_player, targetPos, false );
+
+            // Explicitly spawn 3D entity on leader's screen & register in leader's VisiblePlayers
+            // CPlayer::SpawnToPlayer( receiver, entity ) sends entity to receiver!
+            m_player->SpawnToPlayer( m_followTarget, m_player );
+            m_followTarget->SpawnToPlayer( m_player, m_followTarget );
+
+            bool foundV = false;
+            for ( size_t v = 0; v < m_followTarget->VisiblePlayers.size( ); v++ )
+            {
+                if ( m_followTarget->VisiblePlayers[v] == m_player ) { foundV = true; break; }
+            }
+            if ( !foundV ) m_followTarget->VisiblePlayers.push_back( m_player );
+
+            bool foundB = false;
+            for ( size_t v = 0; v < m_player->VisiblePlayers.size( ); v++ )
+            {
+                if ( m_player->VisiblePlayers[v] == m_followTarget ) { foundB = true; break; }
+            }
+            if ( !foundB ) m_player->VisiblePlayers.push_back( m_followTarget );
+
             return;
         }
     }
@@ -3686,7 +3726,7 @@ void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
                     ADDWORD    ( pak, (WORD)m_player->Stats->MaxHP );
                     ADDWORD    ( pak, (WORD)m_player->Stats->HP );
                     ADDDWORD   ( pak, GServer->BuildBuffs( m_player ) );
-                    ADDDWORD   ( pak, 0x7200005b );
+                    ADDDWORD   ( pak, 0x1f40008c );
                     ADDWORD    ( pak, 0x1388 );
                     ADDSTRING  ( pak, m_player->CharInfo->charname );
                     ADDBYTE    ( pak, 0x00 );
@@ -3712,7 +3752,8 @@ void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
                     }
 
                     // Explicitly spawn 3D entity on leader's screen & add to VisiblePlayers
-                    m_player->SpawnToPlayer( m_player, sender );
+                    m_player->SpawnToPlayer( sender, m_player );
+                    sender->SpawnToPlayer( m_player, sender );
 
                     bool foundV = false;
                     for ( size_t v = 0; v < sender->VisiblePlayers.size( ); v++ )
@@ -3720,6 +3761,13 @@ void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
                         if ( sender->VisiblePlayers[v] == m_player ) { foundV = true; break; }
                     }
                     if ( !foundV ) sender->VisiblePlayers.push_back( m_player );
+
+                    bool foundB = false;
+                    for ( size_t v = 0; v < m_player->VisiblePlayers.size( ); v++ )
+                    {
+                        if ( m_player->VisiblePlayers[v] == sender ) { foundB = true; break; }
+                    }
+                    if ( !foundB ) m_player->VisiblePlayers.push_back( sender );
                 }
 
                 SetFollowTarget( sender );
