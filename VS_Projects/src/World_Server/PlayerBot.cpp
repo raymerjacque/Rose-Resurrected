@@ -754,11 +754,11 @@ void CBotManager::CheckProximitySpawns( )
                 }
             }
 
-            // Maintain 8-10 bots near player
-            int targetBots = 8;
-            if ( nearbyBotCount < targetBots && GetBotCount( ) < 120 )
+            // Maintain 12-14 bots near real player
+            int targetBots = 12;
+            if ( nearbyBotCount < targetBots && GetBotCount( ) < 200 )
             {
-                int toSpawn = ( targetBots - nearbyBotCount > 2 ) ? 2 : ( targetBots - nearbyBotCount );
+                int toSpawn = ( targetBots - nearbyBotCount > 4 ) ? 4 : ( targetBots - nearbyBotCount );
                 for ( int s = 0; s < toSpawn; s++ )
                 {
                     int botLvl = 1;
@@ -2650,7 +2650,25 @@ void CPlayerBot::Respawn( )
     CMap* map = GetMap( );
     if ( map )
     {
-        map->TeleportPlayer( m_player, m_roamCenter, false );
+        fPoint respawnPos = m_player->Position->current;
+        if ( m_followTarget && m_followTarget->Position && m_followTarget->Position->Map == m_player->Position->Map )
+        {
+            respawnPos = m_followTarget->Position->current;
+            respawnPos.x += ( ( rand( ) % 40 ) - 20 ) / 10.0f;
+            respawnPos.y += ( ( rand( ) % 40 ) - 20 ) / 10.0f;
+        }
+        else if ( !m_isBuffBot && !m_isVendingBot )
+        {
+            // Respawn right where the bot died (with slight offset so bots don't overlap)
+            respawnPos.x += ( ( rand( ) % 40 ) - 20 ) / 10.0f;
+            respawnPos.y += ( ( rand( ) % 40 ) - 20 ) / 10.0f;
+        }
+        else
+        {
+            respawnPos = m_roamCenter;
+        }
+        m_roamCenter = respawnPos;
+        map->TeleportPlayer( m_player, respawnPos, false );
     }
 
     StandUp( );
@@ -3334,7 +3352,7 @@ void CPlayerBot::HandleFollow( )
 void CPlayerBot::HandleDead( )
 {
     clock_t now = clock( );
-    if ( ( now - m_stateTimer ) >= ( 5 * CLOCKS_PER_SEC ) )
+    if ( ( now - m_stateTimer ) >= ( 10 * CLOCKS_PER_SEC ) )
     {
         Respawn( );
     }
