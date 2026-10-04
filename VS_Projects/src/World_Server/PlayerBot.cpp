@@ -1219,7 +1219,7 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_targetDropCid( 0 ),
       m_followTarget( NULL ),
       m_autoRoam( true ),
-      m_roamRadius( 100.0f ),
+      m_roamRadius( 400.0f ),
       m_isBuffBot( false ),
       m_bonfireCid( 0 ),
       m_lastBuffSay( 0 ),
@@ -1645,7 +1645,7 @@ void CPlayerBot::CheckZoneMigration( )
             Say( "Time to move to a higher level zone!" );
             nextMap->TeleportPlayer( m_player, targetPos, false );
             m_roamCenter = targetPos;
-            m_roamRadius = 100.0f;
+            m_roamRadius = 400.0f;
             EquipTieredGear( true );
         }
     }
@@ -3002,7 +3002,7 @@ void CPlayerBot::HandleIdle( )
     }
 
     // 3. Look for nearby drops first
-    CDrop* drop = FindNearbyDrop( 60.0f );
+    CDrop* drop = FindNearbyDrop( 100.0f );
     if ( drop )
     {
         m_targetDropCid = drop->clientid;
@@ -3011,8 +3011,8 @@ void CPlayerBot::HandleIdle( )
         return;
     }
 
-    // 3. Look for nearby monsters to attack (greatly expanded aggro detection radius)
-    CMonster* mob = FindNearbyMonster( 90.0f );
+    // 3. Look for nearby monsters to attack (massively expanded to 400.0m so bots in town spot monsters outside)
+    CMonster* mob = FindNearbyMonster( 400.0f );
     if ( mob )
     {
         AttackTarget( mob );
@@ -3020,15 +3020,15 @@ void CPlayerBot::HandleIdle( )
         return;
     }
 
-    // 4. Roam if enabled and idle timer expired (> 2.5 seconds)
+    // 4. Roam if enabled and idle timer expired (> 1.5 seconds)
     if ( m_autoRoam )
     {
         clock_t elapsed = clock( ) - m_stateTimer;
-        if ( elapsed >= (clock_t)( 2.5f * CLOCKS_PER_SEC ) )
+        if ( elapsed >= (clock_t)( 1.5f * CLOCKS_PER_SEC ) )
         {
             float angle = ( (float)( rand( ) % 360 ) ) * ( 3.14159265f / 180.0f );
-            float maxR = ( m_roamRadius > 5.0f ) ? m_roamRadius : 10.0f;
-            float dist = 5.0f + ( (float)( rand( ) % (int)( maxR - 5.0f + 1.0f ) ) );
+            float maxR = ( m_roamRadius > 50.0f ) ? m_roamRadius : 200.0f;
+            float dist = 10.0f + ( (float)( rand( ) % (int)( maxR - 10.0f + 1.0f ) ) );
             fPoint dest;
             dest.x = m_roamCenter.x + cos( angle ) * dist;
             dest.y = m_roamCenter.y + sin( angle ) * dist;
@@ -3046,7 +3046,7 @@ void CPlayerBot::HandleRoam( )
     if ( !m_player ) return;
 
     // Check for drops while roaming
-    CDrop* drop = FindNearbyDrop( 50.0f );
+    CDrop* drop = FindNearbyDrop( 100.0f );
     if ( drop )
     {
         m_targetDropCid = drop->clientid;
@@ -3055,8 +3055,8 @@ void CPlayerBot::HandleRoam( )
         return;
     }
 
-    // Check for monsters while roaming (expanded detection radius)
-    CMonster* mob = FindNearbyMonster( 85.0f );
+    // Check for monsters while roaming (massively expanded to 350.0m)
+    CMonster* mob = FindNearbyMonster( 350.0f );
     if ( mob )
     {
         AttackTarget( mob );
@@ -3155,8 +3155,8 @@ void CPlayerBot::HandleCombat( )
     // Ranged kiting AI check
     KiteTarget( mob );
 
-    // If target is too far away, drop combat
-    if ( dist > 100.0f )
+    // If target is too far away (> 450m), drop combat
+    if ( dist > 450.0f )
     {
         m_targetMobCid = 0;
         ClearBattle( m_player->Battle );
@@ -3361,6 +3361,15 @@ void CPlayerBot::HandleDead( )
 void CPlayerBot::HandleTownStroll( )
 {
     if ( !m_player ) return;
+
+    // Check for monsters outside town gates (up to 400m radius)
+    CMonster* mob = FindNearbyMonster( 400.0f );
+    if ( mob )
+    {
+        AttackTarget( mob );
+        SetState( BOT_STATE_COMBAT );
+        return;
+    }
 
     if ( !m_player->IsMoving( ) )
     {
