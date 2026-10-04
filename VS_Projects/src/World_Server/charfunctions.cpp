@@ -507,16 +507,9 @@ bool CCharacter::IsTargetReached( CCharacter* Enemy, CSkills* skill )
             reach = Stats->Attack_Distance > 1.5f ? Stats->Attack_Distance : 1.5f;
     }
 
-    float target_allowance = 1.7f;
-    if (Enemy->IsMonster())
-    {
-        CMonster* mon = (CMonster*)Enemy;
-        if (mon->thisnpc != NULL && mon->thisnpc->atkdistance > 0.0f)
-        {
-            target_allowance = 1.2f + (mon->thisnpc->atkdistance * 0.3f);
-            if (target_allowance < 1.7f) target_allowance = 1.7f;
-        }
-    }
+    // Strict fighting range enforcement: allow a small 0.3m movement tick tolerance for frame interpolation.
+    // Never allow damage from outside actual weapon/skill reach!
+    float target_allowance = 0.3f;
 
     return (distance <= (reach + target_allowance));
 }
