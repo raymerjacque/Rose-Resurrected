@@ -198,6 +198,7 @@ bool CPlayer::loaddata( )
     }
 
 	p_skills = 0;
+	bool quickbar_empty = true;
 	for(BYTE i=0;i<48;i++)
     {
         char* tmp = strtok((i == 0? row[19] :NULL), ",");
@@ -205,7 +206,21 @@ bool CPlayer::loaddata( )
             quickbar[i] = atoi(tmp);
         else
             quickbar[i] = 0;
+
+        if (quickbar[i] != 0)
+            quickbar_empty = false;
     }
+
+	// Fallback for empty quickbars: load default layout (Sit, Attack, Pick, Follow, Target, Consumable Slot 42)
+	if (quickbar_empty)
+	{
+		quickbar[0] = 6;     // Sit / Stand action
+		quickbar[1] = 102;   // Attack action
+		quickbar[2] = 134;   // Pick up action
+		quickbar[3] = 198;   // Follow action
+		quickbar[4] = 294;   // Target action
+		quickbar[39] = 1345; // Consumable shortcut for Slot 42
+	}
 
     //LMA: new way BEGIN
     bool do_save = false;

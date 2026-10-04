@@ -385,7 +385,7 @@ bool CCharServer::pakCreateChar( CCharClient* thisclient, CPacket* P )
 
 	DB->QFree( );
 
-	if(!DB->QExecute("INSERT INTO characters (account_name, char_name, face, hairStyle, sex) VALUES('%s','%s',%i,%i,%i)", thisclient->username, newname.c_str(), face, hairstyle, sex))
+	if(!DB->QExecute("INSERT INTO characters (account_name, char_name, face, hairStyle, sex, quickbar) VALUES('%s','%s',%i,%i,%i,'6,102,134,198,294,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1345,0,0,0,0,0,0,0,0')", thisclient->username, newname.c_str(), face, hairstyle, sex))
 	   return false;
 	unsigned int mid = (unsigned)mysql_insert_id( DB->Mysql );
     MYSQL_ROW row;
