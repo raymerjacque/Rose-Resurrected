@@ -42,7 +42,12 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                     return true;
                 }
             }
-            CPlayer* otherclient = GetClientByID( clientid, 0 ); // Look across all maps in the world
+            UINT targetMap = ( thisclient->Position != NULL ) ? thisclient->Position->Map : 0;
+            CPlayer* otherclient = GetClientByID( clientid, targetMap );
+            if ( otherclient == NULL )
+            {
+                otherclient = GetClientByID( clientid, 0 );
+            }
             if(otherclient==NULL)
             {
                 BEGINPACKET( pak, 0x7d1 );

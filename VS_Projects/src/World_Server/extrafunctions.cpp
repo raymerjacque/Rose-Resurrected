@@ -747,8 +747,9 @@ CPlayer* CWorldServer::GetClientByUserName( char *username )
 // Get Client By ID
 CPlayer* CWorldServer::GetClientByID( UINT id, UINT map )
 {
-    if(map!=0)
+    if(map!=0 && map < (UINT)MapList.max && MapList.Index[map] != NULL)
         return MapList.Index[map]->GetPlayerInMap( id );
+
     for(UINT i=0;i<ClientList.size();i++)
     {
         if (ClientList.at(i) == NULL) continue;
@@ -757,14 +758,25 @@ CPlayer* CWorldServer::GetClientByID( UINT id, UINT map )
 		if (thisclient->clientid==id)
             return thisclient;
 	}
+
+    // Fallback: search all active maps for Player Bots
+    for(UINT m=0; m<MapList.Map.size(); m++)
+    {
+        CMap* pMap = MapList.Map.at(m);
+        if(!pMap || pMap == MapList.nullzone) continue;
+        CPlayer* pBot = pMap->GetPlayerInMap( id );
+        if(pBot != NULL) return pBot;
+    }
+
 	return NULL;
 }
 
 // Search a Client by CharID
 CPlayer* CWorldServer::GetClientByCID( DWORD id, UINT map )
 {
-    if(map!=0)
+    if(map!=0 && map < (UINT)MapList.max && MapList.Index[map] != NULL)
         return MapList.Index[map]->GetCharIDInMap( id );
+
     for(UINT i=0;i<ClientList.size();i++)
     {
         if (ClientList.at(i) == NULL) continue;
@@ -773,6 +785,16 @@ CPlayer* CWorldServer::GetClientByCID( DWORD id, UINT map )
 		if (thisclient->CharInfo->charid==id)
             return thisclient;
 	}
+
+    // Fallback: search all active maps for Player Bots
+    for(UINT m=0; m<MapList.Map.size(); m++)
+    {
+        CMap* pMap = MapList.Map.at(m);
+        if(!pMap || pMap == MapList.nullzone) continue;
+        CPlayer* pBot = pMap->GetCharIDInMap( id );
+        if(pBot != NULL) return pBot;
+    }
+
 	return NULL;
 }
 
@@ -788,6 +810,20 @@ CPlayer* CWorldServer::GetClientByCharName( char* name)
         if (strncmp(thisclient->CharInfo->charname,name, 16)==0)
             return thisclient;
 	}
+
+    // Fallback: search all active maps for Player Bots
+    for(UINT m=0; m<MapList.Map.size(); m++)
+    {
+        CMap* pMap = MapList.Map.at(m);
+        if(!pMap || pMap == MapList.nullzone) continue;
+        for(UINT i=0; i<pMap->PlayerList.size(); i++)
+        {
+            CPlayer* p = pMap->PlayerList.at(i);
+            if(p && p->CharInfo && strncmp(p->CharInfo->charname, name, 16) == 0)
+                return p;
+        }
+    }
+
 	return NULL;
 }
 
@@ -804,6 +840,20 @@ CPlayer* CWorldServer::GetClientByCharNameCI( char* name  )
         if (_strnicmp(thisclient->CharInfo->charname,name, 16) == 0)
             return thisclient;
 	}
+
+    // Fallback: search all active maps for Player Bots
+    for(UINT m=0; m<MapList.Map.size(); m++)
+    {
+        CMap* pMap = MapList.Map.at(m);
+        if(!pMap || pMap == MapList.nullzone) continue;
+        for(UINT i=0; i<pMap->PlayerList.size(); i++)
+        {
+            CPlayer* p = pMap->PlayerList.at(i);
+            if(p && p->CharInfo && _strnicmp(p->CharInfo->charname, name, 16) == 0)
+                return p;
+        }
+    }
+
 	return NULL;
 }
 
