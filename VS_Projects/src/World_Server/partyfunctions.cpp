@@ -133,6 +133,11 @@ void CParty::SendToVisible( CPacket* pak, CPlayer* thisclient )
 
 bool CParty::AddPlayer( CPlayer* player )				/// Player joins a party
 {
+    if ( player == NULL ) return false;
+    for ( size_t i = 0; i < Members.size( ); i++ )
+    {
+        if ( Members[i] == player ) return false;
+    }
     player->Party->party = this;
 	player->Party->party->PartyId = this->PartyId;		// need to give him the correct partyID. May not be needed but I'm not sure if it will be inherited
     Members.push_back( player );						// add to the party members vector

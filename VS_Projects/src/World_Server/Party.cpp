@@ -44,15 +44,37 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                 }
             }
             UINT targetMap = ( thisclient->Position != NULL ) ? thisclient->Position->Map : 0;
-            CPlayer* otherclient = GetClientByID( clientid, targetMap );
-            if ( otherclient == NULL ) otherclient = GetClientByID( clientid, 0 );
-            if ( otherclient == NULL ) otherclient = GetClientByCID( charid, targetMap );
-            if ( otherclient == NULL ) otherclient = GetClientByCID( charid, 0 );
-            if ( otherclient == NULL && thisclient->lastTargetPlayerId != 0 )
+            CPlayer* otherclient = NULL;
+
+            // 1. Try clientid from packet if not self
+            if ( clientid != 0 && clientid != thisclient->clientid )
+            {
+                otherclient = GetClientByID( clientid, targetMap );
+                if ( otherclient == NULL ) otherclient = GetClientByID( clientid, 0 );
+            }
+
+            // 2. Try charid from packet if not self
+            if ( otherclient == NULL && charid != 0 && charid != thisclient->CharInfo->charid )
+            {
+                otherclient = GetClientByCID( charid, targetMap );
+                if ( otherclient == NULL ) otherclient = GetClientByCID( charid, 0 );
+            }
+
+            // 3. Fallback: check thisclient's lastTargetPlayerId
+            if ( otherclient == NULL && thisclient->lastTargetPlayerId != 0 && thisclient->lastTargetPlayerId != thisclient->clientid )
             {
                 otherclient = GetClientByID( thisclient->lastTargetPlayerId, targetMap );
                 if ( otherclient == NULL ) otherclient = GetClientByID( thisclient->lastTargetPlayerId, 0 );
             }
+
+            // 4. Fallback: check thisclient's Battle->target
+            if ( otherclient == NULL && thisclient->Battle != NULL && thisclient->Battle->target != 0 && thisclient->Battle->target != thisclient->clientid )
+            {
+                otherclient = GetClientByID( thisclient->Battle->target, targetMap );
+                if ( otherclient == NULL ) otherclient = GetClientByID( thisclient->Battle->target, 0 );
+            }
+
+            // 5. Fallback: Search CBotManager active bots
             if ( otherclient == NULL )
             {
                 CBotManager* botMgr = CBotManager::GetInstance( );
@@ -64,23 +86,36 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                         if ( bots[i] && bots[i]->GetPlayer( ) )
                         {
                             CPlayer* pBot = bots[i]->GetPlayer( );
-                            if ( pBot->clientid == clientid || pBot->clientid == thisclient->lastTargetPlayerId ||
-                                 ( pBot->CharInfo && ( pBot->CharInfo->charid == charid || pBot->CharInfo->charid == (DWORD)clientid ) ) )
+                            if ( pBot != thisclient )
                             {
-                                otherclient = pBot;
-                                break;
+                                if ( ( clientid != 0 && pBot->clientid == clientid ) ||
+                                     ( thisclient->lastTargetPlayerId != 0 && pBot->clientid == thisclient->lastTargetPlayerId ) ||
+                                     ( thisclient->Battle != NULL && thisclient->Battle->target != 0 && pBot->clientid == thisclient->Battle->target ) ||
+                                     ( charid != 0 && pBot->CharInfo && pBot->CharInfo->charid == charid ) )
+                                {
+                                    otherclient = pBot;
+                                    break;
+                                }
                             }
                         }
                     }
                 }
             }
-            if(otherclient==NULL)
+
+            if ( otherclient == NULL || otherclient == thisclient )
             {
-                BEGINPACKET( pak, 0x7d1 );
-                ADDBYTE    ( pak, 0x00 );//No encontro el ID
-                ADDWORD    ( pak, clientid );
-                ADDBYTE    ( pak, 0x00 );
-                thisclient->client->SendPacket( &pak );
+                if ( otherclient == thisclient )
+                {
+                    SendSysMsg( thisclient, "You cannot invite yourself to a party." );
+                }
+                else
+                {
+                    BEGINPACKET( pak, 0x7d1 );
+                    ADDBYTE    ( pak, 0x00 ); // Character not found
+                    ADDWORD    ( pak, clientid );
+                    ADDBYTE    ( pak, 0x00 );
+                    thisclient->client->SendPacket( &pak );
+                }
                 return true;
             }
             if(otherclient->Party->party!=NULL)
