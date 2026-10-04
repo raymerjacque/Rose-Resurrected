@@ -1248,7 +1248,13 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_lastBuyListRefreshTime( 0 ),
       m_lastWhisperTime( 0 ),
       m_lastArenaQueueTime( 0 ),
-      m_lastDungeonCheckTime( 0 )
+      m_lastDungeonCheckTime( 0 ),
+      m_rallyBossCid( 0 ),
+      m_lastRaidKiteTime( 0 ),
+      m_lastVendorRunTime( 0 ),
+      m_lastHaggleTime( 0 ),
+      m_lastClanRivalryTime( 0 ),
+      m_lastBountyCheckTime( 0 )
 {
     m_lastAiTick = clock( );
     m_stateTimer = clock( );
@@ -1269,6 +1275,7 @@ CPlayerBot::CPlayerBot( CPlayer* player )
     m_lastArenaQueueTime = now + ( ( 180 + ( rand( ) % 600 ) ) * CLOCKS_PER_SEC );
     m_lastDungeonCheckTime = now + ( ( 180 + ( rand( ) % 600 ) ) * CLOCKS_PER_SEC );
     m_lastShopBrowseTime = now + ( ( 120 + ( rand( ) % 300 ) ) * CLOCKS_PER_SEC );
+    m_lastVendorRunTime = now + ( ( 300 + ( rand( ) % 600 ) ) * CLOCKS_PER_SEC );
 
     if ( m_player )
     {
@@ -1279,6 +1286,7 @@ CPlayerBot::CPlayerBot( CPlayer* player )
         AssignClanTag( );
         AssignTitle( );
         ApplyRandomCosmetics( );
+        AssignNewBounty( );
     }
     else
     {
@@ -1313,6 +1321,13 @@ const char* CPlayerBot::GetStateString( ) const
         case BOT_STATE_VENDING:    return "VENDING";
         case BOT_STATE_TOWN_STROLL: return "TOWN_STROLL";
         case BOT_STATE_MIGRATE:    return "MIGRATE";
+        case BOT_STATE_DUEL:       return "DUEL";
+        case BOT_STATE_TOWN_REPAIR: return "TOWN_REPAIR";
+        case BOT_STATE_LFG_SHOUT:  return "LFG_SHOUT";
+        case BOT_STATE_RALLY_RAID:  return "RALLY_RAID";
+        case BOT_STATE_VENDOR_RUN:  return "VENDOR_RUN";
+        case BOT_STATE_QUEST_RETURN: return "QUEST_RETURN";
+        case BOT_STATE_CLAN_HANGOUT: return "CLAN_HANGOUT";
         default:                   return "UNKNOWN";
     }
 }
@@ -2928,6 +2943,10 @@ void CPlayerBot::Update( )
         case BOT_STATE_DUEL:        HandleDuel( );        break;
         case BOT_STATE_TOWN_REPAIR: HandleTownRepair( );  break;
         case BOT_STATE_LFG_SHOUT:   break;
+        case BOT_STATE_RALLY_RAID:   HandleRallyRaid( );   break;
+        case BOT_STATE_VENDOR_RUN:   HandleVendorRun( );   break;
+        case BOT_STATE_QUEST_RETURN: HandleQuestReturn( );  break;
+        case BOT_STATE_CLAN_HANGOUT: HandleClanHangout( );  break;
     }
 }
 
@@ -3062,6 +3081,10 @@ void CPlayerBot::HandleCombat( )
     CMonster* mob = map->GetMonsterInMap( m_targetMobCid );
     if ( !mob || mob->IsDead( ) || mob->Stats->HP <= 0 || mob->IsBonfire( ) )
     {
+        if ( mob && mob->IsDead( ) )
+        {
+            CheckBountyProgress( mob );
+        }
         ClearBattle( m_player->Battle );
         m_targetMobCid = 0;
 
@@ -3455,6 +3478,7 @@ void CPlayerBot::CheckWorldBossRaids( )
             ADDBYTE    ( pak, 0 );
             GServer->SendToMap( &pak, m_player->Position->Map );
 
+            BroadcastRaidRally( boss );
             AttackTarget( boss );
             SetState( BOT_STATE_COMBAT );
         }
@@ -3490,6 +3514,36 @@ void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
     else if ( text.find( "duel" ) != std::string::npos || text.find( "fight" ) != std::string::npos || text.find( "pvp" ) != std::string::npos )
     {
         snprintf( reply, sizeof(reply), "You want to fight? Type '/duel %s' and let's go!", m_player->CharInfo->charname );
+    }
+    else if ( text.find( "discount" ) != std::string::npos || text.find( "cheaper" ) != std::string::npos ||
+              text.find( "haggle" ) != std::string::npos || text.find( "lower" ) != std::string::npos ||
+              text.find( "price" ) != std::string::npos || text.find( "buy" ) != std::string::npos )
+    {
+        clock_t now = clock( );
+        if ( ( now - m_lastHaggleTime ) >= ( 10 * CLOCKS_PER_SEC ) )
+        {
+            m_lastHaggleTime = now;
+            int chaMod = ( m_player && m_player->Attr ) ? ( m_player->Attr->Cha / 10 ) : 0;
+            int roll = RollD20( ) + chaMod;
+            if ( roll >= 14 )
+            {
+                const char* successMsgs[] = {
+                    "Alright %s, deal! Since you asked nicely, I can offer a 10%% discount!",
+                    "Sure %s! I'll lower the price by 10%% for you.",
+                    "Deal %s! 5%% to 10%% off just for you."
+                };
+                snprintf( reply, sizeof(reply), successMsgs[rand() % 3], sender->CharInfo->charname );
+            }
+            else
+            {
+                const char* failMsgs[] = {
+                    "Sorry %s, prices are firm right now!",
+                    "Can't go any lower, %s! Market prices are tough.",
+                    "Haha, nice try %s! Price stays as listed."
+                };
+                snprintf( reply, sizeof(reply), failMsgs[rand() % 3], sender->CharInfo->charname );
+            }
+        }
     }
     else if ( text.find( "hi" ) != std::string::npos || text.find( "hello" ) != std::string::npos || text.find( "hey" ) != std::string::npos )
     {
@@ -4163,4 +4217,293 @@ void CPlayerBot::CheckDungeonRuns( )
             }
         }
     }
+}
+
+// -------------------------------------------------------------
+// Advanced Feature 1: Multi-Party Boss Raid Assemblies
+// -------------------------------------------------------------
+void CPlayerBot::BroadcastRaidRally( CMonster* boss )
+{
+    if ( !m_player || !boss || !m_player->Position ) return;
+
+    CMap* map = GetMap( );
+    if ( !map ) return;
+
+    fPoint bossPos = boss->Position->current;
+
+    for ( size_t i = 0; i < map->PlayerList.size( ); i++ )
+    {
+        CPlayer* other = map->PlayerList[i];
+        if ( !other || other == m_player || !other->bot_ai || other->IsDead( ) ) continue;
+        CPlayerBot* bot = other->bot_ai;
+        if ( bot->IsBuffBot( ) || bot->IsVendingBot( ) ) continue;
+
+        // Roll d20 >= 8 to join raid assembly (~65% rally response chance)
+        if ( RollD20( ) >= 8 )
+        {
+            if ( bot->GetState( ) == BOT_STATE_IDLE || bot->GetState( ) == BOT_STATE_ROAM ||
+                 bot->GetState( ) == BOT_STATE_REST || bot->GetState( ) == BOT_STATE_TOWN_STROLL )
+            {
+                bot->SetRaidTarget( boss, bossPos );
+            }
+        }
+    }
+}
+
+void CPlayerBot::SetRaidTarget( CMonster* boss, fPoint rallyPos )
+{
+    if ( !boss ) return;
+    if ( m_state == BOT_STATE_REST ) StandUp( );
+
+    m_rallyBossCid = boss->clientid;
+    m_rallyPos = rallyPos;
+    SetState( BOT_STATE_RALLY_RAID );
+
+    const char* rallyQuotes[] = {
+        "On my way to the raid!",
+        "Heading to boss coordinates now!",
+        "Rallying up for the World Boss!",
+        "Hold on, reinforcement arriving!"
+    };
+    Say( rallyQuotes[rand( ) % 4] );
+}
+
+void CPlayerBot::HandleRallyRaid( )
+{
+    if ( !m_player || m_player->IsDead( ) ) return;
+    CMap* map = GetMap( );
+    if ( !map ) { SetState( BOT_STATE_IDLE ); return; }
+
+    CMonster* boss = map->GetMonsterInMap( m_rallyBossCid );
+    if ( !boss || boss->IsDead( ) || boss->Stats->HP <= 0 )
+    {
+        m_rallyBossCid = 0;
+        Say( "Boss defeated! Great raid everyone!" );
+        DoEmote( 3 ); // Cheer
+        SetState( BOT_STATE_IDLE );
+        return;
+    }
+
+    float dist = GServer->distance( m_player->Position->current, boss->Position->current );
+
+    // Path to raid assembly if far away
+    if ( dist > 20.0f )
+    {
+        MoveTo( boss->Position->current );
+        return;
+    }
+
+    // Role-Based Raid Combat Positioning & Tactics
+    int wType = m_player->getWeaponType( );
+    bool isRanged = ( wType == BOW || wType == GUN || wType == LAUNCHER || wType == CROSSBOW || wType == WAND || wType == STAFF );
+    bool isHealer = ( m_player->CharInfo->Job == 211 || m_player->CharInfo->Job == 222 );
+    bool isTank = ( m_player->CharInfo->Job == 111 || m_player->CharInfo->Job == 121 );
+
+    // Boss Enrage / Heavy AOE Reaction (HP < 25%)
+    if ( boss->Stats->HP < ( boss->Stats->MaxHP * 25 / 100 ) && !isTank )
+    {
+        clock_t now = clock( );
+        if ( ( now - m_lastRaidKiteTime ) >= ( 8 * CLOCKS_PER_SEC ) )
+        {
+            if ( RollD20( ) < 10 ) // Squishy classes step back
+            {
+                m_lastRaidKiteTime = now;
+                KiteTarget( boss );
+                Say( "Boss enraging! Step back!" );
+                return;
+            }
+        }
+    }
+
+    if ( isTank )
+    {
+        // Main Tank: Engages front, uses taunt, positions boss
+        CheckPartyTaunt( );
+        AttackTarget( boss );
+    }
+    else if ( isHealer )
+    {
+        // Dedicated Healer: Positions at 12m-15m, prioritizes group heals & buffs
+        if ( dist < 10.0f ) KiteTarget( boss );
+        if ( CheckPartyHeal( ) ) return;
+        if ( CheckPartyBuffs( ) ) return;
+        AttackTarget( boss );
+    }
+    else
+    {
+        // Ranged / Melee DPS: Flank boss & cast combat skills
+        if ( isRanged && dist < 8.0f ) KiteTarget( boss );
+        CastCombatSkill( boss );
+        AttackTarget( boss );
+    }
+}
+
+// -------------------------------------------------------------
+// Advanced Feature 2: Interactive Economy & Vendor Runs
+// -------------------------------------------------------------
+void CPlayerBot::HandleVendorRun( )
+{
+    if ( !m_player ) return;
+
+    // Path to town center coordinates for vendor dump
+    fPoint townPos;
+    if ( m_player->Position->Map == 2 ) { townPos.x = 5655.0f; townPos.y = 5238.0f; townPos.z = 0; }
+    else if ( m_player->Position->Map == 1 ) { townPos.x = 5240.0f; townPos.y = 5189.0f; townPos.z = 0; }
+    else { townPos.x = 5839.0f; townPos.y = 5332.0f; townPos.z = 0; }
+
+    float dist = GServer->distance( m_player->Position->current, townPos );
+    if ( dist > 8.0f )
+    {
+        MoveTo( townPos );
+        return;
+    }
+
+    // Vendor dump completed: gain Zulies from sales
+    long long zulyGain = 2500 + ( rand( ) % 10000 );
+    m_player->CharInfo->Zulies += zulyGain;
+
+    Say( "Sold off surplus loot to the merchant! Back to grinding." );
+    SetState( BOT_STATE_ROAM );
+}
+
+void CPlayerBot::TriggerVendorRun( )
+{
+    if ( m_isBuffBot || m_isVendingBot || m_state == BOT_STATE_DEAD ) return;
+    clock_t now = clock( );
+    if ( ( now - m_lastVendorRunTime ) < ( 300 * CLOCKS_PER_SEC ) ) return;
+    m_lastVendorRunTime = now;
+
+    if ( m_state == BOT_STATE_REST ) StandUp( );
+    SetState( BOT_STATE_VENDOR_RUN );
+}
+
+// -------------------------------------------------------------
+// Advanced Feature 3: Clan System & Dynamic Rivalries
+// -------------------------------------------------------------
+void CPlayerBot::CheckClanRivalry( CPlayer* other )
+{
+    if ( !m_player || !other || !other->bot_ai || m_isBuffBot || m_isVendingBot ) return;
+    if ( !m_player->Clan || !other->Clan ) return;
+    if ( m_player->Clan->clanid == 0 || other->Clan->clanid == 0 ) return;
+    if ( m_player->Clan->clanid == other->Clan->clanid ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastClanRivalryTime ) < ( 45 * CLOCKS_PER_SEC ) ) return;
+
+    // Roll d20 >= 10 to initiate rivalry banter & skirmish (~55% chance)
+    if ( RollD20( ) >= 10 )
+    {
+        m_lastClanRivalryTime = now;
+        char msg[128];
+        const char* clanQuotes[] = {
+            "For Clan #%d! Prepare yourself, %s!",
+            "Rival clan spotted! %s, face me!",
+            "Our clan rules this zone, %s!"
+        };
+        snprintf( msg, sizeof(msg), clanQuotes[rand( ) % 3], m_player->Clan->clanid, other->CharInfo->charname );
+        Say( msg );
+
+        StartDuel( other );
+    }
+}
+
+void CPlayerBot::HandleClanHangout( )
+{
+    if ( !m_player || !m_player->Clan ) return;
+
+    // Clan hangout coordinates
+    fPoint plazaPos;
+    if ( m_player->Clan->clanid == 1 ) { plazaPos.x = 5240.0f; plazaPos.y = 5189.0f; plazaPos.z = 0; }
+    else if ( m_player->Clan->clanid == 2 ) { plazaPos.x = 5655.0f; plazaPos.y = 5238.0f; plazaPos.z = 0; }
+    else { plazaPos.x = 5102.0f; plazaPos.y = 5063.0f; plazaPos.z = 0; }
+
+    float dist = GServer->distance( m_player->Position->current, plazaPos );
+    if ( dist > 10.0f )
+    {
+        MoveTo( plazaPos );
+        return;
+    }
+
+    if ( rand( ) % 3 == 0 ) SitDown( );
+    else DoEmote( 1 ); // Wave
+}
+
+// -------------------------------------------------------------
+// Advanced Feature 4: Dynamic Questing & Daily Bounties
+// -------------------------------------------------------------
+void CPlayerBot::AssignNewBounty( )
+{
+    int lvl = ( m_player && m_player->Stats ) ? m_player->Stats->Level : 1;
+
+    if ( lvl >= 50 )
+    {
+        m_bounty.targetMobId = 781;
+        m_bounty.mobName = "Moldie";
+        m_bounty.requiredKills = 15;
+    }
+    else if ( lvl >= 30 )
+    {
+        m_bounty.targetMobId = 711;
+        m_bounty.mobName = "Goblin Warrior";
+        m_bounty.requiredKills = 15;
+    }
+    else if ( lvl >= 15 )
+    {
+        m_bounty.targetMobId = 511;
+        m_bounty.mobName = "Woofy";
+        m_bounty.requiredKills = 15;
+    }
+    else
+    {
+        m_bounty.targetMobId = 101;
+        m_bounty.mobName = "Jellybean";
+        m_bounty.requiredKills = 10;
+    }
+
+    m_bounty.currentKills = 0;
+    m_bounty.isComplete = false;
+    m_bounty.npcMapId = 1;
+    m_bounty.npcPos.x = 5240.0f;
+    m_bounty.npcPos.y = 5189.0f;
+    m_bounty.npcPos.z = 0.0f;
+}
+
+void CPlayerBot::CheckBountyProgress( CMonster* mob )
+{
+    if ( !mob || m_bounty.isComplete ) return;
+
+    m_bounty.currentKills++;
+    if ( m_bounty.currentKills >= m_bounty.requiredKills )
+    {
+        m_bounty.isComplete = true;
+        char msg[128];
+        snprintf( msg, sizeof(msg), "Daily Bounty Complete (%d/%d %s killed)! Returning to town for reward!",
+                  m_bounty.currentKills, m_bounty.requiredKills, m_bounty.mobName.c_str( ) );
+        Say( msg );
+        SetState( BOT_STATE_QUEST_RETURN );
+    }
+}
+
+void CPlayerBot::HandleQuestReturn( )
+{
+    if ( !m_player ) return;
+
+    float dist = GServer->distance( m_player->Position->current, m_bounty.npcPos );
+    if ( dist > 6.0f )
+    {
+        MoveTo( m_bounty.npcPos );
+        return;
+    }
+
+    // Turn in quest
+    DoEmote( 3 ); // Cheer
+    Say( "Turned in Daily Bounty to NPC! Received EXP & Zuly reward!" );
+
+    long long zulyReward = 5000 + ( m_player->Stats->Level * 500 );
+    m_player->CharInfo->Zulies += zulyReward;
+    m_player->CharInfo->Exp += 2500 + ( m_player->Stats->Level * 300 );
+
+    EquipTieredGear( true );
+    AssignNewBounty( );
+    SetState( BOT_STATE_ROAM );
 }

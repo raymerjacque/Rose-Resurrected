@@ -25,7 +25,21 @@ enum BotState {
     BOT_STATE_MIGRATE,
     BOT_STATE_DUEL,
     BOT_STATE_TOWN_REPAIR,
-    BOT_STATE_LFG_SHOUT
+    BOT_STATE_LFG_SHOUT,
+    BOT_STATE_RALLY_RAID,
+    BOT_STATE_VENDOR_RUN,
+    BOT_STATE_QUEST_RETURN,
+    BOT_STATE_CLAN_HANGOUT
+};
+
+struct BotBounty {
+    UINT targetMobId;
+    std::string mobName;
+    int requiredKills;
+    int currentKills;
+    UINT npcMapId;
+    fPoint npcPos;
+    bool isComplete;
 };
 
 enum BotPersonality {
@@ -60,9 +74,20 @@ public:
     void HandleMigrate( );
     void HandleDuel( );
     void HandleTownRepair( );
+    void HandleRallyRaid( );
+    void HandleVendorRun( );
+    void TriggerVendorRun( );
+    void HandleQuestReturn( );
+    void HandleClanHangout( );
     void StartDuel( CPlayer* challenger );
     void CheckPlayerGreetings( );
     void AssignClanTag( );
+    void BroadcastRaidRally( CMonster* boss );
+    void SetRaidTarget( CMonster* boss, fPoint rallyPos );
+    void CheckClanRivalry( CPlayer* other );
+    void AssignNewBounty( );
+    void CheckBountyProgress( CMonster* mob );
+    const BotBounty* GetBounty( ) const { return &m_bounty; }
 
     void CheckPlayerShops( );
     void CheckWhispers( );
@@ -234,6 +259,23 @@ private:
     clock_t m_lastBossRaidCheckTime;
     clock_t m_lastTownRepairTime;
     std::map<UINT, int> m_pvpRecord; // Player CharID -> win(+1)/loss(-1)
+
+    // Boss Raid Assemblies & Tactics
+    UINT m_rallyBossCid;
+    fPoint m_rallyPos;
+    clock_t m_lastRaidKiteTime;
+
+    // Interactive Economy & Vendor Runs
+    clock_t m_lastVendorRunTime;
+    clock_t m_lastHaggleTime;
+
+    // Clan System & Dynamic Rivalries
+    clock_t m_lastClanRivalryTime;
+    fPoint m_clanHangoutPos;
+
+    // Dynamic Questing & Daily Bounties
+    BotBounty m_bounty;
+    clock_t m_lastBountyCheckTime;
 };
 
 class CBotManager {
