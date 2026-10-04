@@ -3650,23 +3650,26 @@ void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
                 if ( sender->client ) sender->client->SendPacket( &pak );
 
                 m_player->Party->IsMaster = false;
+                party->AddPlayer( m_player );
 
-                // Send member info packet 0x7d2 to party members
+                // Send complete Party Member List (0x7d2) to all members of the party
                 RESETPACKET( pak, 0x7d2 );
                 ADDBYTE    ( pak, party->Option );
-                ADDBYTE    ( pak, 0x01 );
-                ADDDWORD   ( pak, m_player->CharInfo->charid );
-                ADDWORD    ( pak, m_player->clientid );
-                ADDWORD    ( pak, m_player->Stats->MaxHP );
-                ADDWORD    ( pak, m_player->Stats->HP );
-                ADDDWORD   ( pak, GServer->BuildBuffs( m_player ) );
-                ADDDWORD   ( pak, 0x1f40008c );
-                ADDWORD    ( pak, 0x1388 );
-                ADDSTRING  ( pak, m_player->CharInfo->charname );
-                ADDBYTE    ( pak, 0x00 );
+                ADDBYTE    ( pak, (BYTE)party->Members.size( ) );
+                for ( size_t m = 0; m < party->Members.size( ); m++ )
+                {
+                    CPlayer* member = party->Members[m];
+                    ADDDWORD   ( pak, member->CharInfo->charid );
+                    ADDWORD    ( pak, member->clientid );
+                    ADDWORD    ( pak, (WORD)member->Stats->MaxHP );
+                    ADDWORD    ( pak, (WORD)member->Stats->HP );
+                    ADDDWORD   ( pak, GServer->BuildBuffs( member ) );
+                    ADDDWORD   ( pak, 0x7200005b );
+                    ADDWORD    ( pak, 0x1388 );
+                    ADDSTRING  ( pak, member->CharInfo->charname );
+                    ADDBYTE    ( pak, 0x00 );
+                }
                 party->SendToMembers( &pak );
-
-                party->AddPlayer( m_player );
 
                 // Teleport bot to player's side
                 if ( sender->Position != NULL && GServer->MapList.Index[sender->Position->Map] != NULL )
@@ -3676,6 +3679,16 @@ void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
                     spawnCoord.x += ( ( rand() % 40 ) - 20 ) / 10.0f;
                     spawnCoord.y += ( ( rand() % 40 ) - 20 ) / 10.0f;
                     pMap->TeleportPlayer( m_player, spawnCoord, false );
+
+                    // Explicitly spawn 3D entity on leader's screen & add to VisiblePlayers
+                    m_player->SpawnToPlayer( m_player, sender );
+
+                    bool foundV = false;
+                    for ( size_t v = 0; v < sender->VisiblePlayers.size( ); v++ )
+                    {
+                        if ( sender->VisiblePlayers[v] == m_player ) { foundV = true; break; }
+                    }
+                    if ( !foundV ) sender->VisiblePlayers.push_back( m_player );
                 }
 
                 SetFollowTarget( sender );

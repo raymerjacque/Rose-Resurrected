@@ -135,33 +135,45 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                 thisclient->client->SendPacket( &pak );
 
                 otherclient->Party->IsMaster = false;
+                party->AddPlayer( otherclient );
 
-                // Send new member info to party members
+                // Send complete Party Member List (0x7d2) to all members of the party
                 RESETPACKET( pak, 0x7d2 );
                 ADDBYTE    ( pak, party->Option );
-                ADDBYTE    ( pak, 0x01 );
-                ADDDWORD   ( pak, otherclient->CharInfo->charid );
-                ADDWORD    ( pak, otherclient->clientid );
-                ADDWORD    ( pak, otherclient->Stats->MaxHP );
-                ADDWORD    ( pak, otherclient->Stats->HP );
-                ADDDWORD   ( pak, BuildBuffs( otherclient ) );
-                ADDDWORD   ( pak, 0x1f40008c );
-                ADDWORD    ( pak, 0x1388 );
-                ADDSTRING  ( pak, otherclient->CharInfo->charname );
-                ADDBYTE    ( pak, 0x00 );
+                ADDBYTE    ( pak, (BYTE)party->Members.size( ) );
+                for ( size_t m = 0; m < party->Members.size( ); m++ )
+                {
+                    CPlayer* member = party->Members[m];
+                    ADDDWORD   ( pak, member->CharInfo->charid );
+                    ADDWORD    ( pak, member->clientid );
+                    ADDWORD    ( pak, (WORD)member->Stats->MaxHP );
+                    ADDWORD    ( pak, (WORD)member->Stats->HP );
+                    ADDDWORD   ( pak, BuildBuffs( member ) );
+                    ADDDWORD   ( pak, 0x7200005b );
+                    ADDWORD    ( pak, 0x1388 );
+                    ADDSTRING  ( pak, member->CharInfo->charname );
+                    ADDBYTE    ( pak, 0x00 );
+                }
                 party->SendToMembers( &pak );
-
-                // Add bot to party
-                party->AddPlayer( otherclient );
 
                 // Teleport player bot to inviting player's location anywhere in the world
                 if ( thisclient->Position != NULL && MapList.Index[thisclient->Position->Map] != NULL )
                 {
                     CMap* pMap = MapList.Index[thisclient->Position->Map];
                     fPoint spawnCoord = thisclient->Position->current;
-                    spawnCoord.x += ( ( rand() % 60 ) - 30 ) / 10.0f;
-                    spawnCoord.y += ( ( rand() % 60 ) - 30 ) / 10.0f;
+                    spawnCoord.x += ( ( rand() % 40 ) - 20 ) / 10.0f;
+                    spawnCoord.y += ( ( rand() % 40 ) - 20 ) / 10.0f;
                     pMap->TeleportPlayer( otherclient, spawnCoord, false );
+
+                    // Explicitly spawn 3D entity on leader's screen & add to VisiblePlayers
+                    otherclient->SpawnToPlayer( otherclient, thisclient );
+
+                    bool foundV = false;
+                    for ( size_t v = 0; v < thisclient->VisiblePlayers.size( ); v++ )
+                    {
+                        if ( thisclient->VisiblePlayers[v] == otherclient ) { foundV = true; break; }
+                    }
+                    if ( !foundV ) thisclient->VisiblePlayers.push_back( otherclient );
                 }
 
                 // Update bot AI state
