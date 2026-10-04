@@ -3678,7 +3678,16 @@ void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
                     fPoint spawnCoord = sender->Position->current;
                     spawnCoord.x += ( ( rand() % 40 ) - 20 ) / 10.0f;
                     spawnCoord.y += ( ( rand() % 40 ) - 20 ) / 10.0f;
-                    pMap->TeleportPlayer( m_player, spawnCoord, false );
+
+                    if ( m_player->Position->Map != sender->Position->Map )
+                    {
+                        pMap->TeleportPlayer( m_player, spawnCoord, false );
+                    }
+                    else
+                    {
+                        m_player->Position->current = spawnCoord;
+                        m_player->Position->destiny = spawnCoord;
+                    }
 
                     // Explicitly spawn 3D entity on leader's screen & add to VisiblePlayers
                     m_player->SpawnToPlayer( m_player, sender );

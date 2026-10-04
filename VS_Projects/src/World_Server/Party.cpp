@@ -198,7 +198,16 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                     fPoint spawnCoord = thisclient->Position->current;
                     spawnCoord.x += ( ( rand() % 40 ) - 20 ) / 10.0f;
                     spawnCoord.y += ( ( rand() % 40 ) - 20 ) / 10.0f;
-                    pMap->TeleportPlayer( otherclient, spawnCoord, false );
+
+                    if ( otherclient->Position->Map != thisclient->Position->Map )
+                    {
+                        pMap->TeleportPlayer( otherclient, spawnCoord, false );
+                    }
+                    else
+                    {
+                        otherclient->Position->current = spawnCoord;
+                        otherclient->Position->destiny = spawnCoord;
+                    }
 
                     // Explicitly spawn 3D entity on leader's screen & add to VisiblePlayers
                     otherclient->SpawnToPlayer( otherclient, thisclient );

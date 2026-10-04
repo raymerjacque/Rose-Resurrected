@@ -122,7 +122,11 @@ bool CMap::AddPlayer( CPlayer* player )
 
 bool CMap::RemovePlayer( CPlayer* player, bool clearobject )
 {
-    GServer->ClearClientID( player->clientid );
+    if ( player == NULL ) return false;
+    if ( !player->is_bot )
+    {
+        GServer->ClearClientID( player->clientid );
+    }
     if(clearobject)
     {
         BEGINPACKET( pak, 0x794 );
