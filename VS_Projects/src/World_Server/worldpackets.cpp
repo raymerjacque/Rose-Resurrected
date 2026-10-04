@@ -2301,6 +2301,33 @@ bool CWorldServer::pakUserDied ( CPlayer* thisclient, CPacket* P )
     */
 
 
+    if ( thisclient->Party && thisclient->Party->party && thisclient->client )
+    {
+        CParty* party = thisclient->Party->party;
+        BEGINPACKET( pak, 0x7d4 );
+        ADDBYTE    ( pak, party->PartyLevel );
+        ADDDWORD   ( pak, party->Exp );
+        thisclient->client->SendPacket( &pak );
+
+        RESETPACKET( pak, 0x7d2 );
+        ADDBYTE    ( pak, party->Option );
+        ADDBYTE    ( pak, (BYTE)party->Members.size( ) );
+        for ( size_t m = 0; m < party->Members.size( ); m++ )
+        {
+            CPlayer* member = party->Members[m];
+            ADDDWORD   ( pak, member->CharInfo->charid );
+            ADDWORD    ( pak, member->clientid );
+            ADDWORD    ( pak, (WORD)member->Stats->MaxHP );
+            ADDWORD    ( pak, (WORD)member->Stats->HP );
+            ADDDWORD   ( pak, BuildBuffs( member ) );
+            ADDDWORD   ( pak, 0x7200005b );
+            ADDWORD    ( pak, 0x1388 );
+            ADDSTRING  ( pak, member->CharInfo->charname );
+            ADDBYTE    ( pak, 0x00 );
+        }
+        thisclient->client->SendPacket( &pak );
+    }
+
 	return true;
 }
 

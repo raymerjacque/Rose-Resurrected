@@ -2952,11 +2952,15 @@ void CPlayerBot::Update( )
     // Check progression, stat points, and tiered equipment
     CheckProgression( );
 
-    // Phase 2: Autonomous party invitations check
-    CheckPartyInvitations( );
+    // Autonomous party invitations and zone migration ONLY when NOT in a player party
+    if ( !m_player->Party || !m_player->Party->party )
+    {
+        // Phase 2: Autonomous party invitations check
+        CheckPartyInvitations( );
 
-    // Phase 3: Zone migration check
-    CheckZoneMigration( );
+        // Phase 3: Zone migration check
+        CheckZoneMigration( );
+    }
 
     // Player Greetings: Wave and greet nearby real players
     CheckPlayerGreetings( );
@@ -3338,15 +3342,16 @@ void CPlayerBot::HandleFollow( )
     }
 
     CPlayer* leader = GetPartyLeader( );
-    if ( !leader || !leader->Session->inGame )
+    if ( !leader )
     {
         SetState( BOT_STATE_IDLE );
         return;
     }
     m_followTarget = leader;
 
-    // 1. Cross-map teleport: If party leader changed maps (zone transfer, portal, recall), follow leader instantly
-    if ( m_player->Position->Map != m_followTarget->Position->Map )
+    // 1. Teleport follow: If party leader changed maps or moved far away (> 35m), follow leader instantly
+    if ( m_player->Position->Map != m_followTarget->Position->Map ||
+         GServer->distance( m_player->Position->current, m_followTarget->Position->current ) > 35.0f )
     {
         CMap* targetMap = GServer->MapList.Index[m_followTarget->Position->Map];
         if ( targetMap != NULL && targetMap != GServer->MapList.nullzone )
@@ -3626,6 +3631,7 @@ void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
         else
         {
             CParty* party = sender->Party->party;
+            bool isNewParty = ( party == NULL );
             if ( party == NULL )
             {
                 party = new CParty;
@@ -3652,21 +3658,37 @@ void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
                 m_player->Party->IsMaster = false;
                 party->AddPlayer( m_player );
 
-                // Send complete Party Member List (0x7d2) to all members of the party
+                // Send Party Member List (0x7d2) to party members
                 RESETPACKET( pak, 0x7d2 );
                 ADDBYTE    ( pak, party->Option );
-                ADDBYTE    ( pak, (BYTE)party->Members.size( ) );
-                for ( size_t m = 0; m < party->Members.size( ); m++ )
+                if ( isNewParty )
                 {
-                    CPlayer* member = party->Members[m];
-                    ADDDWORD   ( pak, member->CharInfo->charid );
-                    ADDWORD    ( pak, member->clientid );
-                    ADDWORD    ( pak, (WORD)member->Stats->MaxHP );
-                    ADDWORD    ( pak, (WORD)member->Stats->HP );
-                    ADDDWORD   ( pak, GServer->BuildBuffs( member ) );
+                    ADDBYTE    ( pak, (BYTE)party->Members.size( ) );
+                    for ( size_t m = 0; m < party->Members.size( ); m++ )
+                    {
+                        CPlayer* member = party->Members[m];
+                        ADDDWORD   ( pak, member->CharInfo->charid );
+                        ADDWORD    ( pak, member->clientid );
+                        ADDWORD    ( pak, (WORD)member->Stats->MaxHP );
+                        ADDWORD    ( pak, (WORD)member->Stats->HP );
+                        ADDDWORD   ( pak, GServer->BuildBuffs( member ) );
+                        ADDDWORD   ( pak, 0x7200005b );
+                        ADDWORD    ( pak, 0x1388 );
+                        ADDSTRING  ( pak, member->CharInfo->charname );
+                        ADDBYTE    ( pak, 0x00 );
+                    }
+                }
+                else
+                {
+                    ADDBYTE    ( pak, 0x01 );
+                    ADDDWORD   ( pak, m_player->CharInfo->charid );
+                    ADDWORD    ( pak, m_player->clientid );
+                    ADDWORD    ( pak, (WORD)m_player->Stats->MaxHP );
+                    ADDWORD    ( pak, (WORD)m_player->Stats->HP );
+                    ADDDWORD   ( pak, GServer->BuildBuffs( m_player ) );
                     ADDDWORD   ( pak, 0x7200005b );
                     ADDWORD    ( pak, 0x1388 );
-                    ADDSTRING  ( pak, member->CharInfo->charname );
+                    ADDSTRING  ( pak, m_player->CharInfo->charname );
                     ADDBYTE    ( pak, 0x00 );
                 }
                 party->SendToMembers( &pak );
