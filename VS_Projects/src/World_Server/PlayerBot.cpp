@@ -1632,7 +1632,7 @@ void CPlayerBot::ApplyRandomCosmetics( )
 
 void CPlayerBot::CheckZoneMigration( )
 {
-    if ( !m_player || m_isBuffBot || m_isVendingBot || m_followTarget ) return;
+    if ( !m_player || m_isBuffBot || m_isVendingBot || m_followTarget || ( m_player->Party && m_player->Party->party ) ) return;
     clock_t now = clock( );
     if ( ( now - m_lastMigrationCheck ) < ( 60 * CLOCKS_PER_SEC ) ) return;
     m_lastMigrationCheck = now;
@@ -2574,6 +2574,38 @@ bool CPlayerBot::CheckPartyTaunt( )
     return false;
 }
 
+CPlayer* CPlayerBot::GetPartyLeader( )
+{
+    if ( !m_player || !m_player->Party || !m_player->Party->party ) return NULL;
+    CParty* party = m_player->Party->party;
+
+    for ( size_t i = 0; i < party->Members.size( ); i++ )
+    {
+        CPlayer* member = party->Members[i];
+        if ( member && member != m_player && member->Party && member->Party->IsMaster )
+        {
+            return member;
+        }
+    }
+    for ( size_t i = 0; i < party->Members.size( ); i++ )
+    {
+        CPlayer* member = party->Members[i];
+        if ( member && member != m_player && !member->is_bot )
+        {
+            return member;
+        }
+    }
+    for ( size_t i = 0; i < party->Members.size( ); i++ )
+    {
+        CPlayer* member = party->Members[i];
+        if ( member && member != m_player )
+        {
+            return member;
+        }
+    }
+    return NULL;
+}
+
 int CPlayerBot::GetPartySlotIndex( ) const
 {
     if ( !m_player || !m_player->Party || !m_player->Party->party ) return 0;
@@ -2949,6 +2981,20 @@ void CPlayerBot::Update( )
     // Proximity buffing: buff nearby unbuffed stationary real players (without chasing/moving toward them)
     if ( CheckProximityBuffs( ) ) return;
 
+    // Party Lock-On & State Enforcement: If bot is in a party, lock onto party leader and follow!
+    if ( m_player->Party && m_player->Party->party )
+    {
+        CPlayer* leader = GetPartyLeader( );
+        if ( leader )
+        {
+            m_followTarget = leader;
+            if ( m_state == BOT_STATE_IDLE || m_state == BOT_STATE_ROAM || m_state == BOT_STATE_TOWN_STROLL || m_state == BOT_STATE_SEEK_BUFF )
+            {
+                SetState( BOT_STATE_FOLLOW );
+            }
+        }
+    }
+
     // Self-defense check: If attacked by a monster while not in combat
     if ( m_state != BOT_STATE_COMBAT && m_state != BOT_STATE_DEAD )
     {
@@ -3284,14 +3330,33 @@ void CPlayerBot::HandleFollow( )
 {
     if ( !m_player ) return;
 
-    if ( !m_followTarget || !m_followTarget->Session->inGame ||
-         m_followTarget->Position->Map != m_player->Position->Map ||
-         ( m_player->Party->party && m_followTarget->Party->party != m_player->Party->party ) ||
-         ( !m_player->Party->party ) )
+    if ( !m_player->Party || !m_player->Party->party )
     {
         m_followTarget = NULL;
         SetState( BOT_STATE_IDLE );
         return;
+    }
+
+    CPlayer* leader = GetPartyLeader( );
+    if ( !leader || !leader->Session->inGame )
+    {
+        SetState( BOT_STATE_IDLE );
+        return;
+    }
+    m_followTarget = leader;
+
+    // 1. Cross-map teleport: If party leader changed maps (zone transfer, portal, recall), follow leader instantly
+    if ( m_player->Position->Map != m_followTarget->Position->Map )
+    {
+        CMap* targetMap = GServer->MapList.Index[m_followTarget->Position->Map];
+        if ( targetMap != NULL && targetMap != GServer->MapList.nullzone )
+        {
+            fPoint targetPos = m_followTarget->Position->current;
+            targetPos.x += ( ( rand() % 40 ) - 20 ) / 10.0f;
+            targetPos.y += ( ( rand() % 40 ) - 20 ) / 10.0f;
+            targetMap->TeleportPlayer( m_player, targetPos, false );
+            return;
+        }
     }
 
     CMap* map = GetMap( );
@@ -3301,23 +3366,17 @@ void CPlayerBot::HandleFollow( )
         return;
     }
 
-    // 1. Check if party members need healing
+    // 2. Party Member Support: Heals, Resurrections, Buffs, and Taunts
     if ( CheckPartyHeal( ) ) return;
-
-    // 2. Check if party members need resurrecting
     if ( CheckPartyResurrect( ) ) return;
-
-    // 3. Check if party members need buffing
     if ( CheckPartyBuffs( ) ) return;
-
-    // 4. Tank aggro defense
     if ( CheckPartyTaunt( ) ) return;
 
-    // 5. Assist leader: check if leader is attacking a monster
+    // 3. Assist Party Leader in Combat: check if leader is attacking a monster
     if ( m_followTarget->IsOnBattle( ) && m_followTarget->Battle->target != 0 )
     {
         CMonster* leaderMob = map->GetMonsterInMap( m_followTarget->Battle->target );
-        if ( leaderMob && !leaderMob->IsDead( ) && leaderMob->Stats->HP > 0 )
+        if ( leaderMob && !leaderMob->IsDead( ) && leaderMob->Stats->HP > 0 && !leaderMob->IsBonfire( ) )
         {
             AttackTarget( leaderMob );
             SetState( BOT_STATE_COMBAT );
@@ -3325,41 +3384,40 @@ void CPlayerBot::HandleFollow( )
         }
     }
 
-    // 6. Defend leader: check if any monster is attacking leader
+    // 4. Defend Party Members: check if any monster is attacking leader or any party member within 60m
     for ( UINT i = 0; i < map->MonsterList.size( ); i++ )
     {
         CMonster* mob = map->MonsterList[i];
-        if ( mob && !mob->IsDead( ) && mob->Stats->HP > 0 )
+        if ( mob && !mob->IsDead( ) && mob->Stats->HP > 0 && !mob->IsBonfire( ) )
         {
-            if ( mob->Battle && mob->Battle->target == m_followTarget->clientid )
+            float distToLeader = GServer->distance( m_followTarget->Position->current, mob->Position->current );
+            if ( distToLeader <= 60.0f && mob->Battle && mob->Battle->target != 0 )
             {
-                AttackTarget( mob );
-                SetState( BOT_STATE_COMBAT );
-                return;
+                for ( size_t m = 0; m < m_player->Party->party->Members.size( ); m++ )
+                {
+                    CPlayer* pm = m_player->Party->party->Members[m];
+                    if ( pm && mob->Battle->target == pm->clientid )
+                    {
+                        AttackTarget( mob );
+                        SetState( BOT_STATE_COMBAT );
+                        return;
+                    }
+                }
             }
         }
     }
 
-    // 7. Tactical formation follow (and cross-map teleportation)
-    if ( m_player->Position->Map != m_followTarget->Position->Map )
-    {
-        CMap* targetMap = GServer->MapList.Index[m_followTarget->Position->Map];
-        if ( targetMap != NULL )
-        {
-            targetMap->TeleportPlayer( m_player, m_followTarget->Position->current, false );
-            return;
-        }
-    }
-
+    // 5. Tactical Formation Following
     int slot = GetPartySlotIndex( );
     fPoint destPos = GetFormationOffset( slot, m_followTarget->Position->current, m_followTarget->Position->destiny );
 
     float dist = GServer->distance( m_player->Position->current, destPos );
-    if ( dist > 55.0f )
+    if ( dist > 40.0f )
     {
+        // Leader moved far away or teleported: snap to leader's side
         map->TeleportPlayer( m_player, destPos, false );
     }
-    else if ( dist > 2.0f )
+    else if ( dist > 2.5f )
     {
         MoveTo( destPos );
     }

@@ -157,6 +157,7 @@ public:
     bool CheckPartyResurrect( );
     bool CheckPartyTaunt( );
     bool CheckProximityBuffs( );
+    CPlayer* GetPartyLeader( );
     fPoint GetFormationOffset( int slotIndex, fPoint leaderCurrent, fPoint leaderDest );
     int GetPartySlotIndex( ) const;
     void ForcePartyBuff( );
