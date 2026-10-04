@@ -3701,36 +3701,16 @@ void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
                 // Send Party Member List (0x7d2) to party members
                 RESETPACKET( pak, 0x7d2 );
                 ADDBYTE    ( pak, party->Option );
-                if ( isNewParty )
-                {
-                    ADDBYTE    ( pak, (BYTE)party->Members.size( ) );
-                    for ( size_t m = 0; m < party->Members.size( ); m++ )
-                    {
-                        CPlayer* member = party->Members[m];
-                        ADDDWORD   ( pak, member->CharInfo->charid );
-                        ADDWORD    ( pak, member->clientid );
-                        ADDWORD    ( pak, (WORD)member->Stats->MaxHP );
-                        ADDWORD    ( pak, (WORD)member->Stats->HP );
-                        ADDDWORD   ( pak, GServer->BuildBuffs( member ) );
-                        ADDDWORD   ( pak, 0x7200005b );
-                        ADDWORD    ( pak, 0x1388 );
-                        ADDSTRING  ( pak, member->CharInfo->charname );
-                        ADDBYTE    ( pak, 0x00 );
-                    }
-                }
-                else
-                {
-                    ADDBYTE    ( pak, 0x01 );
-                    ADDDWORD   ( pak, m_player->CharInfo->charid );
-                    ADDWORD    ( pak, m_player->clientid );
-                    ADDWORD    ( pak, (WORD)m_player->Stats->MaxHP );
-                    ADDWORD    ( pak, (WORD)m_player->Stats->HP );
-                    ADDDWORD   ( pak, GServer->BuildBuffs( m_player ) );
-                    ADDDWORD   ( pak, 0x1f40008c );
-                    ADDWORD    ( pak, 0x1388 );
-                    ADDSTRING  ( pak, m_player->CharInfo->charname );
-                    ADDBYTE    ( pak, 0x00 );
-                }
+                ADDBYTE    ( pak, 0x01 );
+                ADDDWORD   ( pak, m_player->CharInfo->charid );
+                ADDWORD    ( pak, m_player->clientid );
+                ADDWORD    ( pak, (WORD)m_player->Stats->MaxHP );
+                ADDWORD    ( pak, (WORD)m_player->Stats->HP );
+                ADDDWORD   ( pak, GServer->BuildBuffs( m_player ) );
+                ADDDWORD   ( pak, 0x1f40008c );
+                ADDWORD    ( pak, 0x1388 );
+                ADDSTRING  ( pak, m_player->CharInfo->charname );
+                ADDBYTE    ( pak, 0x00 );
                 party->SendToMembers( &pak );
 
                 // Teleport bot to player's side

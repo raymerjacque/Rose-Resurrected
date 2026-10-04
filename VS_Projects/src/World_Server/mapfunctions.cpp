@@ -84,7 +84,7 @@ bool CMap::TeleportPlayer( CPlayer* player, fPoint coordold, bool TelePassenger 
     player->Position->Map = id;
     player->Position->current = coord; //TELEPORT ONLY
     player->Position->destiny = coord; //TELEPORT ONLY
-    player->Session->inGame = false;
+    player->Session->inGame = player->is_bot ? true : false;
     player->Position->lastMoveTime = clock();
     if(!allowpat || !TelePassenger)
     {
