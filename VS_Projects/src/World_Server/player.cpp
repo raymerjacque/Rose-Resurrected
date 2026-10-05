@@ -673,7 +673,7 @@ bool CPlayer::SpawnToPlayer( CPlayer* player, CPlayer* otherclient )
         //ADDDWORD   ( pak, 0x01000000 );//Tomiz: Was not commented before
         ADDDWORD   ( pak, GServer->BuildBuffs( this ));//Tomiz: Buff Data
         //ADDDWORD   ( pak, 0x0000000f );//Tomiz: Was not commented before
-        ADDDWORD   ( pak, 0x7200005d );//Tomiz
+        ADDDWORD   ( pak, 0x1f40008c );//Tomiz
         ADDWORD    ( pak, 0x1388 );
         if ( player->client != NULL ) player->client->SendPacket( &pak );
     }

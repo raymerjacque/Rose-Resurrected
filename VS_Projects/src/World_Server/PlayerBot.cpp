@@ -712,27 +712,28 @@ void CBotManager::CheckAndRelocateUninvitedBot( CPlayer* bot )
     bool isCity = false;
     GetZoneLevelRange( currentMap, minLvl, maxLvl, isCity );
 
-    if ( isCity || ( botLvl >= ( minLvl - 5 ) && botLvl <= ( maxLvl + 10 ) ) )
-    {
-        botAi->SetFollowTarget( NULL );
-        botAi->SetState( BOT_STATE_IDLE );
-        return;
-    }
+    botAi->SetFollowTarget( NULL );
+    botAi->SetAutoRoam( true );
+    botAi->SetRoamCenter( bot->Position->current );
 
-    UINT targetMapId = currentMap;
-    fPoint spawnPos = bot->Position->current;
-    if ( GetMapForLevel( botLvl, targetMapId, spawnPos ) )
+    if ( isCity || botLvl < ( minLvl - 5 ) || botLvl > ( maxLvl + 10 ) )
     {
-        Log( MSG_INFO, "Uninvited Bot '%s' (Lvl %d) relocating from Map %u (Zone Lvl %d-%d) to Map %u for grinding",
-             bot->CharInfo->charname, botLvl, currentMap, minLvl, maxLvl, targetMapId );
-
-        botAi->SetFollowTarget( NULL );
-        botAi->SetState( BOT_STATE_IDLE );
-        if ( targetMapId < (UINT)GServer->MapList.max && GServer->MapList.Index[targetMapId] )
+        UINT targetMapId = currentMap;
+        fPoint spawnPos = bot->Position->current;
+        if ( GetMapForLevel( botLvl, targetMapId, spawnPos ) )
         {
-            GServer->MapList.Index[targetMapId]->TeleportPlayer( bot, spawnPos, false );
+            Log( MSG_INFO, "Uninvited Bot '%s' (Lvl %d) relocating from Map %u (isCity=%d) to Map %u for grinding",
+                 bot->CharInfo->charname, botLvl, currentMap, (int)isCity, targetMapId );
+
+            if ( targetMapId < (UINT)GServer->MapList.max && GServer->MapList.Index[targetMapId] )
+            {
+                GServer->MapList.Index[targetMapId]->TeleportPlayer( bot, spawnPos, false );
+                botAi->SetRoamCenter( spawnPos );
+            }
         }
     }
+
+    botAi->SetState( BOT_STATE_IDLE );
 }
 
 void CBotManager::CheckProximitySpawns( )

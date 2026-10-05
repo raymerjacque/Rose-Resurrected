@@ -256,8 +256,7 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                 return true;
             if( thisclient->is_bot && thisclient->bot_ai )
             {
-                thisclient->bot_ai->SetFollowTarget( NULL );
-                thisclient->bot_ai->SetState( BOT_STATE_IDLE );
+                CBotManager::GetInstance()->CheckAndRelocateUninvitedBot( thisclient );
             }
             if(party->Members.size()>1)
             {
