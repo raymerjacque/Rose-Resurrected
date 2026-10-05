@@ -485,7 +485,7 @@ bool CWorldServer::pakPartyManager( CPlayer* thisclient, CPacket* P )
                 //ADDDWORD   ( pak, 0x00000000 );//Tomiz: Was not commented before
                 ADDDWORD   ( pak, BuildBuffs( member ));//Tomiz: Buff Data
                 //ADDDWORD   ( pak, 0x0000000f );//Tomiz: Was not commented before
-                ADDDWORD   ( pak, 0x7200005b );//Tomiz
+                ADDDWORD   ( pak, 0x1f40008c );//Tomiz
                 ADDWORD    ( pak, 0x1388 );
                 ADDSTRING  ( pak, member->CharInfo->charname );
                 ADDBYTE    ( pak, 0x00 );

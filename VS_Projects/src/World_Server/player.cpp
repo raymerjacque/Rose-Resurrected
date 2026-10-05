@@ -659,8 +659,11 @@ bool CPlayer::SpawnToPlayer( CPlayer* player, CPlayer* otherclient )
         Log(MSG_INFO,"[WS] Clan info in player packet 0x793");
     }
     ADDWORD( pak, 0x0000 );
-    player->client->SendPacket(&pak);
-    if( Party->party != NULL && Party->party == player->Party->party)
+    if ( player != NULL && player->client != NULL )
+    {
+        player->client->SendPacket(&pak);
+    }
+    if( Party->party != NULL && player != NULL && player->Party != NULL && Party->party == player->Party->party)
     {
         BEGINPACKET( pak, 0x7d5 );
         ADDDWORD   ( pak, CharInfo->charid );
@@ -672,7 +675,7 @@ bool CPlayer::SpawnToPlayer( CPlayer* player, CPlayer* otherclient )
         //ADDDWORD   ( pak, 0x0000000f );//Tomiz: Was not commented before
         ADDDWORD   ( pak, 0x7200005d );//Tomiz
         ADDWORD    ( pak, 0x1388 );
-        player->client->SendPacket( &pak );
+        if ( player->client != NULL ) player->client->SendPacket( &pak );
     }
 	if( Ride->Ride )
 	{

@@ -595,12 +595,13 @@ bool CWorldServer::pakDoID( CPlayer* thisclient, CPacket* P )
         for ( size_t m = 0; m < party->Members.size( ); m++ )
         {
             CPlayer* member = party->Members[m];
+            if ( !member || !member->CharInfo || !member->Stats ) continue;
             ADDDWORD   ( pak, member->CharInfo->charid );
             ADDWORD    ( pak, member->clientid );
             ADDWORD    ( pak, (WORD)member->Stats->MaxHP );
             ADDWORD    ( pak, (WORD)member->Stats->HP );
             ADDDWORD   ( pak, BuildBuffs( member ) );
-            ADDDWORD   ( pak, 0x7200005b );
+            ADDDWORD   ( pak, 0x1f40008c );
             ADDWORD    ( pak, 0x1388 );
             ADDSTRING  ( pak, member->CharInfo->charname );
             ADDBYTE    ( pak, 0x00 );
@@ -2342,12 +2343,13 @@ bool CWorldServer::pakUserDied ( CPlayer* thisclient, CPacket* P )
         for ( size_t m = 0; m < party->Members.size( ); m++ )
         {
             CPlayer* member = party->Members[m];
+            if ( !member || !member->CharInfo || !member->Stats ) continue;
             ADDDWORD   ( pak, member->CharInfo->charid );
             ADDWORD    ( pak, member->clientid );
             ADDWORD    ( pak, (WORD)member->Stats->MaxHP );
             ADDWORD    ( pak, (WORD)member->Stats->HP );
             ADDDWORD   ( pak, BuildBuffs( member ) );
-            ADDDWORD   ( pak, 0x7200005b );
+            ADDDWORD   ( pak, 0x1f40008c );
             ADDWORD    ( pak, 0x1388 );
             ADDSTRING  ( pak, member->CharInfo->charname );
             ADDBYTE    ( pak, 0x00 );
