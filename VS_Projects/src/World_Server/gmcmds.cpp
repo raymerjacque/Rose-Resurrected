@@ -25,6 +25,89 @@
 #include "Arena.h"
 #include "DungeonManager.h"
 
+struct GMLocationMapping {
+    const char* key;
+    unsigned int mapId;
+    float x;
+    float y;
+};
+
+static bool LookupGMLocation( const char* input, unsigned int& mapId, float& x, float& y )
+{
+    if ( !input || strlen( input ) == 0 ) return false;
+
+    std::string cleanKey = "";
+    for ( size_t i = 0; input[i] != '\0'; i++ )
+    {
+        char c = input[i];
+        if ( c >= 'A' && c <= 'Z' ) c += 32;
+        if ( ( c >= 'a' && c <= 'z' ) || ( c >= '0' && c <= '9' ) )
+        {
+            cleanKey += c;
+        }
+    }
+
+    static const GMLocationMapping s_locs[] = {
+        { "adventureplains",          22, 5240.0f, 5190.0f },
+        { "adventure",                22, 5240.0f, 5190.0f },
+        { "zant",                     1,  5240.0f, 5190.0f },
+        { "plainsofcityofzant",       5,  5200.0f, 5200.0f },
+        { "junonpolis",               2,  5655.0f, 5238.0f },
+        { "junon",                    2,  5655.0f, 5238.0f },
+        { "eucar",                    61, 5200.0f, 5200.0f },
+        { "xitasanctuary",            71, 5200.0f, 5200.0f },
+        { "xita",                     71, 5200.0f, 5200.0f },
+        { "breezyhills",              12, 5096.0f, 4905.0f },
+        { "breezy",                   12, 5096.0f, 4905.0f },
+        { "elvergel",                 13, 5200.0f, 5200.0f },
+        { "animalake",                14, 5379.0f, 5184.0f },
+        { "kenjibeach",               21, 5102.0f, 5063.0f },
+        { "kenji",                    21, 5102.0f, 5063.0f },
+        { "gorgeofsilence",           23, 5200.0f, 5200.0f },
+        { "dolphinisland",            24, 5200.0f, 5200.0f },
+        { "forestofwisdom",           11, 5200.0f, 5200.0f },
+        { "desertofthedead",          25, 5200.0f, 5200.0f },
+        { "sunshinecoast",            3,  5200.0f, 5200.0f },
+        { "valleyofluxtower",         4,  5100.0f, 5100.0f },
+        { "luxem",                    4,  5100.0f, 5100.0f },
+        { "manasnowfields",           51, 5200.0f, 5200.0f },
+        { "goblincaveb1",             31, 5200.0f, 5200.0f },
+        { "goblincaveb2",             32, 5200.0f, 5200.0f },
+        { "goblincaveb3",             33, 5200.0f, 5200.0f },
+        { "georgecaveb1",             41, 5200.0f, 5200.0f },
+        { "georgecaveb2",             42, 5200.0f, 5200.0f },
+        { "crystalsnowfields",        52, 5200.0f, 5200.0f },
+        { "freezingplateau",          53, 5200.0f, 5200.0f },
+        { "arumicvalley",             54, 5200.0f, 5200.0f },
+        { "lakeoffire",               81, 5200.0f, 5200.0f },
+        { "seaofseeds",               62, 5200.0f, 5200.0f },
+        { "forgottentempleb1",        72, 5200.0f, 5200.0f },
+        { "forgottentempleb2",        73, 5200.0f, 5200.0f },
+        { "shadyjungle",              63, 5200.0f, 5200.0f },
+        { "forestofwandering",        64, 5200.0f, 5200.0f },
+        { "sunshineplains",           3,  5200.0f, 5200.0f },
+        { "citadeloftheforgotten",   74, 5200.0f, 5200.0f },
+        { "sikukuundergroundprison",  65, 5200.0f, 5200.0f },
+        { "sikukuruins",              66, 5200.0f, 5200.0f },
+        { "clanfield",                90, 5200.0f, 5200.0f },
+        { "teamdeathmatcharena",      95, 5200.0f, 5200.0f },
+        { "crystaldefense",           96, 5200.0f, 5200.0f }
+    };
+
+    size_t count = sizeof( s_locs ) / sizeof( s_locs[0] );
+    for ( size_t i = 0; i < count; i++ )
+    {
+        if ( cleanKey == s_locs[i].key )
+        {
+            mapId = s_locs[i].mapId;
+            x = s_locs[i].x;
+            y = s_locs[i].y;
+            return true;
+        }
+    }
+    return false;
+}
+
 // Parse our commands to their appropriate function
 bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
 {
@@ -2179,11 +2262,18 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
 	{
 		if (Config.Command_go > thisclient->Session->accesslevel)
 			return true;
-		int loc = 0;
-		if ((tmp = strtok (NULL, " ")) == NULL)
-			tmp = 0;
-		else
-			loc = atoi (tmp);
+		char* locArg = strtok (NULL, " ");
+		if ( !locArg ) return true;
+
+		unsigned int namedMap = 0;
+		float namedX = 5200.0f, namedY = 5200.0f;
+		if ( LookupGMLocation( locArg, namedMap, namedX, namedY ) )
+		{
+			SendPM( thisclient, "Teleporting to %s (Map %u, X: %.1f, Y: %.1f)", locArg, namedMap, namedX, namedY );
+			return pakGMTele( thisclient, namedMap, namedX, namedY, 0 );
+		}
+
+		int loc = atoi (locArg);
 		if (loc != 0)		//we have a destination
 		{
 			fPoint Coord;
@@ -4878,22 +4968,32 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
 	       return true;
         return GMShowTargetInfo( thisclient );
     }
-    if (strcmp(command, "tele")==0) // **** TELEPORT TO MAX AND X Y POINTS *****
+    if (strcmp(command, "tele")==0) // **** TELEPORT TO MAP OR LOCATION NAME *****
     {
         if(Config.Command_Tele > thisclient->Session->accesslevel)
 	       return true;
-        int noqsd=0;
-		if ((tmp = strtok(NULL, " "))==NULL) return true; unsigned map=atoi(tmp);
-		if ((tmp = strtok(NULL, " "))==NULL) return true; float x=(float)atoi(tmp);
-		if ((tmp = strtok(NULL, " "))==NULL) return true; float y=(float)atoi(tmp);
+        char* firstArg = strtok( NULL, " " );
+        if ( !firstArg ) return true;
 
-		if ((tmp = strtok(NULL, " "))!=NULL)
-		{
-		    noqsd =atoi(tmp);
-		}
+        unsigned int namedMap = 0;
+        float namedX = 5200.0f, namedY = 5200.0f;
+        if ( LookupGMLocation( firstArg, namedMap, namedX, namedY ) )
+        {
+            Log( MSG_GMACTION, " %s : /tele %s (%u,%.2f,%.2f)" , thisclient->CharInfo->charname, firstArg, namedMap, namedX, namedY );
+            return pakGMTele( thisclient, namedMap, namedX, namedY, 0 );
+        }
+
+        unsigned map = atoi( firstArg );
+        if ((tmp = strtok(NULL, " "))==NULL) return true; float x=(float)atoi(tmp);
+        if ((tmp = strtok(NULL, " "))==NULL) return true; float y=(float)atoi(tmp);
+        int noqsd = 0;
+        if ((tmp = strtok(NULL, " "))!=NULL)
+        {
+            noqsd = atoi(tmp);
+        }
 
         Log( MSG_GMACTION, " %s : /tele %i,%.2f,%.2f" , thisclient->CharInfo->charname, map, x, y);
-        return pakGMTele(thisclient, map, x, y,noqsd);
+        return pakGMTele(thisclient, map, x, y, noqsd);
     }
     if (strcmp(command, "teletome")==0)
     {

@@ -3109,8 +3109,8 @@ void CPlayerBot::HandleIdle( )
         return;
     }
 
-    // 3. Look for nearby monsters to attack (massively expanded to 400.0m so bots in town spot monsters outside)
-    CMonster* mob = FindNearbyMonster( 400.0f );
+    // 3. Look for nearby monsters to attack (expanded to 1200.0m map-wide detection so bots in town or fields spot distant monsters)
+    CMonster* mob = FindNearbyMonster( 1200.0f );
     if ( mob )
     {
         AttackTarget( mob );
@@ -3153,8 +3153,8 @@ void CPlayerBot::HandleRoam( )
         return;
     }
 
-    // Check for monsters while roaming (massively expanded to 350.0m)
-    CMonster* mob = FindNearbyMonster( 350.0f );
+    // Check for monsters while roaming (expanded to 1200.0m map-wide detection)
+    CMonster* mob = FindNearbyMonster( 1200.0f );
     if ( mob )
     {
         AttackTarget( mob );
@@ -3493,8 +3493,8 @@ void CPlayerBot::HandleTownStroll( )
 {
     if ( !m_player ) return;
 
-    // Check for monsters outside town gates (up to 400m radius)
-    CMonster* mob = FindNearbyMonster( 400.0f );
+    // Check for monsters outside town gates (expanded to 1200.0m map-wide detection)
+    CMonster* mob = FindNearbyMonster( 1200.0f );
     if ( mob )
     {
         AttackTarget( mob );
