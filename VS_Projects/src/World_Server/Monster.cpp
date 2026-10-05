@@ -189,8 +189,8 @@ bool CMonster::UnspawnMonster( )
 // Move a mob (random place)
 void CMonster::Move( )
 {
+    if( !IsMoving() ) Position->lastMoveTime = clock(); // start walk from now, not from a stale timestamp
     Position->destiny  = GServer->RandInCircle( Position->source, 10 );
-//    Position->lastMoveTime = clock();
     ClearBattle( Battle );
     BEGINPACKET( pak, 0x797 );
 	ADDWORD    ( pak, clientid );
@@ -212,9 +212,9 @@ void CMonster::Move( )
 // Move a mob (specified point)
 void CMonster::MoveTo( fPoint nPos, bool randcircle )
 {
+    if( !IsMoving() ) Position->lastMoveTime = clock(); // start walk from now, not from a stale timestamp
     if(randcircle) Position->destiny  = GServer->RandInCircle( nPos, 5 );
     else Position->destiny  = nPos;
-//    Position->lastMoveTime = clock();
     BEGINPACKET( pak, 0x797 );
 	ADDWORD    ( pak, clientid );
 	ADDWORD    ( pak, 0x0000 ); // ???

@@ -348,9 +348,12 @@ void CCharacter::UpdatePosition( bool monster_stay_still )
 
     if(!IsMoving())
     {
-        //osprose
-        if(IsPlayer())Position->lastMoveTime = clock();
-        //osprose end
+        // Keep the movement clock fresh while standing still for ALL characters (players AND monsters).
+        // If this is only done for players, an idle monster keeps an old timestamp; the moment it is
+        // given a new destination, etime (now - lastMoveTime) is huge, ntime <= etime, and the server
+        // snaps it to the destination instantly while clients still show it walking. That makes
+        // monsters hit players (and players hit monsters) while visibly far out of range.
+        Position->lastMoveTime = clock();
         return;
     }
 
