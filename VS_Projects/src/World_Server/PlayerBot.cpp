@@ -3388,8 +3388,8 @@ void CPlayerBot::HandleFollow( )
 
             // Explicitly spawn 3D entity on leader's screen & register in leader's VisiblePlayers
             // CPlayer::SpawnToPlayer( receiver, entity ) sends entity to receiver!
-            m_player->SpawnToPlayer( m_followTarget, m_player );
-            m_followTarget->SpawnToPlayer( m_player, m_followTarget );
+            m_player->RespawnToPlayer( m_followTarget );
+            m_followTarget->RespawnToPlayer( m_player );
 
             bool foundV = false;
             for ( size_t v = 0; v < m_followTarget->VisiblePlayers.size( ); v++ )
@@ -3737,8 +3737,8 @@ void CPlayerBot::ProcessIncomingWhisper( CPlayer* sender, const char* msg )
                     }
 
                     // Explicitly spawn 3D entity on leader's screen & add to VisiblePlayers
-                    m_player->SpawnToPlayer( sender, m_player );
-                    sender->SpawnToPlayer( m_player, sender );
+                    m_player->RespawnToPlayer( sender );
+                    sender->RespawnToPlayer( m_player );
 
                     bool foundV = false;
                     for ( size_t v = 0; v < sender->VisiblePlayers.size( ); v++ )

@@ -292,6 +292,7 @@ class CPlayer: public CCharacter
     bool VisiblityList( );
     bool ForceRefreshMonster(bool refresh_all, UINT monster_id);      //LMA: force refresh (20070621-211100)
     bool SpawnToPlayer( CPlayer* player, CPlayer* otherclient );
+    void RespawnToPlayer( CPlayer* player ); // Despawn (0x794) then spawn (0x793) - avoids client "loadModel already exists" / headless avatars
     long int ReturnPvp( CPlayer* player, CPlayer* otherclient );    //LMA: for PVP.
     bool UpdateValues( );
     bool RefreshHPMP();  //LMA HP / MP Jumping

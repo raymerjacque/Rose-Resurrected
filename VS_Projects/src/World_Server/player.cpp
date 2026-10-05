@@ -444,6 +444,19 @@ long int CPlayer::ReturnPvp( CPlayer* player, CPlayer* otherclient )
 }
 
 
+// Safely (re)spawn this player on "player"'s screen.
+// The client asserts "loadModel(<name>) failed. already exists" and renders a broken
+// (headless) avatar if it receives 0x793 for an object it already has loaded.
+// Always despawn first; a 0x794 for an unknown id is ignored by the client.
+void CPlayer::RespawnToPlayer( CPlayer* player )
+{
+    if ( player == NULL || player == this || player->client == NULL ) return;
+    BEGINPACKET( pak, 0x794 );
+    ADDWORD    ( pak, clientid );
+    player->client->SendPacket( &pak );
+    SpawnToPlayer( player, this );
+}
+
 // Spawn Another User on the Screen
 //We send "otherclient" to "player"
 bool CPlayer::SpawnToPlayer( CPlayer* player, CPlayer* otherclient )

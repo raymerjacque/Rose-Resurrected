@@ -207,8 +207,8 @@ bool CWorldServer::pakPartyActions( CPlayer* thisclient, CPacket* P )
                     }
 
                     // Explicitly spawn 3D entity on leader's screen & add to VisiblePlayers
-                    otherclient->SpawnToPlayer( thisclient, otherclient );
-                    thisclient->SpawnToPlayer( otherclient, thisclient );
+                    otherclient->RespawnToPlayer( thisclient );
+                    thisclient->RespawnToPlayer( otherclient );
 
                     bool foundV = false;
                     for ( size_t v = 0; v < thisclient->VisiblePlayers.size( ); v++ )
