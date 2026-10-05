@@ -314,7 +314,10 @@ bool CPlayer::VisiblityList( )
 			if ( distance < MINVISUALRANGE)
             {
 			    newVisiblePlayers.push_back( otherclient );
-				otherclient->SpawnToPlayer(this, otherclient);
+				// Despawn first: after death-respawn / map change the server's VisiblePlayers list is reset,
+				// but the client may still have this player (e.g. a party bot that teleported along) loaded.
+				// A plain 0x793 then creates a duplicate, headless copy ("loadModel ... already exists").
+				otherclient->RespawnToPlayer(this);
 			}
         }
 	}
