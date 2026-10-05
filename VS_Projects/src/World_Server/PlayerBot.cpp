@@ -1914,99 +1914,103 @@ void CPlayerBot::EquipTieredGear( bool broadcast )
 
     if ( job == 111 || job == 121 || job == 122 ) // Soldier / Knight / Champion
     {
+        capNum = 0;
         if ( lvl < 20 )
         {
-            capNum = 31; bodyNum = 31; armNum = 31; footNum = 31;
+            bodyNum = 31; armNum = 31; footNum = 31;
             wepNum = ( lvl >= 8 ) ? 2 : 1; // Short Sword / Wooden Sword
             shieldNum = 1; // Wooden Shield
         }
         else if ( lvl < 40 )
         {
-            capNum = 32; bodyNum = 32; armNum = 32; footNum = 32;
+            bodyNum = 32; armNum = 32; footNum = 32;
             wepNum = ( lvl >= 32 ) ? 4 : 3; // Khukuri / Rapier
             shieldNum = 3; // Round Shield
         }
         else if ( lvl < 70 )
         {
-            capNum = 34; bodyNum = 34; armNum = 34; footNum = 34;
+            bodyNum = 34; armNum = 34; footNum = 34;
             wepNum = ( lvl >= 58 ) ? 6 : 5; // Bushido / Long Sword
             shieldNum = 7; // Kite Shield
         }
         else
         {
-            capNum = 37; bodyNum = 37; armNum = 37; footNum = 37;
+            bodyNum = 37; armNum = 37; footNum = 37;
             wepNum = ( lvl >= 84 ) ? 8 : 7; // Elven Sword / Saber
             shieldNum = 10; // Plate Shield
         }
     }
     else if ( job == 211 || job == 221 || job == 222 ) // Muse / Mage / Cleric
     {
+        capNum = 0;
         if ( lvl < 20 )
         {
-            capNum = 61; bodyNum = 61; armNum = 61; footNum = 61;
+            bodyNum = 61; armNum = 61; footNum = 61;
             wepNum = 301; // Baobab Rod
         }
         else if ( lvl < 40 )
         {
-            capNum = 63; bodyNum = 63; armNum = 63; footNum = 63;
+            bodyNum = 63; armNum = 63; footNum = 63;
             wepNum = 302; // Lemmings Rod
         }
         else if ( lvl < 70 )
         {
-            capNum = 66; bodyNum = 66; armNum = 66; footNum = 66;
+            bodyNum = 66; armNum = 66; footNum = 66;
             wepNum = 304; // Mage's Rod
         }
         else
         {
-            capNum = 71; bodyNum = 71; armNum = 71; footNum = 71;
+            bodyNum = 71; armNum = 71; footNum = 71;
             wepNum = 305; // White Staff
         }
     }
     else if ( job == 311 || job == 321 || job == 322 ) // Hawker / Raider / Scout
     {
+        capNum = 0;
         ammoType = 1;
         if ( lvl < 20 )
         {
-            capNum = 91; bodyNum = 91; armNum = 91; footNum = 91;
+            bodyNum = 91; armNum = 91; footNum = 91;
             wepNum = 201; // Toy Bow
         }
         else if ( lvl < 40 )
         {
-            capNum = 93; bodyNum = 93; armNum = 93; footNum = 93;
+            bodyNum = 93; armNum = 93; footNum = 93;
             wepNum = 202; // Short Bow
         }
         else if ( lvl < 70 )
         {
-            capNum = 96; bodyNum = 96; armNum = 96; footNum = 96;
+            bodyNum = 96; armNum = 96; footNum = 96;
             wepNum = 203; // Long Bow
         }
         else
         {
-            capNum = 99; bodyNum = 99; armNum = 99; footNum = 99;
+            bodyNum = 99; armNum = 99; footNum = 99;
             wepNum = 205; // White Wing Bow
         }
     }
     else if ( job == 411 || job == 421 || job == 422 ) // Dealer / Bourgeois / Artisan
     {
+        capNum = 0;
         ammoType = 2;
         if ( lvl < 20 )
         {
-            capNum = 121; bodyNum = 121; armNum = 121; footNum = 121;
+            bodyNum = 121; armNum = 121; footNum = 121;
             wepNum = 231; // Bubble Gun
         }
         else if ( lvl < 40 )
         {
-            capNum = 123; bodyNum = 123; armNum = 123; footNum = 123;
+            bodyNum = 123; armNum = 123; footNum = 123;
             wepNum = 232; // Air Gun
         }
         else if ( lvl < 70 )
         {
-            capNum = 125; bodyNum = 125; armNum = 125; footNum = 125;
+            bodyNum = 125; armNum = 125; footNum = 125;
             wepNum = 234; // Iron Rifle
         }
         else
         {
-            capNum = 126; bodyNum = 126; armNum = 126; footNum = 126;
+            bodyNum = 126; armNum = 126; footNum = 126;
             wepNum = 235; // Iron Shotgun
         }
     }
