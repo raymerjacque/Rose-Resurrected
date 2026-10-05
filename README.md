@@ -312,7 +312,10 @@ RosE Resurrected features an industry-leading, fully autonomous PlayerBot system
 ```
 
 ### 1. Autonomous Grinding Combat Bots (`PlayerBot.cpp`)
-- **Expanded Aggro Sensor Radius**: Sensor detection expanded to **$85\text{m} - 90\text{m}$** (over $4\times$ standard range). Bots spot monsters as soon as they spawn across wide map areas without standing idle.
+- **1,200m Map-Wide Aggro Sensor Radius**: Sensor detection expanded to **1,200 meters** across `HandleIdle`, `HandleRoam`, and `HandleTownStroll`. Bots continuously scan the entire zone for monsters. If no monsters are within range in peaceful cities (e.g., Canyon City of Zant, Junon Polis, Adventure Plains beach), bots automatically relocate out to active hunting grounds to ensure continuous grinding.
+- **Headless Party Bot Prevention (`RespawnToPlayer`)**: Solved duplicate client character model assertions (`loadModel(...) failed. already exists`) by issuing a wire-level `0x794` despawn packet immediately prior to `0x793` spawn during party invites, map teleports, and respawns.
+- **Combat Distance & Timestamp Synchronization**: Synchronized position timestamps (`lastMoveTime`) for both monsters and players while stationary, eliminating time-warp visual snaps and out-of-range combat glitches.
+- **Automated Leveling, Stat, Skill & Refine Progression**: Bots dynamically allocate stat points (STR, DEX, INT, CON, SEN), learn class skill trees, and upgrade weapon refines (+4 at Lvl 20+, +7 at Lvl 35+, +9 at Lvl 70+, +10 at Lvl 100+) with active glowing weapon particle effects.
 - **Combat Leash & Targeting**: Maximum combat target distance set to **$100\text{m}$**, preventing bots from abandoning targets while approaching them across long distances. Anti-KS logic ensures bots respect player monster ownership.
 - **Class-Specific Skill Combos**:
   * *Soldier / Knight / Champion*: Taunts mobs off squishy allies, charges, shield bash/stun combos, voltage crash.
@@ -320,7 +323,6 @@ RosE Resurrected features an industry-leading, fully autonomous PlayerBot system
   * *Hawker / Raider / Scout*: Bow/gun range kiting, stealth openers, Stun Arrow, Triple Arrow, high-critical strike combos.
   * *Dealer / Bourgeois / Artisan*: PAT artillery fire, Sniping, Demolition Expertise, Triple Shot.
 - **Resting & Recovery**: When HP or MP drops below 40% HP / 30% MP, bots execute sit stance (`Status->Stance = SITTING`), regenerate HP/MP, and stand when recovered.
-- **Weapon Refine Particle Glows (+4 to +10)**: Weapon refine levels dynamically scale with bot level tiers (+4 at Lvl 20+, +7 at Lvl 35+, +9 at Lvl 70+, +10 at Lvl 100+), rendering glowing weapon particle effects.
 
 ### 2. PAT Vehicles (Cart & Castle Gear Robot Mounts)
 - **Automatic PAT Deployment**: Bots level 30+ automatically mount PAT vehicles when traveling long distances ($>25\text{m}$) out of combat.
@@ -484,6 +486,10 @@ Comprehensive upgrades to combat mechanics, avatar terrain grounding, and group/
   - `/party bot follow`: Commands all party bots to drop current engagements and return to formation.
   - `/party bot assist`: Orders party bots to focus-fire on the leader's current combat target.
   - `/party bot info`: Displays active formation slots, bot roles, HP, and MP stats.
+- **GM Named Teleport Commands (`/tele <name>` & `/go <name>`)**:
+  - GMs can teleport instantly using friendly map location names (case-insensitive, spaces/special characters ignored) in addition to X/Y coordinates:
+    - *Major Cities & Adventure Zones*: `/tele zant`, `/tele adventure`, `/tele junonpolis` (`/go junon`), `/tele eucar`, `/tele xitasanctuary` (`/tele xita`), `/tele plainsofcityofzant`, `/tele sunshinecoast`, `/tele valleyofluxtower` (`/tele luxem`), `/tele manasnowfields`, `/tele breezyhills` (`/tele breezy`), `/tele elvergel`, `/tele animalake`, `/tele kenjibeach` (`/tele kenji`), `/tele gorgeofsilence`, `/tele dolphinisland`, `/tele forestofwisdom`, `/tele desertofthedead`, `/tele crystalsnowfields`, `/tele freezingplateau`, `/tele arumicvalley`, `/tele lakeoffire`, `/tele seaofseeds`, `/tele shadyjungle`, `/tele forestofwandering`, `/tele citadeloftheforgotten`.
+    - *Dungeons & Arenas*: `/tele goblincaveb1`, `/tele goblincaveb2`, `/tele goblincaveb3`, `/tele georgecaveb1`, `/tele georgecaveb2`, `/tele forgottentempleb1`, `/tele forgottentempleb2`, `/tele sikukuundergroundprison`, `/tele sikukuruins`, `/tele clanfield`, `/tele teamdeathmatcharena`, `/tele crystaldefense`.
 
 ---
 
