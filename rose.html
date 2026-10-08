@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROSE Online: Resurrected — Server Portal & Account Management</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --bg-dark: #090c15;
+            --bg-card: rgba(18, 24, 38, 0.75);
+            --bg-card-border: rgba(255, 255, 255, 0.1);
+            --primary-gold: #ffb700;
+            --primary-gold-glow: rgba(255, 183, 0, 0.35);
+            --primary-cyan: #00f2fe;
+            --primary-cyan-glow: rgba(0, 242, 254, 0.3);
+            --accent-rose: #ff0844;
+            --accent-emerald: #00e676;
+            --text-main: #f0f4f8;
+            --text-muted: #94a3b8;
+            --font-title: 'Outfit', sans-serif;
+            --font-body: 'Inter', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            min-height: 100vh;
+            overflow-x: hidden;
+            line-height: 1.6;
+        }
+
+        /* Ambient Animated Background Canvas */
+        #bgCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 1240px;
+            margin: 0 auto;
+            padding: 0 20px;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Header Bar */
+        header {
+            background: rgba(9, 12, 21, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--bg-card-border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            padding: 14px 0;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--primary-gold), #ff7700);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #000;
+            font-size: 24px;
+            box-shadow: 0 0 20px var(--primary-gold-glow);
+        }
+
+        .logo-text h1 {
+            font-family: var(--font-title);
+            font-size: 22px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: #fff;
+            text-transform: uppercase;
+            line-height: 1.1;
+        }
+
+        .logo-text span {
+            color: var(--primary-gold);
+        }
+
+        .logo-text p {
+            font-size: 11px;
+            color: var(--primary-cyan);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        /* Server Status Indicators */
+        .server-status-bar {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 6px 16px;
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--text-muted);
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+        }
+
+        .status-dot.online {
+            background-color: var(--accent-emerald);
+            box-shadow: 0 0 10px var(--accent-emerald);
+        }
+
+        .status-dot.offline {
+            background-color: var(--accent-rose);
+            box-shadow: 0 0 10px var(--accent-rose);
+        }
+
+        /* Navigation Links */
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 8px;
+        }
+
+        nav a {
+            color: var(--text-muted);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        nav a:hover, nav a.active {
+            color: #fff;
+            background: rgba(255, 183, 0, 0.12);
+            border: 1px solid rgba(255, 183, 0, 0.3);
+        }
+
+        nav a.active {
+            color: var(--primary-gold);
+            font-weight: 600;
+        }
+
+        /* Hero Banner */
+        .hero {
+            padding: 60px 0 40px;
+            text-align: center;
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 16px;
+            border-radius: 30px;
+            background: rgba(0, 242, 254, 0.1);
+            border: 1px solid rgba(0, 242, 254, 0.3);
+            color: var(--primary-cyan);
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .hero h2 {
+            font-family: var(--font-title);
+            font-size: 52px;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 16px;
+            background: linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero h2 span {
+            background: linear-gradient(135deg, var(--primary-gold) 0%, #ff8800 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            max-width: 680px;
+            margin: 0 auto 32px;
+            color: var(--text-muted);
+            font-size: 16px;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            border: 1px solid var(--bg-card-border);
+            backdrop-filter: blur(12px);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(255, 183, 0, 0.4);
+        }
+
+        .stat-number {
+            font-family: var(--font-title);
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--primary-gold);
+            line-height: 1;
+            margin-bottom: 6px;
+        }
+
+        .stat-label {
+            font-size: 13px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        /* Tab Content Section */
+        .tab-content {
+            display: none;
+            padding-bottom: 60px;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.4s ease forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Glassmorphism Panel */
+        .glass-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--bg-card-border);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 20px;
+            padding: 32px;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            margin-bottom: 30px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .panel-title {
+            font-family: var(--font-title);
+            font-size: 24px;
+            font-weight: 700;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .panel-title i {
+            color: var(--primary-gold);
+        }
+
+        /* Form Controls */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+
+        .form-group.full-width {
+            grid-column: span 2;
+        }
+
+        .form-group label {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-wrapper i {
+            position: absolute;
+            left: 14px;
+            color: var(--text-muted);
+            font-size: 16px;
+        }
+
+        .form-input {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 10px;
+            padding: 12px 14px 12px 42px;
+            color: #fff;
+            font-family: var(--font-body);
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary-gold);
+            box-shadow: 0 0 12px var(--primary-gold-glow);
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px 28px;
+            border-radius: 10px;
+            font-family: var(--font-title);
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            border: none;
+            transition: all 0.25s ease;
+            text-decoration: none;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .btn-gold {
+            background: linear-gradient(135deg, var(--primary-gold) 0%, #ff8800 100%);
+            color: #000;
+            box-shadow: 0 6px 20px var(--primary-gold-glow);
+        }
+
+        .btn-gold:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(255, 183, 0, 0.5);
+        }
+
+        .btn-cyan {
+            background: linear-gradient(135deg, var(--primary-cyan) 0%, #0072ff 100%);
+            color: #fff;
+            box-shadow: 0 6px 20px var(--primary-cyan-glow);
+        }
+
+        .btn-cyan:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 242, 254, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .btn-danger {
+            background: rgba(255, 8, 68, 0.2);
+            color: #ff4b6b;
+            border: 1px solid rgba(255, 8, 68, 0.4);
+        }
+
+        .btn-danger:hover {
+            background: rgba(255, 8, 68, 0.35);
+            color: #fff;
+        }
+
+        /* Toast Notifications */
+        #toastContainer {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .toast {
+            background: var(--bg-card);
+            border: 1px solid var(--bg-card-border);
+            backdrop-filter: blur(16px);
+            padding: 14px 20px;
+            border-radius: 12px;
+            color: #fff;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            animation: slideIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            min-width: 300px;
+        }
+
+        .toast.success {
+            border-left: 4px solid var(--accent-emerald);
+        }
+
+        .toast.error {
+            border-left: 4px solid var(--accent-rose);
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(50px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        /* Character Roster Cards */
+        .character-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .character-card {
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 20px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.25s ease;
+        }
+
+        .character-card:hover {
+            border-color: var(--primary-gold);
+            transform: translateY(-4px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+        }
+
+        .character-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .char-name {
+            font-family: var(--font-title);
+            font-size: 20px;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .char-level {
+            background: rgba(255, 183, 0, 0.15);
+            color: var(--primary-gold);
+            border: 1px solid rgba(255, 183, 0, 0.4);
+            padding: 2px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .char-info-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        .char-info-row strong {
+            color: #cbd5e1;
+        }
+
+        /* Leaderboard Table */
+        .table-responsive {
+            overflow-x: auto;
+        }
+
+        .custom-table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+        }
+
+        .custom-table th {
+            background: rgba(0, 0, 0, 0.4);
+            color: var(--text-muted);
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            padding: 14px 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .custom-table td {
+            padding: 14px 18px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            font-size: 14px;
+        }
+
+        .custom-table tr:hover td {
+            background: rgba(255, 255, 255, 0.03);
+        }
+
+        .rank-badge {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 13px;
+            background: rgba(255, 255, 255, 0.08);
+            color: var(--text-muted);
+        }
+
+        .rank-1 { background: linear-gradient(135deg, #ffd700, #ff8800); color: #000; box-shadow: 0 0 10px rgba(255, 215, 0, 0.5); }
+        .rank-2 { background: linear-gradient(135deg, #e0e0e0, #9e9e9e); color: #000; }
+        .rank-3 { background: linear-gradient(135deg, #cd7f32, #8b4513); color: #fff; }
+
+        /* Feature Cards */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--bg-card-border);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.3s ease;
+        }
+
+        .feature-card:hover {
+            border-color: var(--primary-cyan);
+            transform: translateY(-4px);
+        }
+
+        .feature-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 14px;
+            background: rgba(0, 242, 254, 0.1);
+            color: var(--primary-cyan);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            margin-bottom: 16px;
+        }
+
+        .feature-title {
+            font-family: var(--font-title);
+            font-size: 18px;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 8px;
+        }
+
+        .feature-desc {
+            font-size: 14px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--bg-card-border);
+            padding: 30px 0;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 13px;
+        }
+
+        @media (max-width: 900px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .features-grid { grid-template-columns: 1fr; }
+            .form-grid { grid-template-columns: 1fr; }
+            .form-group.full-width { grid-column: span 1; }
+            .hero h2 { font-size: 36px; }
+            .header-content { flex-direction: column; gap: 16px; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Animated Particle Canvas -->
+    <canvas id="bgCanvas"></canvas>
+
+    <!-- Header Navigation -->
+    <header>
+        <div class="container header-content">
+            <a href="#home" class="logo-group" onclick="showTab('home')">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-rose"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>RosE <span>Resurrected</span></h1>
+                    <p>EVOLUTION v142 EMULATOR</p>
+                </div>
+            </a>
+
+            <!-- Server Status Live Bar -->
+            <div class="server-status-bar">
+                <div class="status-pill" title="Login Server (Port 29000)">
+                    <div id="dotLogin" class="status-dot online"></div> Login
+                </div>
+                <div class="status-pill" title="Char Server (Port 29100)">
+                    <div id="dotChar" class="status-dot online"></div> Char
+                </div>
+                <div class="status-pill" title="World Server (Port 29200)">
+                    <div id="dotWorld" class="status-dot online"></div> World
+                </div>
+                <div class="status-pill" style="color: var(--primary-gold); margin-left: 8px;">
+                    <i class="fa-solid fa-users"></i> <span id="onlineCounter">0</span> Online
+                </div>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav>
+                <ul>
+                    <li><a href="#home" id="nav-home" class="active" onclick="showTab('home')"><i class="fa-solid fa-house"></i> Home</a></li>
+                    <li><a href="#register" id="nav-register" onclick="showTab('register')"><i class="fa-solid fa-user-plus"></i> Register</a></li>
+                    <li><a href="#account" id="nav-account" onclick="showTab('account')"><i class="fa-solid fa-user-gear"></i> <span id="navAccountText">Account</span></a></li>
+                    <li><a href="#leaderboard" id="nav-leaderboard" onclick="showTab('leaderboard')"><i class="fa-solid fa-trophy"></i> Ranking</a></li>
+                    <li><a href="#downloads" id="nav-downloads" onclick="showTab('downloads')"><i class="fa-solid fa-download"></i> Downloads</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="container">
+        
+        <!-- Hero Section -->
+        <section class="hero">
+            <div class="hero-badge">
+                <i class="fa-solid fa-bolt"></i> High Performance Solo & Multiplayer MMORPG
+            </div>
+            <h2>ROSE ONLINE <span>RESURRECTED</span></h2>
+            <p>Experience authentic ROSE Evolution with 1,200m Autonomous PlayerBots, Worldwide Grind-Spot Buff Clerics, 18 Market Vendors, PvP Arenas, and Instanced Dungeon Crawling.</p>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="statAccounts">25</div>
+                    <div class="stat-label">Total Accounts</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="statChars">10</div>
+                    <div class="stat-label">Total Characters</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">3x</div>
+                    <div class="stat-label">EXP & Drop Rate</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number">18</div>
+                    <div class="stat-label">Market Vendor Bots</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- TAB 1: HOME OVERVIEW -->
+        <div id="tab-home" class="tab-content active">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-star"></i> Server Highlights & Features
+                    </div>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fa-solid fa-robot"></i></div>
+                        <div class="feature-title">Autonomous PlayerBot AI</div>
+                        <div class="feature-desc">1,200m map-wide aggro sensor scanning, class-specific skill combos, auto stat/skill points, glowing weapon refines (+4 to +10), and PAT vehicle mounts.</div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fa-solid fa-store"></i></div>
+                        <div class="feature-title">18 Market Vendor Bots</div>
+                        <div class="feature-desc">Stationed across Junon Polis and Canyon City of Zant selling weapons, class armor sets, T5-T7 gems, refining talismans, and vehicle parts.</div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fa-solid fa-dungeon"></i></div>
+                        <div class="feature-title">Instanced Dungeon Raiding</div>
+                        <div class="feature-desc">Private party-isolated instances for Goblin Cave, George's Cave, Forgotten Temple, and Sea of Seeds with automated party wipe safety.</div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fa-solid fa-wand-magic-sparkles"></i></div>
+                        <div class="feature-title">Grind-Spot Cleric Sisters</div>
+                        <div class="feature-desc">7 Cleric Sister bots placed at major leveling grounds giving 7-Charm Full Blessings and 3x HP/MP Regeneration Bonfires.</div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fa-solid fa-swords"></i></div>
+                        <div class="feature-title">Multi-Mode PvP & Colosseum</div>
+                        <div class="feature-desc">Akram Arena Colosseum manager with automated Red vs Blue team balancing, Clan Wars, Union Wars, and open-world /duel system.</div>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon"><i class="fa-solid fa-map-location-dot"></i></div>
+                        <div class="feature-title">Named GM Teleports</div>
+                        <div class="feature-desc">38+ map locations mapped directly to GM commands: <code>/tele zant</code>, <code>/tele adventure</code>, <code>/tele junon</code>, <code>/tele eucar</code>, <code>/tele xita</code>.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: REGISTER -->
+        <div id="tab-register" class="tab-content">
+            <div class="glass-panel" style="max-width: 640px; margin: 0 auto;">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-user-plus"></i> Create New Account
+                    </div>
+                </div>
+                <form id="registerForm" onsubmit="handleRegister(event)">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-user"></i>
+                            <input type="text" id="regUsername" class="form-input" placeholder="Enter username (3-16 alphanumeric)" required minlength="3" maxlength="16">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-envelope"></i>
+                            <input type="email" id="regEmail" class="form-input" placeholder="Enter valid email address" required>
+                        </div>
+                    </div>
+
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Password</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-lock"></i>
+                                <input type="password" id="regPassword" class="form-input" placeholder="Password (min 4 chars)" required minlength="4">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Confirm Password</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-key"></i>
+                                <input type="password" id="regConfirm" class="form-input" placeholder="Confirm password" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 10px; text-align: right;">
+                        <button type="submit" class="btn btn-gold">
+                            <i class="fa-solid fa-check"></i> Register Account
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- TAB 3: ACCOUNT DASHBOARD / LOGIN -->
+        <div id="tab-account" class="tab-content">
+            
+            <!-- Logged Out View -->
+            <div id="loggedOutView" class="glass-panel" style="max-width: 520px; margin: 0 auto;">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-right-to-bracket"></i> Player Login
+                    </div>
+                </div>
+                <form id="loginForm" onsubmit="handleLogin(event)">
+                    <div class="form-group">
+                        <label>Username</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-user"></i>
+                            <input type="text" id="loginUsername" class="form-input" placeholder="Enter your username" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Password</label>
+                        <div class="input-wrapper">
+                            <i class="fa-solid fa-lock"></i>
+                            <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" required>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px;">
+                        <a href="#register" onclick="showTab('register')" style="color: var(--primary-cyan); font-size: 13px; text-decoration: none;">Don't have an account? Register here</a>
+                        <button type="submit" class="btn btn-gold">
+                            <i class="fa-solid fa-arrow-right-to-bracket"></i> Log In
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Logged In View -->
+            <div id="loggedInView" style="display: none;">
+                <div class="glass-panel">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <i class="fa-solid fa-id-card"></i> Account Dashboard
+                        </div>
+                        <button class="btn btn-danger" onclick="handleLogout()">
+                            <i class="fa-solid fa-power-off"></i> Log Out
+                        </button>
+                    </div>
+
+                    <div style="display: flex; gap: 24px; flex-wrap: wrap; margin-bottom: 24px;">
+                        <div><strong>Username:</strong> <span id="dashUser">-</span></div>
+                        <div><strong>Account ID:</strong> <span id="dashId">-</span></div>
+                        <div><strong>Access Level:</strong> <span id="dashAccess">-</span></div>
+                        <div><strong>Email:</strong> <span id="dashEmail">-</span></div>
+                    </div>
+
+                    <hr style="border-color: rgba(255, 255, 255, 0.08); margin: 24px 0;">
+
+                    <h3 style="font-family: var(--font-title); font-size: 20px; margin-bottom: 16px; color: var(--primary-gold);">
+                        <i class="fa-solid fa-users"></i> Character Roster
+                    </h3>
+
+                    <div id="characterRoster" class="character-grid">
+                        <!-- Loaded via JS -->
+                    </div>
+                </div>
+
+                <!-- Password Change Form -->
+                <div class="glass-panel" style="max-width: 600px;">
+                    <div class="panel-header">
+                        <div class="panel-title">
+                            <i class="fa-solid fa-key"></i> Change Account Password
+                        </div>
+                    </div>
+                    <form id="changePassForm" onsubmit="handleChangePassword(event)">
+                        <div class="form-group">
+                            <label>Current Password</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-lock"></i>
+                                <input type="password" id="oldPassword" class="form-input" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>New Password</label>
+                            <div class="input-wrapper">
+                                <i class="fa-solid fa-key"></i>
+                                <input type="password" id="newPassword" class="form-input" required minlength="4">
+                            </div>
+                        </div>
+                        <button type="submit" class="btn btn-cyan">
+                            <i class="fa-solid fa-floppy-disk"></i> Update Password
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- TAB 4: LEADERBOARDS -->
+        <div id="tab-leaderboard" class="tab-content">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-trophy"></i> Server Leaderboards
+                    </div>
+                    <button class="btn btn-secondary" onclick="loadLeaderboard()">
+                        <i class="fa-solid fa-arrows-rotate"></i> Refresh
+                    </button>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="custom-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Character Name</th>
+                                <th>Level</th>
+                                <th>Class / Job</th>
+                                <th>Zulies (Gold)</th>
+                                <th>Total EXP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="leaderboardBody">
+                            <tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Loading rankings...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 5: DOWNLOADS & SPECS -->
+        <div id="tab-downloads" class="tab-content">
+            <div class="glass-panel">
+                <div class="panel-header">
+                    <div class="panel-title">
+                        <i class="fa-solid fa-download"></i> Game Client Downloads
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 30px;">
+                    <a href="https://github.com/raymerjacque/Rose-Resurrected" target="_blank" class="btn btn-gold">
+                        <i class="fa-brands fa-github"></i> GitHub Source Code
+                    </a>
+                    <a href="https://makululinux.us/rose.html" class="btn btn-cyan">
+                        <i class="fa-solid fa-globe"></i> Direct Web Portal
+                    </a>
+                </div>
+
+                <h3 style="font-family: var(--font-title); font-size: 20px; margin-bottom: 12px; color: var(--primary-gold);">
+                    <i class="fa-solid fa-terminal"></i> GM Named Teleport Commands Guide
+                </h3>
+                <p style="color: var(--text-muted); margin-bottom: 16px;">GMs can instantly warp to map locations using location names instead of X/Y coordinates:</p>
+                
+                <div style="background: rgba(0,0,0,0.4); padding: 16px; border-radius: 10px; font-family: monospace; font-size: 13px; color: var(--primary-cyan); line-height: 1.8;">
+                    /tele zant | /tele adventure | /tele junonpolis | /tele eucar | /tele xitasanctuary<br>
+                    /tele breezyhills | /tele elvergel | /tele animalake | /tele kenjibeach | /tele gorgeofsilence<br>
+                    /tele goblincaveb1 | /tele georgecaveb1 | /tele forgottentempleb1 | /tele clanfield | /tele teamdeathmatcharena
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Toast Notifications Container -->
+    <div id="toastContainer"></div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>&copy; 2026 RosE Resurrected — High-Performance ROSE Online Server Emulator. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <!-- JavaScript Engine -->
+    <script>
+        const API_URL = 'rose_api.php';
+
+        // Particle Canvas Background
+        const canvas = document.getElementById('bgCanvas');
+        const ctx = canvas.getContext('2d');
+        let particles = [];
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 2 + 0.5;
+                this.speedX = Math.random() * 0.4 - 0.2;
+                this.speedY = Math.random() * 0.4 - 0.2;
+                this.opacity = Math.random() * 0.5 + 0.2;
+            }
+            update() {
+                this.x += this.speedX;
+                this.y += this.speedY;
+                if (this.x < 0 || this.x > canvas.width) this.speedX *= -1;
+                if (this.y < 0 || this.y > canvas.height) this.speedY *= -1;
+            }
+            draw() {
+                ctx.fillStyle = `rgba(255, 183, 0, ${this.opacity})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        for (let i = 0; i < 60; i++) {
+            particles.push(new Particle());
+        }
+
+        function animateParticles() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animateParticles);
+        }
+        animateParticles();
+
+        // Toast Notification System
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i> <span>${message}</span>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateX(50px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // Tab Navigation System
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
+
+            const targetTab = document.getElementById(`tab-${tabId}`);
+            const targetNav = document.getElementById(`nav-${tabId}`);
+
+            if (targetTab) targetTab.classList.add('active');
+            if (targetNav) targetNav.classList.add('active');
+
+            if (tabId === 'leaderboard') {
+                loadLeaderboard();
+            }
+        }
+
+        // Job Class Mapper
+        function getClassTitle(classid) {
+            const id = parseInt(classid);
+            switch(id) {
+                case 0: return 'Visitor';
+                case 111: return 'Soldier';
+                case 112: return 'Knight';
+                case 113: return 'Champion';
+                case 211: return 'Muse';
+                case 212: return 'Mage';
+                case 213: return 'Cleric';
+                case 311: return 'Hawker';
+                case 312: return 'Raider';
+                case 313: return 'Scout';
+                case 411: return 'Dealer';
+                case 412: return 'Bourgeois';
+                case 413: return 'Artisan';
+                default: return 'Novice (' + id + ')';
+            }
+        }
+
+        // Fetch Server Status
+        async function fetchStatus() {
+            try {
+                const res = await fetch(`${API_URL}?action=status`);
+                const data = await res.json();
+                if (data.status === 'success') {
+                    document.getElementById('dotLogin').className = `status-dot ${data.servers.login ? 'online' : 'offline'}`;
+                    document.getElementById('dotChar').className = `status-dot ${data.servers.char ? 'online' : 'offline'}`;
+                    document.getElementById('dotWorld').className = `status-dot ${data.servers.world ? 'online' : 'offline'}`;
+
+                    document.getElementById('onlineCounter').textContent = data.stats.online_players;
+                    document.getElementById('statAccounts').textContent = data.stats.total_accounts;
+                    document.getElementById('statChars').textContent = data.stats.total_characters;
+                }
+            } catch (err) {
+                console.warn('Status check failed:', err);
+            }
+        }
+
+        // Handle Registration Submission
+        async function handleRegister(e) {
+            e.preventDefault();
+            const username = document.getElementById('regUsername').value;
+            const email = document.getElementById('regEmail').value;
+            const password = document.getElementById('regPassword').value;
+            const confirm = document.getElementById('regConfirm').value;
+
+            if (password !== confirm) {
+                showToast('Passwords do not match.', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('username', username);
+            formData.append('email', email);
+            formData.append('password', password);
+            formData.append('confirm_password', confirm);
+
+            try {
+                const res = await fetch(`${API_URL}?action=register`, { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    showToast(data.message, 'success');
+                    document.getElementById('registerForm').reset();
+                    showTab('account');
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (err) {
+                showToast('Network error during registration.', 'error');
+            }
+        }
+
+        // Handle Login Submission
+        async function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+
+            const formData = new FormData();
+            formData.append('username', username);
+            formData.append('password', password);
+
+            try {
+                const res = await fetch(`${API_URL}?action=login`, { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    showToast(data.message, 'success');
+                    renderAccountDashboard(data.account, data.characters);
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (err) {
+                showToast('Network error during login.', 'error');
+            }
+        }
+
+        // Check Session & Render Account Dashboard
+        async function checkAccountSession() {
+            try {
+                const res = await fetch(`${API_URL}?action=get_account`);
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    renderAccountDashboard(data.account, data.characters);
+                } else {
+                    document.getElementById('loggedOutView').style.display = 'block';
+                    document.getElementById('loggedInView').style.display = 'none';
+                    document.getElementById('navAccountText').textContent = 'Account';
+                }
+            } catch (err) {
+                console.warn('Session check error:', err);
+            }
+        }
+
+        function renderAccountDashboard(account, characters) {
+            document.getElementById('loggedOutView').style.display = 'none';
+            document.getElementById('loggedInView').style.display = 'block';
+            document.getElementById('navAccountText').textContent = account.username;
+
+            document.getElementById('dashUser').textContent = account.username;
+            document.getElementById('dashId').textContent = '#' + account.id;
+            document.getElementById('dashAccess').textContent = account.accesslevel >= 300 ? 'Game Master (' + account.accesslevel + ')' : 'Player';
+            document.getElementById('dashEmail').textContent = account.email || 'N/A';
+
+            const roster = document.getElementById('characterRoster');
+            roster.innerHTML = '';
+
+            if (characters && characters.length > 0) {
+                characters.forEach(c => {
+                    const card = document.createElement('div');
+                    card.className = 'character-card';
+                    card.innerHTML = `
+                        <div class="character-header">
+                            <span class="char-name">${c.char_name}</span>
+                            <span class="char-level">Lvl ${c.level}</span>
+                        </div>
+                        <div class="char-info-row">
+                            <span>Class:</span> <strong>${getClassTitle(c.classid)}</strong>
+                        </div>
+                        <div class="char-info-row">
+                            <span>Gold (Zulies):</span> <strong>${parseInt(c.zuly).toLocaleString()}</strong>
+                        </div>
+                        <div class="char-info-row">
+                            <span>Total EXP:</span> <strong>${parseInt(c.exp).toLocaleString()}</strong>
+                        </div>
+                    `;
+                    roster.appendChild(card);
+                });
+            } else {
+                roster.innerHTML = '<p style="color: var(--text-muted); grid-column: span 3;">No characters created yet on this account.</p>';
+            }
+        }
+
+        // Change Password Handler
+        async function handleChangePassword(e) {
+            e.preventDefault();
+            const oldPassword = document.getElementById('oldPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+
+            const formData = new FormData();
+            formData.append('old_password', oldPassword);
+            formData.append('new_password', newPassword);
+
+            try {
+                const res = await fetch(`${API_URL}?action=change_password`, { method: 'POST', body: formData });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    showToast(data.message, 'success');
+                    document.getElementById('changePassForm').reset();
+                } else {
+                    showToast(data.message, 'error');
+                }
+            } catch (err) {
+                showToast('Network error during password update.', 'error');
+            }
+        }
+
+        // Logout Handler
+        async function handleLogout() {
+            try {
+                await fetch(`${API_URL}?action=logout`);
+                showToast('Logged out successfully.', 'success');
+                checkAccountSession();
+                showTab('home');
+            } catch (err) {
+                showToast('Logout error.', 'error');
+            }
+        }
+
+        // Load Leaderboards
+        async function loadLeaderboard() {
+            const body = document.getElementById('leaderboardBody');
+            body.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">Loading rankings...</td></tr>';
+
+            try {
+                const res = await fetch(`${API_URL}?action=leaderboard`);
+                const data = await res.json();
+
+                if (data.status === 'success' && data.players.length > 0) {
+                    body.innerHTML = '';
+                    data.players.forEach((p, index) => {
+                        const rank = index + 1;
+                        const rankClass = rank <= 3 ? `rank-${rank}` : '';
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td><div class="rank-badge ${rankClass}">${rank}</div></td>
+                            <td><strong>${p.char_name}</strong></td>
+                            <td><span class="char-level">Lvl ${p.level}</span></td>
+                            <td>${getClassTitle(p.classid)}</td>
+                            <td>${parseInt(p.zuly).toLocaleString()}</td>
+                            <td>${parseInt(p.exp).toLocaleString()}</td>
+                        `;
+                        body.appendChild(tr);
+                    });
+                } else {
+                    body.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--text-muted);">No player rankings found.</td></tr>';
+                }
+            } catch (err) {
+                body.innerHTML = '<tr><td colspan="6" style="text-align: center; color: var(--accent-rose);">Failed to load rankings.</td></tr>';
+            }
+        }
+
+        // Init on Page Load
+        fetchStatus();
+        checkAccountSession();
+        setInterval(fetchStatus, 15000);
+    </script>
+</body>
+</html>
