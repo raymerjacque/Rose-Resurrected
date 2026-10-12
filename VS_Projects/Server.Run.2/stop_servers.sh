@@ -18,5 +18,6 @@ done
 pkill -f "./loginserver" 2>/dev/null || true
 pkill -f "./charserver" 2>/dev/null || true
 pkill -f "./worldserver" 2>/dev/null || true
+pkill -f "./rose_worldserver" 2>/dev/null || true
 
 echo "=== Servers stopped ==="
