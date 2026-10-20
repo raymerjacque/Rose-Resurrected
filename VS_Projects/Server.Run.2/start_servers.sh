@@ -4,6 +4,11 @@ cd "${SCRIPT_DIR}"
 
 mkdir -p log plog
 
+# Ensure mysql socket exists
+if [ ! -e /tmp/mysql.sock ] && [ -e /run/mysqld/mysqld.sock ]; then
+    ln -sf /run/mysqld/mysqld.sock /tmp/mysql.sock
+fi
+
 echo "=== Starting RosE Resurrected Server Daemons ==="
 
 echo "Starting Login Server..."
@@ -21,7 +26,7 @@ echo "  Character Server PID: ${CHAR_PID}"
 sleep 2
 
 echo "Starting World Server..."
-nohup ./worldserver </dev/null > log/worldserver_stdout.log 2>&1 &
+nohup ./rose_worldserver </dev/null > log/worldserver_stdout.log 2>&1 &
 WORLD_PID=$!
 echo "  World Server PID: ${WORLD_PID}"
 
