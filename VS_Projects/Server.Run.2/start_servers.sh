@@ -30,6 +30,8 @@ setsid ./rose_worldserver </dev/null > log/worldserver_stdout.log 2>&1 &
 WORLD_PID=$!
 echo "  World Server PID: ${WORLD_PID}"
 
+sleep 2
+
 echo "${LOGIN_PID}" > .loginserver.pid
 echo "${CHAR_PID}" > .charserver.pid
 echo "${WORLD_PID}" > .worldserver.pid

@@ -83,6 +83,7 @@ CBotManager::CBotManager( )
     m_lastPruneCheck = clock( );
     m_lastBuffBotCheck = clock( );
     m_lastVendingBotCheck = clock( );
+    m_lastCompanionCheck = clock( );
 }
 
 CBotManager::~CBotManager( )
@@ -221,6 +222,9 @@ void CBotManager::Update( )
 
     // 6. Prune orphaned dynamic bots
     PruneOrphanedBots( );
+
+    // 7. Companion Party Check & Maintenance for Real Players
+    CheckPlayerCompanions( );
 }
 
 void CBotManager::CheckAmbientPopulation( )
@@ -851,7 +855,7 @@ void CBotManager::PruneOrphanedBots( )
     for ( size_t i = 0; i < m_bots.size( ); i++ )
     {
         CPlayerBot* botAi = m_bots[i];
-        if ( !botAi || !botAi->IsDynamic( ) || !botAi->GetPlayer( ) ) continue;
+        if ( !botAi || !botAi->IsDynamic( ) || !botAi->GetPlayer( ) || botAi->IsCompanion( ) ) continue;
 
         CPlayer* bot = botAi->GetPlayer( );
         if ( HasRealPlayerInParty( bot ) )
@@ -1280,8 +1284,15 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_lastClanRivalryTime( 0 ),
       m_lastBountyCheckTime( 0 ),
       m_lastRecruitmentShoutTime( 0 ),
-      m_lastCasualChatterTime( 0 )
+      m_lastCasualChatterTime( 0 ),
+      m_isCompanion( false ),
+      m_companionOwner( NULL ),
+      m_role( BOT_ROLE_GENERAL_VISITOR )
 {
+    if ( player && player->CharInfo )
+    {
+        m_role = DetermineRoleFromJob( player->CharInfo->Job );
+    }
     m_lastAiTick = clock( );
     m_stateTimer = clock( );
     m_stuckTimer = clock( );
@@ -1920,25 +1931,25 @@ void CPlayerBot::EquipTieredGear( bool broadcast )
         {
             bodyNum = 31; armNum = 31; footNum = 31;
             wepNum = ( lvl >= 8 ) ? 2 : 1; // Short Sword / Wooden Sword
-            shieldNum = 1; // Wooden Shield
+            shieldNum = ( job == 122 ) ? 0 : 1; // Wooden Shield (Knight/Soldier tank uses shield, Champion does not)
         }
         else if ( lvl < 40 )
         {
             bodyNum = 32; armNum = 32; footNum = 32;
             wepNum = ( lvl >= 32 ) ? 4 : 3; // Khukuri / Rapier
-            shieldNum = 3; // Round Shield
+            shieldNum = ( job == 122 ) ? 0 : 3; // Round Shield
         }
         else if ( lvl < 70 )
         {
             bodyNum = 34; armNum = 34; footNum = 34;
             wepNum = ( lvl >= 58 ) ? 6 : 5; // Bushido / Long Sword
-            shieldNum = 7; // Kite Shield
+            shieldNum = ( job == 122 ) ? 0 : 7; // Kite Shield
         }
         else
         {
             bodyNum = 37; armNum = 37; footNum = 37;
             wepNum = ( lvl >= 84 ) ? 8 : 7; // Elven Sword / Saber
-            shieldNum = 10; // Plate Shield
+            shieldNum = ( job == 122 ) ? 0 : 10; // Plate Shield
         }
     }
     else if ( job == 211 || job == 221 || job == 222 ) // Muse / Mage / Cleric
@@ -2021,7 +2032,27 @@ void CPlayerBot::EquipTieredGear( bool broadcast )
         bodyNum = 29;
         armNum = 21;
         footNum = 29;
-        wepNum = 1;
+        if ( m_role == BOT_ROLE_TANK )
+        {
+            wepNum = ( lvl >= 8 ) ? 2 : 1;
+            shieldNum = 1;
+        }
+        else if ( m_role == BOT_ROLE_HEALER || m_role == BOT_ROLE_DPS_MAGIC )
+        {
+            wepNum = 301; // Baobab Rod
+            shieldNum = 0;
+        }
+        else if ( m_role == BOT_ROLE_DPS_PHYS_RANGED )
+        {
+            wepNum = 201; // Toy Bow
+            shieldNum = 0;
+            ammoType = 1;
+        }
+        else
+        {
+            wepNum = ( lvl >= 8 ) ? 2 : 1;
+            shieldNum = 0;
+        }
     }
 
     int oldItems[6] = {
@@ -2127,12 +2158,12 @@ void CPlayerBot::UpdateSkills( )
         if ( lvl >= 35 ) skillsToLearn.push_back( 336 ); // Piercing Lunge
         if ( lvl >= 50 ) skillsToLearn.push_back( 351 ); // Voltage Crash
     }
-    else if ( job == 211 || job == 221 || job == 222 ) // Muse
+    else if ( job == 211 || job == 221 || job == 222 ) // Muse / Mage / Cleric
     {
         if ( lvl >= 10 ) { skillsToLearn.push_back( 851 ); skillsToLearn.push_back( 921 ); } // Mana Bolt, Cure
-        if ( lvl >= 20 ) { skillsToLearn.push_back( 821 ); skillsToLearn.push_back( 926 ); } // Ice Bolt, Hustle Charm
-        if ( lvl >= 35 ) { skillsToLearn.push_back( 861 ); skillsToLearn.push_back( 981 ); } // Mana Spear, Recovery
-        if ( lvl >= 50 ) { skillsToLearn.push_back( 871 ); skillsToLearn.push_back( 1031 ); } // Voltage Jolt, Party Heal
+        if ( lvl >= 20 ) { skillsToLearn.push_back( 821 ); skillsToLearn.push_back( 926 ); skillsToLearn.push_back( 930 ); } // Ice Bolt, Hustle Charm
+        if ( lvl >= 35 ) { skillsToLearn.push_back( 861 ); skillsToLearn.push_back( 981 ); skillsToLearn.push_back( 1270 ); } // Mana Spear, Recovery, Clobber Charm
+        if ( lvl >= 50 ) { skillsToLearn.push_back( 871 ); skillsToLearn.push_back( 1031 ); skillsToLearn.push_back( 1004 ); skillsToLearn.push_back( 1254 ); skillsToLearn.push_back( 1019 ); skillsToLearn.push_back( 1051 ); } // Voltage Jolt, Party Heal, Resilience, Battle, Precision, Resurrection
     }
     else if ( job == 311 || job == 321 || job == 322 ) // Hawker
     {
@@ -2147,6 +2178,27 @@ void CPlayerBot::UpdateSkills( )
         if ( lvl >= 25 ) skillsToLearn.push_back( 2061 ); // Sniping
         if ( lvl >= 40 ) skillsToLearn.push_back( 2301 ); // Triple Shot
         if ( lvl >= 55 ) skillsToLearn.push_back( 2076 ); // Demolition Expertise
+    }
+    else // Visitor (job 0)
+    {
+        if ( m_role == BOT_ROLE_TANK || m_role == BOT_ROLE_DPS_PHYS_MELEE )
+        {
+            skillsToLearn.push_back( 261 ); // Double Attack
+        }
+        else if ( m_role == BOT_ROLE_HEALER )
+        {
+            skillsToLearn.push_back( 921 ); // Cure
+            skillsToLearn.push_back( 930 ); // Hustle Charm
+        }
+        else if ( m_role == BOT_ROLE_DPS_MAGIC )
+        {
+            skillsToLearn.push_back( 851 ); // Mana Bolt
+            skillsToLearn.push_back( 821 ); // Ice Bolt
+        }
+        else if ( m_role == BOT_ROLE_DPS_PHYS_RANGED )
+        {
+            skillsToLearn.push_back( 1441 ); // Double Arrow
+        }
     }
 
     int skillLvl = 1 + ( lvl / 10 );
@@ -2177,33 +2229,51 @@ bool CPlayerBot::CastCombatSkill( CCharacter* target )
     int lvl = m_player->Stats->Level;
     UINT chosenSkill = 101; // Dual Scratch fallback
 
-    if ( job == 111 || job == 121 || job == 122 ) // Soldier
+    if ( m_role == BOT_ROLE_TANK || job == 111 || job == 121 ) // Tank (Soldier / Knight)
     {
         if ( lvl >= 50 && ( rand( ) % 3 == 0 ) ) chosenSkill = 351; // Voltage Crash
         else if ( lvl >= 35 && ( rand( ) % 2 == 0 ) ) chosenSkill = 336; // Piercing Lunge
         else if ( lvl >= 20 && ( rand( ) % 2 == 0 ) ) chosenSkill = 291; // Fatal Thrust
         else if ( lvl >= 10 ) chosenSkill = 261; // Double Attack
+        else chosenSkill = 101; // Dual Scratch
     }
-    else if ( job == 211 || job == 221 || job == 222 ) // Muse
+    else if ( m_role == BOT_ROLE_DPS_PHYS_MELEE || job == 122 || job == 321 || job == 422 ) // Melee DPS (Champion / Raider / Artisan)
+    {
+        if ( lvl >= 50 && ( rand( ) % 3 == 0 ) ) chosenSkill = 351; // Voltage Crash
+        else if ( lvl >= 20 && ( rand( ) % 2 == 0 ) ) chosenSkill = 291; // Fatal Thrust
+        else if ( lvl >= 10 ) chosenSkill = 261; // Double Attack
+        else chosenSkill = 101; // Dual Scratch
+    }
+    else if ( m_role == BOT_ROLE_HEALER || job == 222 ) // Healer (Cleric)
+    {
+        if ( lvl >= 35 && ( rand( ) % 2 == 0 ) ) chosenSkill = 861; // Mana Spear
+        else if ( lvl >= 20 && ( rand( ) % 2 == 0 ) ) chosenSkill = 821; // Ice Bolt
+        else if ( lvl >= 10 ) chosenSkill = 851; // Mana Bolt
+        else chosenSkill = 101;
+    }
+    else if ( m_role == BOT_ROLE_DPS_MAGIC || job == 211 || job == 221 ) // Magic DPS (Mage)
     {
         if ( lvl >= 50 && ( rand( ) % 3 == 0 ) ) chosenSkill = 871; // Voltage Jolt
         else if ( lvl >= 35 && ( rand( ) % 2 == 0 ) ) chosenSkill = 861; // Mana Spear
         else if ( lvl >= 20 && ( rand( ) % 2 == 0 ) ) chosenSkill = 821; // Ice Bolt
         else if ( lvl >= 10 ) chosenSkill = 851; // Mana Bolt
+        else chosenSkill = 101;
     }
-    else if ( job == 311 || job == 321 || job == 322 ) // Hawker
+    else if ( m_role == BOT_ROLE_DPS_PHYS_RANGED || job == 311 || job == 322 ) // Hawker / Scout
     {
         if ( lvl >= 50 && ( rand( ) % 3 == 0 ) ) chosenSkill = 1501; // Stun Arrow
         else if ( lvl >= 35 && ( rand( ) % 2 == 0 ) ) chosenSkill = 1486; // Triple Arrow
         else if ( lvl >= 20 && ( rand( ) % 2 == 0 ) ) chosenSkill = 1431; // Clamp Arrow
         else if ( lvl >= 10 ) chosenSkill = 1441; // Double Arrow
+        else chosenSkill = 101;
     }
-    else if ( job == 411 || job == 421 || job == 422 ) // Dealer
+    else if ( job == 411 || job == 421 ) // Dealer / Bourgeois
     {
         if ( lvl >= 55 && ( rand( ) % 3 == 0 ) ) chosenSkill = 2076; // Demolition Expertise
         else if ( lvl >= 40 && ( rand( ) % 2 == 0 ) ) chosenSkill = 2301; // Triple Shot
         else if ( lvl >= 25 && ( rand( ) % 2 == 0 ) ) chosenSkill = 2061; // Sniping
         else if ( lvl >= 10 ) chosenSkill = 2036; // Twin Shot
+        else chosenSkill = 101;
     }
 
     int skillLvl = 1 + ( lvl / 10 );
@@ -2226,18 +2296,63 @@ bool CPlayerBot::CastCombatSkill( CCharacter* target )
 
 bool CPlayerBot::CheckPartyHeal( )
 {
-    if ( !m_player || !m_player->Status->CanCastSkill || m_player->Stats->MP < 30 ) return false;
+    if ( !m_player || !m_player->Status->CanCastSkill || m_player->Stats->MP < 20 ) return false;
     int job = m_player->CharInfo->Job;
-    if ( job != 211 && job != 221 && job != 222 ) return false;
+    if ( m_role != BOT_ROLE_HEALER && job != 211 && job != 221 && job != 222 ) return false;
 
     clock_t now = clock( );
-    if ( ( now - m_lastSkillCastTime ) < (clock_t)( 4.0f * CLOCKS_PER_SEC ) ) return false;
+    if ( ( now - m_lastSkillCastTime ) < (clock_t)( 2.5f * CLOCKS_PER_SEC ) ) return false;
 
     UINT healSkill = ( m_player->Stats->Level >= 35 ) ? 981 : 921; // Recovery or Cure
     CSkills* sk = GServer->GetSkillByID( healSkill );
-    if ( !sk ) return false;
+    if ( !sk )
+    {
+        healSkill = 921;
+        sk = GServer->GetSkillByID( healSkill );
+        if ( !sk ) return false;
+    }
 
-    // 1. Check self
+    // 1. Check Party Leader (Real Player) - Highest Priority!
+    CPlayer* leader = GetPartyLeader( );
+    if ( leader && !leader->IsDead( ) && leader->Position && leader->Position->Map == m_player->Position->Map )
+    {
+        if ( leader->Stats->HP < ( leader->Stats->MaxHP * 75 / 100 ) &&
+             GServer->distance( m_player->Position->current, leader->Position->current ) <= 25.0f )
+        {
+            m_player->StartAction( leader, SKILL_BUFF, healSkill );
+            m_lastSkillCastTime = now;
+            char healMsg[64];
+            snprintf( healMsg, sizeof(healMsg), "Healing leader %s!", leader->CharInfo->charname );
+            Say( healMsg );
+            return true;
+        }
+    }
+
+    // 2. Check Party Tank
+    if ( m_player->Party && m_player->Party->party != NULL )
+    {
+        CParty* party = m_player->Party->party;
+        for ( UINT i = 0; i < party->Members.size( ); i++ )
+        {
+            CPlayer* member = party->Members[i];
+            if ( !member || member->IsDead( ) || member->Position->Map != m_player->Position->Map ) continue;
+            if ( member->CharInfo->Job == 121 || member->CharInfo->Job == 111 ) // Tank
+            {
+                if ( member->Stats->HP < ( member->Stats->MaxHP * 65 / 100 ) &&
+                     GServer->distance( m_player->Position->current, member->Position->current ) <= 25.0f )
+                {
+                    m_player->StartAction( member, SKILL_BUFF, healSkill );
+                    m_lastSkillCastTime = now;
+                    char healMsg[64];
+                    snprintf( healMsg, sizeof(healMsg), "Healing tank %s!", member->CharInfo->charname );
+                    Say( healMsg );
+                    return true;
+                }
+            }
+        }
+    }
+
+    // 3. Check Self
     if ( m_player->Stats->HP < ( m_player->Stats->MaxHP * 60 / 100 ) )
     {
         m_player->StartAction( m_player, SKILL_BUFF, healSkill );
@@ -2246,17 +2361,17 @@ bool CPlayerBot::CheckPartyHeal( )
         return true;
     }
 
-    // 2. Check party members
-    if ( m_player->Party->party != NULL )
+    // 4. Check other party members
+    if ( m_player->Party && m_player->Party->party != NULL )
     {
         CParty* party = m_player->Party->party;
         for ( UINT i = 0; i < party->Members.size( ); i++ )
         {
             CPlayer* member = party->Members[i];
-            if ( member && !member->IsDead( ) && member->Position->Map == m_player->Position->Map )
+            if ( member && !member->IsDead( ) && member != leader && member->Position->Map == m_player->Position->Map )
             {
                 if ( member->Stats->HP < ( member->Stats->MaxHP * 65 / 100 ) &&
-                     GServer->distance( m_player->Position->current, member->Position->current ) <= 20.0f )
+                     GServer->distance( m_player->Position->current, member->Position->current ) <= 22.0f )
                 {
                     m_player->StartAction( member, SKILL_BUFF, healSkill );
                     m_lastSkillCastTime = now;
@@ -2275,22 +2390,35 @@ bool CPlayerBot::CheckPartyHeal( )
 bool CPlayerBot::CheckPartyBuffs( )
 {
     if ( !m_player || !m_player->Party || !m_player->Party->party ) return false;
-    if ( !m_player->Status->CanCastSkill || m_player->Stats->MP < 30 ) return false;
+    if ( !m_player->Status->CanCastSkill || m_player->Stats->MP < 20 ) return false;
 
     int job = m_player->CharInfo->Job;
-    if ( job != 211 && job != 221 && job != 222 ) return false; // Muse / Mage / Cleric only
+    if ( m_role != BOT_ROLE_HEALER && job != 211 && job != 221 && job != 222 ) return false; // Healer / Muse / Mage / Cleric only
 
     clock_t now = clock( );
-    if ( ( now - m_lastPartyBuffTime ) < (clock_t)( 3.5f * CLOCKS_PER_SEC ) ) return false;
+    if ( ( now - m_lastPartyBuffTime ) < (clock_t)( 2.5f * CLOCKS_PER_SEC ) ) return false;
 
     CParty* party = m_player->Party->party;
     CPlayer* targetToBuff = NULL;
     UINT skillToCast = 0;
     const char* buffName = NULL;
 
+    // Prioritize leader first, then rest of the party
+    CPlayer* leader = GetPartyLeader( );
+    std::vector<CPlayer*> targetsToCheck;
+    if ( leader && !leader->IsDead( ) && leader->Position && leader->Position->Map == m_player->Position->Map )
+    {
+        targetsToCheck.push_back( leader );
+    }
     for ( UINT i = 0; i < party->Members.size( ); i++ )
     {
-        CPlayer* member = party->Members[i];
+        CPlayer* m = party->Members[i];
+        if ( m && m != leader ) targetsToCheck.push_back( m );
+    }
+
+    for ( size_t i = 0; i < targetsToCheck.size( ); i++ )
+    {
+        CPlayer* member = targetsToCheck[i];
         if ( !member || member->IsDead( ) || member->Position->Map != m_player->Position->Map ) continue;
         if ( GServer->distance( m_player->Position->current, member->Position->current ) > 22.0f ) continue;
 
@@ -2535,41 +2663,65 @@ bool CPlayerBot::CheckPartyTaunt( )
 {
     if ( !m_player || !m_player->Party || !m_player->Party->party ) return false;
     int job = m_player->CharInfo->Job;
-    if ( job != 111 && job != 121 && job != 122 ) return false; // Soldier / Knight / Champion only
+    if ( m_role != BOT_ROLE_TANK && job != 111 && job != 121 && job != 122 ) return false; // Tank / Soldier / Knight only
 
     clock_t now = clock( );
-    if ( ( now - m_lastTauntTime ) < (clock_t)( 4.0f * CLOCKS_PER_SEC ) ) return false;
+    if ( ( now - m_lastTauntTime ) < (clock_t)( 3.0f * CLOCKS_PER_SEC ) ) return false;
 
     CMap* map = GetMap( );
     if ( !map ) return false;
 
     CParty* party = m_player->Party->party;
+    CPlayer* leader = GetPartyLeader( );
+
     for ( UINT i = 0; i < map->MonsterList.size( ); i++ )
     {
         CMonster* mob = map->MonsterList[i];
         if ( !mob || mob->IsDead( ) || mob->Stats->HP <= 0 || mob->IsBonfire( ) ) continue;
         if ( !mob->Battle || mob->Battle->target == 0 || mob->Battle->target == m_player->clientid ) continue;
 
-        // Check if mob is targeting a party member
+        // 1. Highest Priority: Peel mobs attacking the real player / party leader!
+        if ( leader && mob->Battle->target == leader->clientid )
+        {
+            float dist = GServer->distance( m_player->Position->current, mob->Position->current );
+            if ( dist <= 25.0f )
+            {
+                m_lastTauntTime = now;
+                AttackTarget( mob );
+                SetState( BOT_STATE_COMBAT );
+
+                if ( m_player->Stats->Level >= 10 && m_player->Stats->MP >= 15 )
+                {
+                    m_player->StartAction( mob, SKILL_ATTACK, ( m_player->Stats->Level >= 35 ) ? 336 : 261 );
+                }
+
+                char tauntMsg[64];
+                snprintf( tauntMsg, sizeof(tauntMsg), "Leave %s alone! Over here, beast!", leader->CharInfo->charname );
+                Say( tauntMsg );
+                return true;
+            }
+        }
+
+        // 2. Second Priority: Peel mobs attacking healers or other squishy party members
         for ( UINT p = 0; p < party->Members.size( ); p++ )
         {
             CPlayer* member = party->Members[p];
-            if ( member && member != m_player && member->clientid == mob->Battle->target )
+            if ( member && member != m_player && member != leader && member->clientid == mob->Battle->target )
             {
                 float dist = GServer->distance( m_player->Position->current, mob->Position->current );
-                if ( dist <= 20.0f )
+                if ( dist <= 22.0f )
                 {
                     m_lastTauntTime = now;
                     AttackTarget( mob );
                     SetState( BOT_STATE_COMBAT );
 
-                    if ( m_player->Stats->Level >= 20 && m_player->Stats->MP >= 20 )
+                    if ( m_player->Stats->Level >= 10 && m_player->Stats->MP >= 15 )
                     {
-                        m_player->StartAction( mob, SKILL_ATTACK, 261 );
+                        m_player->StartAction( mob, SKILL_ATTACK, ( m_player->Stats->Level >= 35 ) ? 336 : 261 );
                     }
 
                     char tauntMsg[64];
-                    snprintf( tauntMsg, sizeof(tauntMsg), "Back off! Focus on me, monster!" );
+                    snprintf( tauntMsg, sizeof(tauntMsg), "Back off %s!", member->CharInfo->charname );
                     Say( tauntMsg );
                     return true;
                 }
@@ -2639,16 +2791,50 @@ fPoint CPlayerBot::GetFormationOffset( int slotIndex, fPoint leaderCurrent, fPoi
     }
 
     float relAngle = 3.14159265f;
-    float dist = 3.2f;
+    float dist = 3.5f;
 
-    switch ( slotIndex % 6 )
+    // Role-based tactical positioning
+    switch ( m_role )
     {
-        case 0: relAngle = 3.14159265f + 0.65f; dist = 3.0f; break; // Behind-Right
-        case 1: relAngle = 3.14159265f - 0.65f; dist = 3.0f; break; // Behind-Left
-        case 2: relAngle = 3.14159265f;         dist = 4.5f; break; // Behind-Center
-        case 3: relAngle = 1.5707963f;          dist = 2.8f; break; // Right-Flank
-        case 4: relAngle = -1.5707963f;         dist = 2.8f; break; // Left-Flank
-        default: relAngle = 3.14159265f + 0.35f; dist = 3.5f; break;
+        case BOT_ROLE_TANK:
+            relAngle = 0.40f;   // Front-Right Vanguard
+            dist = 3.6f;
+            break;
+        case BOT_ROLE_DPS_PHYS_MELEE:
+            relAngle = -0.40f;  // Front-Left Flanker
+            dist = 3.6f;
+            break;
+        case BOT_ROLE_DPS_PHYS_RANGED:
+            relAngle = 3.14159265f - 0.75f; // Rear-Right Wing
+            dist = 4.8f;
+            break;
+        case BOT_ROLE_DPS_MAGIC:
+            relAngle = 3.14159265f + 0.75f; // Rear-Left Wing
+            dist = 4.8f;
+            break;
+        case BOT_ROLE_HEALER:
+            relAngle = 3.14159265f; // Rear-Center Safe Distance
+            dist = 5.2f;
+            break;
+        default:
+            switch ( slotIndex % 5 )
+            {
+                case 0: relAngle = 0.50f; dist = 3.5f; break;
+                case 1: relAngle = 3.14159265f; dist = 5.0f; break;
+                case 2: relAngle = 3.14159265f - 0.8f; dist = 4.5f; break;
+                case 3: relAngle = 3.14159265f + 0.8f; dist = 4.5f; break;
+                default: relAngle = -0.50f; dist = 3.5f; break;
+            }
+            break;
+    }
+
+    // Subtle individual breathing offset per bot (prevents robotic identical trajectories)
+    if ( m_player )
+    {
+        float jitterA = ( ( (int)( m_player->clientid * 37 ) % 20 ) - 10 ) * 0.015f;
+        float jitterD = ( ( (int)( m_player->clientid * 53 ) % 20 ) - 10 ) * 0.025f;
+        relAngle += jitterA;
+        dist += jitterD;
     }
 
     float finalAngle = baseAngle + relAngle;
@@ -2968,38 +3154,41 @@ void CPlayerBot::Update( )
     // Check progression, stat points, and tiered equipment
     CheckProgression( );
 
-    // Autonomous party invitations and zone migration ONLY when NOT in a player party
-    if ( !m_player->Party || !m_player->Party->party )
+    // Autonomous activities ONLY when NOT in a player party or companion mode
+    if ( ( !m_player->Party || !m_player->Party->party ) && !m_isCompanion )
     {
         // Phase 2: Autonomous party invitations check
         CheckPartyInvitations( );
 
         // Phase 3: Zone migration check
         CheckZoneMigration( );
+
+        // Phase 4 Realism: LFG Shouts & World Boss Raids & Clan Recruitment Shouts
+        CheckLfgShouts( );
+        CheckWorldBossRaids( );
+        CheckClanRecruitmentShout( );
+
+        // Akram Arena PvP Battleground Participation
+        CheckArenaQueue( );
+
+        // Dungeon Crawling & Raids
+        CheckDungeonRuns( );
     }
 
     // Player Greetings: Wave and greet nearby real players
     CheckPlayerGreetings( );
 
     // Autonomous Player Shop Browsing & Economy Purchases
-    CheckPlayerShops( );
+    if ( !m_isCompanion )
+    {
+        CheckPlayerShops( );
+    }
 
     // Private Message Whispers & Social Interaction
     CheckWhispers( );
 
-    // Akram Arena PvP Battleground Participation
-    CheckArenaQueue( );
-
-    // Dungeon Crawling & Raids
-    CheckDungeonRuns( );
-
-    // Phase 4 Realism: LFG Shouts & World Boss Raids & Clan Recruitment Shouts
-    CheckLfgShouts( );
-    CheckWorldBossRaids( );
-    CheckClanRecruitmentShout( );
-
     // Proximity buffing: buff nearby unbuffed stationary real players (without chasing/moving toward them)
-    if ( CheckProximityBuffs( ) ) return;
+    if ( !m_isCompanion && CheckProximityBuffs( ) ) return;
 
     // Party Lock-On & State Enforcement: If bot is in a party, lock onto party leader and follow!
     if ( m_player->Party && m_player->Party->party )
@@ -3011,7 +3200,8 @@ void CPlayerBot::Update( )
             float distToLeader = ( m_player->Position->Map == leader->Position->Map ) ?
                 GServer->distance( m_player->Position->current, leader->Position->current ) : 9999.0f;
 
-            if ( distToLeader > 25.0f || m_state == BOT_STATE_IDLE || m_state == BOT_STATE_ROAM || m_state == BOT_STATE_TOWN_STROLL || m_state == BOT_STATE_SEEK_BUFF || m_state == BOT_STATE_REST )
+            // Instant Tether Check: If leader is in another zone/map or ran far away, break all actions and follow!
+            if ( distToLeader > 28.0f || m_state == BOT_STATE_IDLE || m_state == BOT_STATE_ROAM || m_state == BOT_STATE_TOWN_STROLL || m_state == BOT_STATE_SEEK_BUFF || m_state == BOT_STATE_REST )
             {
                 if ( m_state == BOT_STATE_COMBAT || m_state == BOT_STATE_LOOT || m_state == BOT_STATE_REST )
                 {
@@ -3194,10 +3384,25 @@ void CPlayerBot::HandleCombat( )
         return;
     }
 
+    // 0. Tether Check: If party leader moved far away or changed maps, drop combat and rejoin leader immediately!
+    if ( m_followTarget != NULL && m_followTarget->Position != NULL )
+    {
+        float distToLeader = ( m_player->Position->Map == m_followTarget->Position->Map ) ?
+            GServer->distance( m_player->Position->current, m_followTarget->Position->current ) : 9999.0f;
+        if ( distToLeader > 32.0f )
+        {
+            ClearBattle( m_player->Battle );
+            m_targetMobCid = 0;
+            SetState( BOT_STATE_FOLLOW );
+            return;
+        }
+    }
+
     // Check party support during combat
     CheckPartyHeal( );
     CheckPartyResurrect( );
     CheckPartyBuffs( );
+    CheckPartyTaunt( );
 
     CMonster* mob = map->GetMonsterInMap( m_targetMobCid );
     if ( !mob || mob->IsDead( ) || mob->Stats->HP <= 0 || mob->IsBonfire( ) )
@@ -3285,6 +3490,18 @@ void CPlayerBot::HandleLoot( )
         return;
     }
 
+    if ( m_followTarget != NULL && m_followTarget->Position != NULL )
+    {
+        float distToLeader = ( m_player->Position->Map == m_followTarget->Position->Map ) ?
+            GServer->distance( m_player->Position->current, m_followTarget->Position->current ) : 9999.0f;
+        if ( distToLeader > 28.0f )
+        {
+            m_targetDropCid = 0;
+            SetState( BOT_STATE_FOLLOW );
+            return;
+        }
+    }
+
     CDrop* drop = map->GetDropInMap( m_targetDropCid );
     if ( !drop )
     {
@@ -3340,6 +3557,18 @@ void CPlayerBot::HandleRest( )
 {
     if ( !m_player ) return;
 
+    if ( m_followTarget != NULL && m_followTarget->Position != NULL )
+    {
+        float distToLeader = ( m_player->Position->Map == m_followTarget->Position->Map ) ?
+            GServer->distance( m_player->Position->current, m_followTarget->Position->current ) : 9999.0f;
+        if ( distToLeader > 25.0f )
+        {
+            StandUp( );
+            SetState( BOT_STATE_FOLLOW );
+            return;
+        }
+    }
+
     if ( m_player->Stats->HP >= ( m_player->Stats->MaxHP * 95 / 100 ) &&
          m_player->Stats->MP >= ( m_player->Stats->MaxMP * 95 / 100 ) )
     {
@@ -3373,6 +3602,12 @@ void CPlayerBot::HandleFollow( )
         return;
     }
     m_followTarget = leader;
+
+    // Auto Level Sync: Keep companion bot level matched with party leader
+    if ( m_followTarget && m_followTarget->Stats && m_player->Stats->Level != m_followTarget->Stats->Level )
+    {
+        SyncLevelToLeader( m_followTarget->Stats->Level );
+    }
 
     // 1. Teleport follow: If party leader changed maps or moved far away (> 25m), follow leader instantly
     if ( m_player->Position->Map != m_followTarget->Position->Map ||
@@ -3461,13 +3696,34 @@ void CPlayerBot::HandleFollow( )
     int slot = GetPartySlotIndex( );
     fPoint destPos = GetFormationOffset( slot, m_followTarget->Position->current, m_followTarget->Position->destiny );
 
+    // Flocking Separation: Prevent bots from stacking/bunching on top of each other or the leader
+    if ( m_player->Party && m_player->Party->party )
+    {
+        CParty* party = m_player->Party->party;
+        for ( size_t m = 0; m < party->Members.size( ); m++ )
+        {
+            CPlayer* otherMem = party->Members[m];
+            if ( otherMem && otherMem != m_player && otherMem->Position && otherMem->Position->Map == m_player->Position->Map )
+            {
+                float sepDist = GServer->distance( destPos, otherMem->Position->current );
+                if ( sepDist < 1.8f && sepDist > 0.05f )
+                {
+                    float pushX = ( destPos.x - otherMem->Position->current.x ) / sepDist;
+                    float pushY = ( destPos.y - otherMem->Position->current.y ) / sepDist;
+                    destPos.x += pushX * ( 1.8f - sepDist );
+                    destPos.y += pushY * ( 1.8f - sepDist );
+                }
+            }
+        }
+    }
+
     float dist = GServer->distance( m_player->Position->current, destPos );
-    if ( dist > 40.0f )
+    if ( dist > 35.0f )
     {
         // Leader moved far away or teleported: snap to leader's side
         map->TeleportPlayer( m_player, destPos, false );
     }
-    else if ( dist > 2.5f )
+    else if ( dist > 2.2f )
     {
         MoveTo( destPos );
     }
@@ -4925,5 +5181,498 @@ void CPlayerBot::HandleSiegeUnit( )
     if ( target )
     {
         AttackTarget( target );
+    }
+}
+
+// -------------------------------------------------------------
+// Auto Companion Party System Implementation
+// -------------------------------------------------------------
+
+BotRole CPlayerBot::DetermineRoleFromJob( int job )
+{
+    if ( job == 121 ) return BOT_ROLE_TANK; // Knight
+    if ( job == 111 ) return BOT_ROLE_TANK; // Soldier
+    if ( job == 122 ) return BOT_ROLE_DPS_PHYS_MELEE; // Champion
+    if ( job == 222 ) return BOT_ROLE_HEALER; // Cleric
+    if ( job == 211 ) return BOT_ROLE_HEALER; // Muse
+    if ( job == 221 ) return BOT_ROLE_DPS_MAGIC; // Mage
+    if ( job == 322 || job == 311 ) return BOT_ROLE_DPS_PHYS_RANGED; // Scout / Hawker
+    if ( job == 321 ) return BOT_ROLE_DPS_PHYS_MELEE; // Raider
+    if ( job == 421 || job == 411 ) return BOT_ROLE_DPS_PHYS_RANGED; // Bourgeois / Dealer
+    if ( job == 422 ) return BOT_ROLE_DPS_PHYS_MELEE; // Artisan
+    return BOT_ROLE_GENERAL_VISITOR;
+}
+
+void CPlayerBot::SyncLevelToLeader( int targetLevel )
+{
+    if ( !m_player || !m_player->Stats ) return;
+    if ( targetLevel < 1 ) targetLevel = 1;
+    if ( targetLevel > GServer->Config.MaxLevel ) targetLevel = GServer->Config.MaxLevel;
+
+    int oldLevel = m_player->Stats->Level;
+    if ( oldLevel == targetLevel && m_lastKnownLevel == targetLevel ) return;
+
+    m_player->Stats->Level = targetLevel;
+    m_lastKnownLevel = targetLevel;
+
+    // Reset base attributes
+    m_player->Attr->Str = 15;
+    m_player->Attr->Dex = 15;
+    m_player->Attr->Int = 15;
+    m_player->Attr->Con = 15;
+    m_player->Attr->Cha = 10;
+    m_player->Attr->Sen = 10;
+
+    int job = m_player->CharInfo->Job;
+    for ( int lvl = 1; lvl < targetLevel; lvl++ )
+    {
+        if ( job == 111 || job == 121 || job == 122 ) // Soldier / Knight / Champion
+        {
+            m_player->Attr->Str += 3;
+            m_player->Attr->Con += 2;
+        }
+        else if ( job == 211 || job == 221 || job == 222 ) // Muse / Mage / Cleric
+        {
+            m_player->Attr->Int += 3;
+            m_player->Attr->Con += 1;
+            m_player->Attr->Sen += 1;
+        }
+        else if ( job == 311 || job == 321 || job == 322 ) // Hawker / Raider / Scout
+        {
+            m_player->Attr->Dex += 3;
+            m_player->Attr->Sen += 1;
+            m_player->Attr->Str += 1;
+        }
+        else if ( job == 411 || job == 421 || job == 422 ) // Dealer / Bourgeois / Artisan
+        {
+            m_player->Attr->Con += 2;
+            m_player->Attr->Sen += 2;
+            m_player->Attr->Str += 1;
+        }
+        else // Visitor (Novice)
+        {
+            if ( m_role == BOT_ROLE_TANK )
+            {
+                m_player->Attr->Str += 3;
+                m_player->Attr->Con += 2;
+            }
+            else if ( m_role == BOT_ROLE_HEALER || m_role == BOT_ROLE_DPS_MAGIC )
+            {
+                m_player->Attr->Int += 3;
+                m_player->Attr->Con += 1;
+                m_player->Attr->Sen += 1;
+            }
+            else if ( m_role == BOT_ROLE_DPS_PHYS_RANGED )
+            {
+                m_player->Attr->Dex += 3;
+                m_player->Attr->Sen += 2;
+            }
+            else
+            {
+                m_player->Attr->Str += 2;
+                m_player->Attr->Dex += 2;
+                m_player->Attr->Con += 1;
+            }
+        }
+    }
+
+    // Re-equip gear and re-train skills to target level
+    EquipTieredGear( true );
+    UpdateSkills( );
+
+    m_player->SetStats( );
+    m_player->Stats->HP = m_player->Stats->MaxHP;
+    m_player->Stats->MP = m_player->Stats->MaxMP;
+
+    // Broadcast level up visual effect if leveling up
+    if ( targetLevel > oldLevel )
+    {
+        BEGINPACKET( pak, 0x79e );
+        ADDWORD( pak, m_player->clientid );
+        ADDWORD( pak, m_player->Stats->Level );
+        ADDDWORD( pak, 0 );
+        ADDWORD( pak, 0 );
+        ADDWORD( pak, 0 );
+        GServer->SendToVisible( &pak, m_player );
+
+        CelebrateLevelUp( );
+    }
+
+    // Refresh party HUD
+    if ( m_player->Party && m_player->Party->party )
+    {
+        CBotManager::GetInstance()->SendPartyFullUpdate( m_player->Party->party );
+    }
+}
+
+void CPlayerBot::AdjustSpecToRole( BotRole role, int level )
+{
+    if ( !m_player ) return;
+    m_role = role;
+
+    int newJob = 0;
+    if ( level < 10 )
+    {
+        newJob = 0; // Visitor with role specialization
+    }
+    else
+    {
+        switch ( role )
+        {
+            case BOT_ROLE_TANK:
+                newJob = ( level >= 70 ) ? 121 : 111; // Knight or Soldier
+                break;
+            case BOT_ROLE_HEALER:
+                newJob = ( level >= 70 ) ? 222 : 211; // Cleric or Muse
+                break;
+            case BOT_ROLE_DPS_MAGIC:
+                newJob = ( level >= 70 ) ? 221 : 211; // Mage or Muse
+                break;
+            case BOT_ROLE_DPS_PHYS_RANGED:
+                newJob = ( level >= 70 ) ? 322 : 311; // Scout or Hawker
+                break;
+            case BOT_ROLE_DPS_PHYS_MELEE:
+                newJob = ( level >= 70 ) ? 122 : 111; // Champion or Soldier
+                break;
+            default:
+                newJob = 0;
+                break;
+        }
+    }
+
+    m_player->CharInfo->Job = newJob;
+    SyncLevelToLeader( level );
+}
+
+BotRole CBotManager::GetPlayerRole( CPlayer* player )
+{
+    if ( !player || !player->CharInfo ) return BOT_ROLE_GENERAL_VISITOR;
+    int job = player->CharInfo->Job;
+
+    if ( job == 121 ) return BOT_ROLE_TANK; // Knight
+    if ( job == 111 ) // Soldier
+    {
+        // If holding a shield, treat as Tank
+        if ( player->items[8].itemtype == SUBWEAPON && player->items[8].itemnum > 0 )
+        {
+            return BOT_ROLE_TANK;
+        }
+        return BOT_ROLE_DPS_PHYS_MELEE;
+    }
+    if ( job == 122 ) return BOT_ROLE_DPS_PHYS_MELEE; // Champion
+    if ( job == 222 ) return BOT_ROLE_HEALER; // Cleric
+    if ( job == 211 ) return BOT_ROLE_HEALER; // Muse
+    if ( job == 221 ) return BOT_ROLE_DPS_MAGIC; // Mage
+    if ( job == 322 || job == 311 ) return BOT_ROLE_DPS_PHYS_RANGED; // Scout / Hawker
+    if ( job == 321 ) return BOT_ROLE_DPS_PHYS_MELEE; // Raider
+    if ( job == 421 || job == 411 ) return BOT_ROLE_DPS_PHYS_RANGED; // Bourgeois / Dealer
+    if ( job == 422 ) return BOT_ROLE_DPS_PHYS_MELEE; // Artisan
+    return BOT_ROLE_GENERAL_VISITOR;
+}
+
+void CBotManager::SendPartyFullUpdate( CParty* party )
+{
+    if ( !party ) return;
+
+    for ( size_t i = 0; i < party->Members.size( ); i++ )
+    {
+        CPlayer* member = party->Members[i];
+        if ( member && !member->is_bot && member->client )
+        {
+            BEGINPACKET( pak, 0x7d4 );
+            ADDBYTE    ( pak, party->PartyLevel );
+            ADDDWORD   ( pak, party->Exp );
+            member->client->SendPacket( &pak );
+
+            RESETPACKET( pak, 0x7d2 );
+            ADDBYTE    ( pak, party->Option );
+            ADDBYTE    ( pak, (BYTE)party->Members.size( ) );
+            for ( size_t m = 0; m < party->Members.size( ); m++ )
+            {
+                CPlayer* pm = party->Members[m];
+                if ( !pm || !pm->CharInfo || !pm->Stats ) continue;
+                ADDDWORD   ( pak, pm->CharInfo->charid );
+                ADDWORD    ( pak, pm->clientid );
+                ADDWORD    ( pak, (WORD)pm->Stats->MaxHP );
+                ADDWORD    ( pak, (WORD)pm->Stats->HP );
+                ADDDWORD   ( pak, GServer->BuildBuffs( pm ) );
+                ADDDWORD   ( pak, 0x1f40008c );
+                ADDWORD    ( pak, 0x1388 );
+                ADDSTRING  ( pak, pm->CharInfo->charname );
+                ADDBYTE    ( pak, 0x00 );
+            }
+            member->client->SendPacket( &pak );
+        }
+    }
+}
+
+CPlayer* CBotManager::SpawnCompanionBot( const char* name, BotRole role, int level, int mapId, fPoint pos, CPlayer* leader )
+{
+    int job = 0;
+    if ( level < 10 )
+    {
+        job = 0; // Visitor
+    }
+    else
+    {
+        switch ( role )
+        {
+            case BOT_ROLE_TANK:
+                job = ( level >= 70 ) ? 121 : 111;
+                break;
+            case BOT_ROLE_HEALER:
+                job = ( level >= 70 ) ? 222 : 211;
+                break;
+            case BOT_ROLE_DPS_MAGIC:
+                job = ( level >= 70 ) ? 221 : 211;
+                break;
+            case BOT_ROLE_DPS_PHYS_RANGED:
+                job = ( level >= 70 ) ? 322 : 311;
+                break;
+            case BOT_ROLE_DPS_PHYS_MELEE:
+                job = ( level >= 70 ) ? 122 : 111;
+                break;
+            default:
+                job = 0;
+                break;
+        }
+    }
+
+    CPlayer* bot = SpawnBot( name, job, level, mapId, pos, false );
+    if ( bot && bot->bot_ai )
+    {
+        CPlayerBot* botAi = reinterpret_cast<CPlayerBot*>( bot->bot_ai );
+        botAi->SetCompanion( true, leader );
+        botAi->SetRole( role );
+        botAi->SetFollowTarget( leader );
+        botAi->SetState( BOT_STATE_FOLLOW );
+        botAi->SyncLevelToLeader( level );
+    }
+    return bot;
+}
+
+void CBotManager::EnsurePlayerCompanionParty( CPlayer* realPlayer )
+{
+    if ( !realPlayer || realPlayer->is_bot || !realPlayer->Session || !realPlayer->Session->inGame ) return;
+
+    // 1. Ensure realPlayer has an active party
+    CParty* party = realPlayer->Party->party;
+    if ( party == NULL )
+    {
+        party = new CParty;
+        party->AddPlayer( realPlayer );
+        GServer->AddParty( party );
+        realPlayer->Party->IsMaster = true;
+    }
+
+    // Party capacity check (Target: 4 members total = 1 player + 3 companion bots)
+    party->RefreshMax( );
+    size_t targetMembers = ( party->Capacity > 4 ) ? 4 : party->Capacity;
+    if ( targetMembers < 4 ) targetMembers = 4;
+
+    // Count existing members
+    size_t currentMembers = party->Members.size( );
+    if ( currentMembers >= targetMembers )
+    {
+        // Party already full: ensure all companion bots are level-synced with the player
+        for ( size_t m = 0; m < party->Members.size( ); m++ )
+        {
+            CPlayer* mem = party->Members[m];
+            if ( mem && mem->is_bot && mem->bot_ai )
+            {
+                CPlayerBot* botAi = reinterpret_cast<CPlayerBot*>( mem->bot_ai );
+                botAi->SetCompanion( true, realPlayer );
+                if ( mem->Stats->Level != realPlayer->Stats->Level )
+                {
+                    botAi->SyncLevelToLeader( realPlayer->Stats->Level );
+                }
+            }
+        }
+        SendPartyFullUpdate( party );
+        return;
+    }
+
+    // Identify roles currently filled in the party
+    bool hasTank = false;
+    bool hasHealer = false;
+    int dpsCount = 0;
+
+    for ( size_t m = 0; m < party->Members.size( ); m++ )
+    {
+        CPlayer* member = party->Members[m];
+        if ( !member ) continue;
+        BotRole r = GetPlayerRole( member );
+        if ( r == BOT_ROLE_TANK ) hasTank = true;
+        else if ( r == BOT_ROLE_HEALER ) hasHealer = true;
+        else if ( r == BOT_ROLE_DPS_PHYS_MELEE || r == BOT_ROLE_DPS_PHYS_RANGED || r == BOT_ROLE_DPS_MAGIC ) dpsCount++;
+    }
+
+    BotRole playerRole = GetPlayerRole( realPlayer );
+    int playerLevel = realPlayer->Stats->Level;
+    UINT mapId = ( realPlayer->Position != NULL ) ? realPlayer->Position->Map : 1;
+    fPoint basePos = ( realPlayer->Position != NULL ) ? realPlayer->Position->current : fPoint{ 5200.0f, 5200.0f, 0.0f };
+
+    // Select complementary companion roles needed to reach target members
+    std::vector<BotRole> neededRoles;
+    while ( ( party->Members.size( ) + neededRoles.size( ) ) < targetMembers )
+    {
+        if ( !hasTank )
+        {
+            neededRoles.push_back( BOT_ROLE_TANK );
+            hasTank = true;
+        }
+        else if ( !hasHealer )
+        {
+            neededRoles.push_back( BOT_ROLE_HEALER );
+            hasHealer = true;
+        }
+        else
+        {
+            if ( dpsCount % 2 == 0 )
+            {
+                neededRoles.push_back( ( playerRole == BOT_ROLE_DPS_MAGIC ) ? BOT_ROLE_DPS_PHYS_RANGED : BOT_ROLE_DPS_MAGIC );
+            }
+            else
+            {
+                neededRoles.push_back( BOT_ROLE_DPS_PHYS_MELEE );
+            }
+            dpsCount++;
+        }
+    }
+
+    // Spawn companion bots for each needed role
+    for ( size_t r = 0; r < neededRoles.size( ); r++ )
+    {
+        BotRole role = neededRoles[r];
+        std::string botName = GenerateUniqueName( );
+
+        fPoint spawnPos = basePos;
+        spawnPos.x += ( ( rand( ) % 40 ) - 20 ) / 10.0f;
+        spawnPos.y += ( ( rand( ) % 40 ) - 20 ) / 10.0f;
+
+        CPlayer* companionBot = SpawnCompanionBot( botName.c_str( ), role, playerLevel, mapId, spawnPos, realPlayer );
+        if ( companionBot )
+        {
+            party->AddPlayer( companionBot );
+            companionBot->Party->IsMaster = false;
+
+            // Spawn 3D entity models on leader's screen & add to VisiblePlayers
+            companionBot->RespawnToPlayer( realPlayer );
+            realPlayer->RespawnToPlayer( companionBot );
+
+            bool foundV = false;
+            for ( size_t v = 0; v < realPlayer->VisiblePlayers.size(); v++ )
+            {
+                if ( realPlayer->VisiblePlayers[v] == companionBot ) { foundV = true; break; }
+            }
+            if ( !foundV ) realPlayer->VisiblePlayers.push_back( companionBot );
+
+            if ( companionBot->bot_ai )
+            {
+                CPlayerBot* botAi = reinterpret_cast<CPlayerBot*>( companionBot->bot_ai );
+                botAi->SetFollowTarget( realPlayer );
+                botAi->SetState( BOT_STATE_FOLLOW );
+
+                const char* roleGreeting = "I'm with you, leader! Let's hunt!";
+                if ( role == BOT_ROLE_TANK ) roleGreeting = "Shield up! I will protect you and hold aggro, leader!";
+                else if ( role == BOT_ROLE_HEALER ) roleGreeting = "Divine blessings upon you! Your health is my priority!";
+                else if ( role == BOT_ROLE_DPS_MAGIC ) roleGreeting = "Arcane energies ready! I will vaporize our enemies!";
+                else if ( role == BOT_ROLE_DPS_PHYS_RANGED ) roleGreeting = "Quiver full, bow strung! Focusing on your targets!";
+                else if ( role == BOT_ROLE_DPS_PHYS_MELEE ) roleGreeting = "Blades drawn! Ready for combat!";
+
+                botAi->Say( roleGreeting );
+                botAi->ForcePartyBuff( );
+            }
+        }
+    }
+
+    SendPartyFullUpdate( party );
+    Log( MSG_INFO, "[PlayerBot] Ensured companion party for player '%s' (Total Members: %lu)",
+         realPlayer->CharInfo->charname, party->Members.size( ) );
+}
+
+void CBotManager::CheckPartyRoleBalance( CPlayer* realPlayer )
+{
+    if ( !realPlayer || realPlayer->is_bot || !realPlayer->Party || !realPlayer->Party->party ) return;
+    CParty* party = realPlayer->Party->party;
+
+    BotRole playerRole = GetPlayerRole( realPlayer );
+    if ( playerRole == BOT_ROLE_GENERAL_VISITOR ) return;
+
+    int tankCount = ( playerRole == BOT_ROLE_TANK ) ? 1 : 0;
+    int healerCount = ( playerRole == BOT_ROLE_HEALER ) ? 1 : 0;
+    int dpsCount = ( playerRole != BOT_ROLE_TANK && playerRole != BOT_ROLE_HEALER ) ? 1 : 0;
+
+    for ( size_t m = 0; m < party->Members.size( ); m++ )
+    {
+        CPlayer* member = party->Members[m];
+        if ( !member || !member->is_bot || !member->bot_ai ) continue;
+        CPlayerBot* botAi = reinterpret_cast<CPlayerBot*>( member->bot_ai );
+        if ( !botAi->IsCompanion( ) ) continue;
+
+        BotRole r = botAi->GetRole( );
+
+        // If player is a Tank and bot is also a Tank -> respec bot to Healer or DPS
+        if ( playerRole == BOT_ROLE_TANK && r == BOT_ROLE_TANK )
+        {
+            BotRole newRole = ( healerCount == 0 ) ? BOT_ROLE_HEALER : BOT_ROLE_DPS_MAGIC;
+            botAi->AdjustSpecToRole( newRole, realPlayer->Stats->Level );
+            botAi->Say( "I see you're tanking now, leader! I've switched my spec to support you!" );
+            if ( newRole == BOT_ROLE_HEALER ) healerCount++; else dpsCount++;
+        }
+        // If player is a Healer and bot is also a Healer -> respec bot to Tank or DPS
+        else if ( playerRole == BOT_ROLE_HEALER && r == BOT_ROLE_HEALER )
+        {
+            BotRole newRole = ( tankCount == 0 ) ? BOT_ROLE_TANK : BOT_ROLE_DPS_MAGIC;
+            botAi->AdjustSpecToRole( newRole, realPlayer->Stats->Level );
+            botAi->Say( "I see you're healing now, leader! I've switched my spec to frontline defense!" );
+            if ( newRole == BOT_ROLE_TANK ) tankCount++; else dpsCount++;
+        }
+    }
+}
+
+void CBotManager::RefillPartyCompanions( CPlayer* realPlayer )
+{
+    EnsurePlayerCompanionParty( realPlayer );
+}
+
+void CBotManager::CheckPlayerCompanions( )
+{
+    clock_t now = clock( );
+    if ( ( now - m_lastCompanionCheck ) < ( 5 * CLOCKS_PER_SEC ) ) return;
+    m_lastCompanionCheck = now;
+
+    // Check all active real players on all maps
+    for ( int m = 0; m < GServer->MapList.max; m++ )
+    {
+        CMap* map = GServer->MapList.Index[m];
+        if ( !map || map == GServer->MapList.nullzone ) continue;
+
+        for ( UINT p = 0; p < map->PlayerList.size( ); p++ )
+        {
+            CPlayer* player = map->PlayerList[p];
+            if ( !player || player->is_bot || !player->Session || !player->Session->inGame ) continue;
+
+            // Check if player's party needs role rebalancing (e.g. after job change)
+            CheckPartyRoleBalance( player );
+
+            // If player is in party and has companions, ensure all companions are on the same map and level
+            if ( player->Party && player->Party->party )
+            {
+                CParty* party = player->Party->party;
+                for ( size_t i = 0; i < party->Members.size( ); i++ )
+                {
+                    CPlayer* mem = party->Members[i];
+                    if ( mem && mem->is_bot && mem->bot_ai )
+                    {
+                        CPlayerBot* botAi = reinterpret_cast<CPlayerBot*>( mem->bot_ai );
+                        if ( mem->Stats->Level != player->Stats->Level )
+                        {
+                            botAi->SyncLevelToLeader( player->Stats->Level );
+                        }
+                    }
+                }
+            }
+        }
     }
 }

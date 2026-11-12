@@ -486,6 +486,27 @@ Comprehensive upgrades to combat mechanics, avatar terrain grounding, and group/
   - `/party bot follow`: Commands all party bots to drop current engagements and return to formation.
   - `/party bot assist`: Orders party bots to focus-fire on the leader's current combat target.
   - `/party bot info`: Displays active formation slots, bot roles, HP, and MP stats.
+
+### 12. Automated AI Companion / Party Bot System (`PlayerBot.h`, `PlayerBot.cpp`)
+Designed for an authentic MMO experience even when solo, real players entering the game are automatically accompanied by an intelligent squad of AI companion bots:
+- **Instant World Auto-Grouping**:
+  Upon entering the world (`pakDoID`), real players are automatically assigned a balanced party of AI companion bots. Missing slots are filled up to party capacity.
+- **Smart Spec & Role Balancing**:
+  The system examines the player's class / spec and dynamically spawns complementary roles:
+  - **Player is Tank**: Spawns Healer (Muse/Cleric) + 2 DPS bots (Magic Mage + Physical Ranged/Melee).
+  - **Player is Healer**: Spawns Tank (Knight/Champion) + 2 DPS bots.
+  - **Player is DPS**: Spawns Tank + Healer + complementary DPS.
+  - **Player is Visitor/Novice**: Spawns a balanced starter squad of Visitor companions with role-tailored weapons and armor. When the player promotes to a first or second class, the companion bots dynamically adjust their classes and roles to rebalance the party.
+- **Bi-Directional Level Synchronization**:
+  Companion bots automatically sync their level, stats, tiered weapons, armor, shields, and skills to match the leader upon joining, during active following, and whenever the player levels up (`CheckPlayerLevelUP`).
+- **Tactical Combat Strategies & Rotations**:
+  - **Tank**: Holds aggro, taunts enemies off the leader/healer, and opens combat with taunt and armor-break combos.
+  - **Healer**: Implements a strict triage hierarchy: Leader (HP < 75%) $\rightarrow$ Tank (HP < 65%) $\rightarrow$ Self (HP < 60%) $\rightarrow$ Party; keeps 5 core charms active (Hustle, Clobber, Resilience, Battle, Precision); uses offensive magic when party HP is stable.
+  - **DPS**: Focus-fires the leader's or tank's combat target with specialized rotations (Fireball/Ice/Magic Arrow for Mages, Double Shot/Combo Shot for Scouts, Shot/Shell for Dealers).
+- **Flocking Formation & Distance Tethering**:
+  Bots maintain natural tactical positions (Tank front-right, Melee front-left, Ranged flanks, Healer rear-center) with breathing jitter and flocking repulsion push so they never bunch up. If the player teleports, uses a scroll, or moves $> 25\text{--}32\text{m}$ away during follow, combat, looting, or resting, bots instantly teleport to the leader.
+- **Persistence & Relog Handling**:
+  If a player leaves the party, kicks companion bots, or logs out and back in, the system automatically refills missing companion slots back to full party capacity with role-balanced companions.
 - **GM Named Teleport Commands (`/tele <name>` & `/go <name>`)**:
   - GMs can teleport instantly using friendly map location names (case-insensitive, spaces/special characters ignored) in addition to X/Y coordinates:
     - *Major Cities & Adventure Zones*: `/tele zant`, `/tele adventure`, `/tele junonpolis` (`/go junon`), `/tele eucar`, `/tele xitasanctuary` (`/tele xita`), `/tele plainsofcityofzant`, `/tele sunshinecoast`, `/tele valleyofluxtower` (`/tele luxem`), `/tele manasnowfields`, `/tele breezyhills` (`/tele breezy`), `/tele elvergel`, `/tele animalake`, `/tele kenjibeach` (`/tele kenji`), `/tele gorgeofsilence`, `/tele dolphinisland`, `/tele forestofwisdom`, `/tele desertofthedead`, `/tele crystalsnowfields`, `/tele freezingplateau`, `/tele arumicvalley`, `/tele lakeoffire`, `/tele seaofseeds`, `/tele shadyjungle`, `/tele forestofwandering`, `/tele citadeloftheforgotten`.

@@ -581,6 +581,12 @@ bool CWorldServer::pakDoID( CPlayer* thisclient, CPacket* P )
 	thisclient->Session->inGame = true;
 	thisclient->firstlogin=clock();    //LMA for fairy
 
+    // Auto-group real players with AI player companions on entering the world
+    if ( !thisclient->is_bot )
+    {
+        CBotManager::GetInstance()->EnsurePlayerCompanionParty( thisclient );
+    }
+
     if ( thisclient->Party && thisclient->Party->party && thisclient->client )
     {
         CParty* party = thisclient->Party->party;

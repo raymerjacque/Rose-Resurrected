@@ -54,6 +54,15 @@ enum BotPersonality {
     BOT_PERSONALITY_TYCOON
 };
 
+enum BotRole {
+    BOT_ROLE_TANK,
+    BOT_ROLE_HEALER,
+    BOT_ROLE_DPS_PHYS_MELEE,
+    BOT_ROLE_DPS_PHYS_RANGED,
+    BOT_ROLE_DPS_MAGIC,
+    BOT_ROLE_GENERAL_VISITOR
+};
+
 class CPlayerBot {
 public:
     CPlayerBot( CPlayer* player );
@@ -200,6 +209,16 @@ public:
     clock_t GetLastPlayerNearby( ) const { return m_lastPlayerNearby; }
     void SetLastPlayerNearby( clock_t t ) { m_lastPlayerNearby = t; }
 
+    bool IsCompanion( ) const { return m_isCompanion; }
+    void SetCompanion( bool isComp, CPlayer* owner = NULL ) { m_isCompanion = isComp; m_companionOwner = owner; }
+    CPlayer* GetCompanionOwner( ) const { return m_companionOwner; }
+    BotRole GetRole( ) const { return m_role; }
+    void SetRole( BotRole role ) { m_role = role; }
+
+    void SyncLevelToLeader( int targetLevel );
+    void AdjustSpecToRole( BotRole role, int level );
+    static BotRole DetermineRoleFromJob( int job );
+
 private:
     CPlayer* m_player;
     BotState m_state;
@@ -249,6 +268,11 @@ private:
 
     // Follow
     CPlayer* m_followTarget;
+
+    // Companion Party & Role
+    bool m_isCompanion;
+    CPlayer* m_companionOwner;
+    BotRole m_role;
 
     // Current Targets
     UINT m_targetMobCid;
@@ -334,6 +358,15 @@ public:
     static bool GetMapForLevel( int botLvl, UINT& mapId, fPoint& spawnPos );
     void CheckAndRelocateUninvitedBot( CPlayer* bot );
 
+    // Auto Companion Party System
+    static BotRole GetPlayerRole( CPlayer* player );
+    void EnsurePlayerCompanionParty( CPlayer* realPlayer );
+    void CheckPartyRoleBalance( CPlayer* realPlayer );
+    void RefillPartyCompanions( CPlayer* realPlayer );
+    CPlayer* SpawnCompanionBot( const char* name, BotRole role, int level, int mapId, fPoint pos, CPlayer* leader );
+    void CheckPlayerCompanions( );
+    void SendPartyFullUpdate( CParty* party );
+
 private:
     CBotManager( );
     ~CBotManager( );
@@ -347,6 +380,7 @@ private:
     clock_t m_lastPruneCheck;
     clock_t m_lastBuffBotCheck;
     clock_t m_lastVendingBotCheck;
+    clock_t m_lastCompanionCheck;
     bool m_ambientInitialized;
     bool m_buffBotsInitialized;
     bool m_vendingBotsInitialized;

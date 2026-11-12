@@ -20,6 +20,7 @@
 */
 #include "player.h"
 #include "worldserver.h"
+#include "PlayerBot.h"
 
 // Returns the amount of exp that is needed for the next level
 UINT CPlayer::GetLevelEXP( )
@@ -124,6 +125,24 @@ bool CPlayer::CheckPlayerLevelUP( )
     ADDWORD( pak, clientid );
     GServer->SendToVisible( &pak, this );
     SetStats( );
+
+    // Auto sync companion bots to new player level
+    if ( !this->is_bot && this->Party && this->Party->party )
+    {
+        for ( size_t m = 0; m < this->Party->party->Members.size(); m++ )
+        {
+            CPlayer* pm = this->Party->party->Members[m];
+            if ( pm && pm->is_bot && pm->bot_ai )
+            {
+                CPlayerBot* botAi = reinterpret_cast<CPlayerBot*>( pm->bot_ai );
+                if ( botAi )
+                {
+                    botAi->SyncLevelToLeader( this->Stats->Level );
+                }
+            }
+        }
+    }
+
     //SendLevelUPtoChar(this);
     //Log(MSG_INFO,"Def exp %I64i, def level: %u",CharInfo->Exp,Stats->Level);
 

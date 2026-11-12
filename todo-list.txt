@@ -433,7 +433,7 @@ MILESTONE 6 — Dynamic Dungeon Instancing & Polish (COMPLETED & VERIFIED)
 [x] Upgrade Mail system for per-message deletion, Zuly attachments, item parcel delivery, and /mail commands.
 [x] Implement complete AIP monster scripting opcodes (CDT 015, CDT 016, CDT 023, CDT 026, Cha in AI_GetAbility, ACT 026, ACT 027, ACT 032, ACT 033).
 
-MILESTONE 7 — Combat Mechanics Polish, Spawn Physics & Player Bot Vanguard AI (COMPLETED & VERIFIED)
+MILESTONE 8 — Combat Mechanics Polish, Spawn Physics & Player Bot Vanguard AI (COMPLETED & VERIFIED)
 [x] Fix "falling from the sky" spawn physics glitch in `player.cpp` and implement `0x770` GSV_STOP with altitude.
 [x] Fix inverted shield block check and magic attack formula in `battle.cpp`.
 [x] Implement dynamic party bot formation offsets relative to leader movement vector in `PlayerBot.cpp`.
@@ -443,6 +443,14 @@ MILESTONE 7 — Combat Mechanics Polish, Spawn Physics & Player Bot Vanguard AI 
 [x] Add polite party bot loot etiquette (leaving spoils to party leader).
 [x] Add player `/party bot <buff|follow|assist|info>` and `/bot party` chat commands.
 [x] Implement Guild Wars 2 style Open-World Auto-Sharing: full EXP credit with 15% co-op bonus, universal quest kill credit, and shared un-locked drop permissions for all non-partied players & player bots attacking the same monster.
+
+MILESTONE 9 — Intelligent Automated AI Companion / Party Bot System (COMPLETED & VERIFIED)
+[x] Real Player Auto-Grouping: Automatically group entering players with AI companion bots upon world entry (`pakDoID`).
+[x] Dynamic Role Balancing & Smart Composition: Detect player spec (Tank, Healer, DPS, Visitor) and fill party with complementary roles. Dynamically adapt bot specs when player changes jobs.
+[x] Level Synchronization & Auto Gear/Skill Progression: Bots auto level up or down to match player level with synchronized tiered gear, weapons, spells, and skills. Auto-sync on player level-up.
+[x] Spec-Specific Combat Strategies & Rotations: Tactical rotations for Tank (aggro peel/taunt), Healer (prioritized healing & buff maintenance), and DPS (focus-fire nukes/shots).
+[x] Formation Flocking & Distance Tethering: Role-based formation positions (Tank front, DPS flanks, Healer rear) with separation push and jitter. Instant map/distance teleportation back to leader when separated.
+[x] Session Persistence & Relog Refilling: Auto-refill missing party companion slots upon player relog or leaving/kicking party members.
 
 ================================================================================
 
