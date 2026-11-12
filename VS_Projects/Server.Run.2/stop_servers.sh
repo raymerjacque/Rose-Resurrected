@@ -15,9 +15,14 @@ for pidfile in .worldserver.pid .charserver.pid .loginserver.pid; do
     fi
 done
 
-pkill -f "./loginserver" 2>/dev/null || true
-pkill -f "./charserver" 2>/dev/null || true
-pkill -f "./worldserver" 2>/dev/null || true
-pkill -f "./rose_worldserver" 2>/dev/null || true
+pkill -f "loginserver" 2>/dev/null || true
+pkill -f "charserver" 2>/dev/null || true
+pkill -f "worldserver" 2>/dev/null || true
+pkill -f "rose_worldserver" 2>/dev/null || true
+sleep 1
+pkill -9 -f "loginserver" 2>/dev/null || true
+pkill -9 -f "charserver" 2>/dev/null || true
+pkill -9 -f "worldserver" 2>/dev/null || true
+pkill -9 -f "rose_worldserver" 2>/dev/null || true
 
 echo "=== Servers stopped ==="
