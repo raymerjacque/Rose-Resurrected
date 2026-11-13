@@ -455,5 +455,18 @@ MILESTONE 9 — Intelligent Automated AI Companion / Party Bot System (COMPLETED
 [x] Quest Objective Awareness & Tactical Callouts: Real-time scanning of player's active quests (`die_quest`), prioritizing quest targets, calling out nearby objectives, and celebrating quest target eliminations.
 [x] Synchronized Camp Resting & Potion Recovery: Loyal synchronized sitting/resting with party leader with friendly camp chatter, and in-combat HP/MP potion consumption.
 
+MILESTONE 10 — Advanced Companion Tactics, Convoy PAT Driving & Squad Affinity (COMPLETED & VERIFIED)
+[x] Synchronized PAT Convoy Mount Driving: Automatic mounting of Cart / Castle Gear vehicles alongside leader when leader mounts or drives, and dismounting on foot when leader stops driving.
+[x] Emergency Leader Resurrection & Medical Protocol: Absolute highest-priority revival for fallen party leader; Healers rush to cast Resurrection while non-healers deploy Emergency Revival Scroll kits, restoring leader to battle with HP/MP updates (`0x79f` and `0x79b`) and gratitude affinity.
+[x] Smart Boss Mechanics & Frontal Cleave Facing: Vanguard Tanks automatically position 180 degrees opposite the party leader behind bosses, directing frontal cone cleaves away from squishies; Healers and Ranged DPS backpedal from melee AOEs.
+[x] Dynamic Spell Channel Interrupts: Automatic cast detection (`mob->Battle->skillid != 0`); Tanks and Scouts execute Shield Bash / Voltage Crash / Stun Arrow to cancel boss spell channels with interrupt callouts.
+[x] Minion & Add Prioritization: DPS bots automatically peel off bosses to clear adds attacking the Healer or Leader before refocusing on the boss.
+[x] Gear Gifting & Appearance Customization: Implemented `/party bot equip <slot> [bot]` allowing players to transfer bag items to companion bots, immediately updating visible equipment packets (`0x7a5`) and boosting bot Affinity (+15).
+[x] Companion Personalities, Banter & Squad Affinity System: Affinity score (0-100) tracking across combat, revives, and gifting; 4 tiers (Hesitant, Friendly, Loyal, Soulbound Champion with passive +5% squad stats), plus archetypal personality banter (Loyal Knight, Caring Healer, Sassy Elementalist, Cocky Sharpshooter, Valiant Striker).
+[x] Target Priority & Focus Marking: Implemented `/party bot mark` to focus-fire designated targets and `/party bot pull` for Tanks to pull and kite targets safely into squad ambush range.
+[x] Dungeon Corridor Tight-Column Formations: Narrow corridor detection (`IsDungeonMap`) switches wide flank formations into tight, staggered single/double file columns, eliminating cave wall clipping.
+[x] Ambient Faction Wars in PvP Zones: Roaming non-companion bots in PvP-enabled maps (`allowpvp != 0`) detect rival clan bots and initiate automatic open-world faction skirmishes with battle cries.
+[x] Living Town Routines for Roaming Bots: Ambient town bots dynamically visit the forge/blacksmith, browse marketplace stalls, and perform friendly social emotes when passing players.
+
 ================================================================================
 

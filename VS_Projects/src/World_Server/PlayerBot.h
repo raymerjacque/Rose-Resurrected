@@ -235,6 +235,22 @@ public:
     void AdjustSpecToRole( BotRole role, int level );
     static BotRole DetermineRoleFromJob( int job );
 
+    // Phase 4: Convoy PAT, Affinity & Squad Tactics
+    void SetMarkedTarget( UINT mobCid ) { m_markedTargetCid = mobCid; }
+    UINT GetMarkedTarget( ) const { return m_markedTargetCid; }
+    void StartPullTarget( CMonster* mob, fPoint returnPos );
+    bool IsPullingTarget( ) const { return m_isPullingTarget; }
+
+    int GetAffinity( ) const { return m_affinity; }
+    void AddAffinity( int amount );
+    const char* GetAffinityTierString( ) const;
+    const char* GetPersonalityString( ) const;
+    bool EquipGiftedItem( int slot, const CItem& itm );
+    bool IsDungeonMap( UINT mapId ) const;
+    void HandleBossCleaveAndTactics( CMonster* mob );
+    bool CheckMinionPeel( );
+    bool CheckSpellInterrupt( CMonster* mob );
+
 private:
     CPlayer* m_player;
     BotState m_state;
@@ -342,6 +358,15 @@ private:
     std::map<UINT, int> m_nemesisMemory; // Player CharID -> Nemesis Score
     clock_t m_lastRecruitmentShoutTime;
     clock_t m_lastCasualChatterTime;
+
+    // Phase 4: Focus Marking, Pulling, Affinity & Convoy
+    UINT m_markedTargetCid;
+    bool m_isPullingTarget;
+    fPoint m_pullAnchorPos;
+    int m_affinity;
+    clock_t m_lastAffinityBanterTime;
+    clock_t m_lastInterruptTime;
+    clock_t m_lastConvoyMountTime;
 };
 
 class CBotManager {

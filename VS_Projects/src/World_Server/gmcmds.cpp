@@ -587,13 +587,16 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
             if (!botAction || strcmp(botAction, "help") == 0)
             {
                 SendPM(thisclient, "=== Party Bot Commands ===");
-                SendPM(thisclient, "/party bot aggressive - Set Hunter stance (proactively pulls mobs)");
-                SendPM(thisclient, "/party bot defensive  - Set Bodyguard stance (protects party)");
-                SendPM(thisclient, "/party bot passive    - Set Pacifist stance (holds fire, follows)");
-                SendPM(thisclient, "/party bot assist     - Set Focus Fire stance on your target");
-                SendPM(thisclient, "/party bot buff       - Order Cleric/Muse bots to refresh buffs");
-                SendPM(thisclient, "/party bot follow     - Order all party bots into formation");
-                SendPM(thisclient, "/party bot info       - Display squad roles, stances & stats");
+                SendPM(thisclient, "/party bot aggressive  - Set Hunter stance (proactively pulls mobs)");
+                SendPM(thisclient, "/party bot defensive   - Set Bodyguard stance (protects party)");
+                SendPM(thisclient, "/party bot passive     - Set Pacifist stance (holds fire, follows)");
+                SendPM(thisclient, "/party bot assist      - Set Focus Fire stance on your target");
+                SendPM(thisclient, "/party bot mark        - Mark your current target for squad focus-fire");
+                SendPM(thisclient, "/party bot pull        - Command Tank to pull target mob back to party");
+                SendPM(thisclient, "/party bot equip <slot> [bot] - Gift armor/weapon to companion bot");
+                SendPM(thisclient, "/party bot buff        - Order Cleric/Muse bots to refresh buffs");
+                SendPM(thisclient, "/party bot follow      - Order all party bots into formation");
+                SendPM(thisclient, "/party bot info        - Display squad roles, affinity, stances & stats");
                 return true;
             }
 
@@ -679,6 +682,172 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                 SendPM(thisclient, "[Party Bot] %d bots rallied into formation behind you.", botCount);
                 return true;
             }
+            else if (strcmp(botAction, "mark") == 0)
+            {
+                if (thisclient->Battle->target == 0)
+                {
+                    SendPM(thisclient, "[Party Bot] Please select/target a monster first, then type '/party bot mark'.");
+                    return true;
+                }
+                CMap* map = GServer->MapList.Index[thisclient->Position->Map];
+                if (!map) return true;
+                CMonster* mob = map->GetMonsterInMap(thisclient->Battle->target);
+                if (!mob || mob->IsDead() || mob->Stats->HP <= 0 || mob->IsBonfire())
+                {
+                    SendPM(thisclient, "[Party Bot] Invalid target to mark.");
+                    return true;
+                }
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        m->bot_ai->SetMarkedTarget(mob->clientid);
+                        m->bot_ai->AttackTarget(mob);
+                        m->bot_ai->SetState(BOT_STATE_COMBAT);
+                        botCount++;
+                    }
+                }
+                SendPM(thisclient, "[Party Bot] Target marked! %d companion bots focus-firing on target!", botCount);
+                return true;
+            }
+            else if (strcmp(botAction, "pull") == 0)
+            {
+                if (thisclient->Battle->target == 0)
+                {
+                    SendPM(thisclient, "[Party Bot] Please target a monster first, then type '/party bot pull'.");
+                    return true;
+                }
+                CMap* map = GServer->MapList.Index[thisclient->Position->Map];
+                if (!map) return true;
+                CMonster* mob = map->GetMonsterInMap(thisclient->Battle->target);
+                if (!mob || mob->IsDead() || mob->Stats->HP <= 0 || mob->IsBonfire())
+                {
+                    SendPM(thisclient, "[Party Bot] Invalid monster to pull.");
+                    return true;
+                }
+
+                // Find Tank bot or first companion
+                CPlayer* puller = NULL;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        if (m->bot_ai->GetRole() == BOT_ROLE_TANK)
+                        {
+                            puller = m;
+                            break;
+                        }
+                        if (!puller) puller = m;
+                    }
+                }
+                if (puller && puller->bot_ai)
+                {
+                    puller->bot_ai->StartPullTarget(mob, thisclient->Position->current);
+                    SendPM(thisclient, "[Party Bot] %s is pulling the target mob back to your squad!", puller->CharInfo->charname);
+                }
+                else
+                {
+                    SendPM(thisclient, "[Party Bot] No companion bots available to pull.");
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "equip") == 0 || strcmp(botAction, "give") == 0)
+            {
+                char* slotStr = strtok(NULL, " ");
+                char* targetBotName = strtok(NULL, " ");
+                if (!slotStr)
+                {
+                    SendPM(thisclient, "Usage: /party bot equip <bag_slot_number> [bot_name]");
+                    return true;
+                }
+                int srcSlot = atoi(slotStr);
+                if (srcSlot < 1 || srcSlot >= 140)
+                {
+                    SendPM(thisclient, "[Party Bot] Invalid inventory slot number (1-139).");
+                    return true;
+                }
+
+                CItem giftItem = thisclient->items[srcSlot];
+                if (giftItem.itemnum == 0)
+                {
+                    SendPM(thisclient, "[Party Bot] Inventory slot %d is empty.", srcSlot);
+                    return true;
+                }
+
+                // Determine target bot
+                CPlayer* targetBot = NULL;
+                if (targetBotName)
+                {
+                    for (UINT i = 0; i < party->Members.size(); i++)
+                    {
+                        CPlayer* m = party->Members[i];
+                        if (m && m->is_bot && strcasecmp(m->CharInfo->charname, targetBotName) == 0)
+                        {
+                            targetBot = m;
+                            break;
+                        }
+                    }
+                }
+                else
+                {
+                    if (thisclient->Battle->target != 0)
+                    {
+                        for (UINT i = 0; i < party->Members.size(); i++)
+                        {
+                            if (party->Members[i] && party->Members[i]->clientid == thisclient->Battle->target && party->Members[i]->is_bot)
+                            {
+                                targetBot = party->Members[i];
+                                break;
+                            }
+                        }
+                    }
+                    if (!targetBot)
+                    {
+                        for (UINT i = 0; i < party->Members.size(); i++)
+                        {
+                            if (party->Members[i] && party->Members[i]->is_bot)
+                            {
+                                targetBot = party->Members[i];
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (!targetBot || !targetBot->bot_ai)
+                {
+                    SendPM(thisclient, "[Party Bot] Companion bot not found in party.");
+                    return true;
+                }
+
+                // Map item type to equip slot
+                int equipSlot = 0;
+                if (giftItem.itemtype == CAP) equipSlot = 2;
+                else if (giftItem.itemtype == BODY) equipSlot = 3;
+                else if (giftItem.itemtype == GLOVE) equipSlot = 5;
+                else if (giftItem.itemtype == SHOE) equipSlot = 6;
+                else if (giftItem.itemtype == WEAPON) equipSlot = 7;
+                else if (giftItem.itemtype == SUBWEAPON) equipSlot = 8;
+                else if (giftItem.itemtype == MASK) equipSlot = 1;
+                else if (giftItem.itemtype == BACK) equipSlot = 4;
+
+                if (equipSlot == 0)
+                {
+                    SendPM(thisclient, "[Party Bot] Item in slot %d cannot be equipped (not armor/weapon).", srcSlot);
+                    return true;
+                }
+
+                targetBot->bot_ai->EquipGiftedItem(equipSlot, giftItem);
+                thisclient->items[srcSlot].itemtype = 0;
+                thisclient->items[srcSlot].itemnum = 0;
+                thisclient->items[srcSlot].count = 0;
+                thisclient->UpdateInventory(srcSlot, srcSlot);
+                SendPM(thisclient, "[Party Bot] Gifted item from bag slot %d to %s! Bot Affinity increased (+15).",
+                    srcSlot, targetBot->CharInfo->charname);
+                return true;
+            }
             else if (strcmp(botAction, "assist") == 0 || strcmp(botAction, "focus") == 0)
             {
                 for (UINT i = 0; i < party->Members.size(); i++)
@@ -725,9 +894,11 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                     {
                         int hpPct = (m->Stats->MaxHP > 0) ? (m->Stats->HP * 100 / m->Stats->MaxHP) : 100;
                         int mpPct = (m->Stats->MaxMP > 0) ? (m->Stats->MP * 100 / m->Stats->MaxMP) : 100;
-                        SendPM(thisclient, "Bot: %s (Lvl %d, Job %d) | HP: %d%% MP: %d%% | Stance: %s | State: %s",
-                            m->CharInfo->charname, m->Stats->Level, m->CharInfo->Job,
-                            hpPct, mpPct, m->bot_ai->GetStanceString(), m->bot_ai->GetStateString());
+                        SendPM(thisclient, "Bot: %s (Lvl %d, %s) | HP: %d%% MP: %d%% | Stance: %s | Affinity: %d/100 (%s)%s",
+                            m->CharInfo->charname, m->Stats->Level, m->bot_ai->GetPersonalityString(),
+                            hpPct, mpPct, m->bot_ai->GetStanceString(),
+                            m->bot_ai->GetAffinity(), m->bot_ai->GetAffinityTierString(),
+                            (m->bot_ai->GetAffinity() >= 90) ? " [Soulbound Perk Active]" : "");
                         botCount++;
                     }
                 }

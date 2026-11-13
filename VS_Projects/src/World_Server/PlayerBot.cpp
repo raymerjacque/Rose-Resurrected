@@ -1291,8 +1291,17 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_stance( BOT_STANCE_DEFENSIVE ),
       m_comboStep( 0 ),
       m_lastQuestScanTime( 0 ),
-      m_lastRestBanterTime( 0 )
+      m_lastRestBanterTime( 0 ),
+      m_markedTargetCid( 0 ),
+      m_isPullingTarget( false ),
+      m_affinity( 50 ),
+      m_lastAffinityBanterTime( 0 ),
+      m_lastInterruptTime( 0 ),
+      m_lastConvoyMountTime( 0 )
 {
+    m_pullAnchorPos.x = 0.0f;
+    m_pullAnchorPos.y = 0.0f;
+    m_pullAnchorPos.z = 0.0f;
     if ( player && player->CharInfo )
     {
         m_role = DetermineRoleFromJob( player->CharInfo->Job );
@@ -2839,16 +2848,69 @@ bool CPlayerBot::CheckProximityBuffs( )
 bool CPlayerBot::CheckPartyResurrect( )
 {
     if ( !m_player || !m_player->Party || !m_player->Party->party ) return false;
-    if ( !m_player->Status->CanCastSkill || m_player->Stats->MP < 60 ) return false;
-
-    int job = m_player->CharInfo->Job;
-    if ( job != 211 && job != 221 && job != 222 ) return false; // Muse / Mage / Cleric
-    if ( m_player->Stats->Level < 30 ) return false;
 
     clock_t now = clock( );
-    if ( ( now - m_lastResurrectTime ) < (clock_t)( 6.0f * CLOCKS_PER_SEC ) ) return false;
+    if ( ( now - m_lastResurrectTime ) < (clock_t)( 5.0f * CLOCKS_PER_SEC ) ) return false;
 
     CParty* party = m_player->Party->party;
+    CPlayer* leader = GetPartyLeader( );
+
+    // 1. EMERGENCY LEADER RESURRECTION PROTOCOL (Absolute Highest Priority!)
+    if ( leader && leader->IsDead( ) && leader->Position->Map == m_player->Position->Map )
+    {
+        float distToLeader = GServer->distance( m_player->Position->current, leader->Position->current );
+        if ( distToLeader <= 25.0f )
+        {
+            m_lastResurrectTime = now;
+            m_lastSkillCastTime = now;
+
+            bool isHealer = ( m_player->CharInfo->Job == 211 || m_player->CharInfo->Job == 221 || m_player->CharInfo->Job == 222 );
+
+            leader->Stats->HP = leader->Stats->MaxHP * 40 / 100;
+            leader->Stats->MP = leader->Stats->MaxMP * 30 / 100;
+            leader->Status->Stance = RUNNING;
+            leader->RefreshBuff( );
+            leader->SetStats( );
+
+            // Broadcast HP packet (0x79f) to visible & send directly to leader
+            BEGINPACKET( pak, 0x79f );
+            ADDWORD    ( pak, leader->clientid );
+            ADDDWORD   ( pak, (DWORD)leader->Stats->HP );
+            GServer->SendToVisible( &pak, leader );
+
+            if ( leader->client )
+            {
+                leader->client->SendPacket( &pak );
+                BEGINPACKET( pakExp, 0x79b );
+                ADDDWORD   ( pakExp, leader->CharInfo->Exp );
+                ADDWORD    ( pakExp, leader->CharInfo->stamina );
+                ADDWORD    ( pakExp, 0 );
+                leader->client->SendPacket( &pakExp );
+            }
+
+            AddAffinity( 10 );
+
+            if ( isHealer )
+            {
+                char rezMsg[96];
+                snprintf( rezMsg, sizeof(rezMsg), "Hang on, %s! Bringing you back into the fight!", leader->CharInfo->charname );
+                Say( rezMsg );
+            }
+            else
+            {
+                char rezMsg[96];
+                snprintf( rezMsg, sizeof(rezMsg), "Emergency medical protocol! %s, take my revival scroll!", leader->CharInfo->charname );
+                Say( rezMsg );
+            }
+            return true;
+        }
+    }
+
+    // 2. Normal party member resurrection by Clerics / Muses
+    int job = m_player->CharInfo->Job;
+    if ( job != 211 && job != 221 && job != 222 ) return false; // Muse / Mage / Cleric
+    if ( m_player->Stats->Level < 30 || !m_player->Status->CanCastSkill || m_player->Stats->MP < 60 ) return false;
+
     for ( UINT i = 0; i < party->Members.size( ); i++ )
     {
         CPlayer* member = party->Members[i];
@@ -2864,6 +2926,7 @@ bool CPlayerBot::CheckPartyResurrect( )
             // Revive ally with 35% HP and 25% MP
             member->Stats->HP = member->Stats->MaxHP * 35 / 100;
             member->Stats->MP = member->Stats->MaxMP * 25 / 100;
+            member->Status->Stance = RUNNING;
             member->RefreshBuff( );
             member->SetStats( );
 
@@ -2872,6 +2935,11 @@ bool CPlayerBot::CheckPartyResurrect( )
             ADDWORD    ( pak, member->clientid );
             ADDDWORD   ( pak, (DWORD)member->Stats->HP );
             GServer->SendToVisible( &pak, member );
+
+            if ( member->client )
+            {
+                member->client->SendPacket( &pak );
+            }
 
             // If reviving a bot, restore its AI state to follow
             if ( member->is_bot && member->bot_ai )
@@ -3032,6 +3100,20 @@ fPoint CPlayerBot::GetFormationOffset( int slotIndex, fPoint leaderCurrent, fPoi
     if ( len > 0.5f )
     {
         baseAngle = atan2( dy, dx );
+    }
+
+    // Dungeon Corridor Tight Column Formation:
+    // Narrow corridors require staggered single/double file to avoid clipping cave walls
+    if ( m_player && IsDungeonMap( m_player->Position->Map ) )
+    {
+        float colDist = 2.0f + ( (float)slotIndex * 1.5f );
+        float sideSign = ( slotIndex % 2 == 0 ) ? 1.0f : -1.0f;
+        float colAngle = baseAngle + 3.14159265f + ( sideSign * 0.12f );
+        fPoint target;
+        target.x = leaderCurrent.x + cos( colAngle ) * colDist;
+        target.y = leaderCurrent.y + sin( colAngle ) * colDist;
+        target.z = leaderCurrent.z;
+        return target;
     }
 
     float relAngle = 3.14159265f;
@@ -3548,6 +3630,36 @@ void CPlayerBot::Update( )
     if ( !m_isCompanion )
     {
         CheckPlayerShops( );
+
+        // Ambient Faction Wars in PvP Zones
+        CMap* pvpMap = GetMap( );
+        if ( pvpMap && ( pvpMap->allowpvp != 0 || pvpMap->pvp_mode != PVP_MODE_OFF ) )
+        {
+            if ( ( now - m_lastClanRivalryTime ) >= ( 30 * CLOCKS_PER_SEC ) )
+            {
+                for ( UINT i = 0; i < pvpMap->PlayerList.size( ); i++ )
+                {
+                    CPlayer* rival = pvpMap->PlayerList[i];
+                    if ( rival && rival != m_player && rival->is_bot && rival->bot_ai && !rival->IsDead( ) )
+                    {
+                        if ( m_player->Clan && rival->Clan && m_player->Clan->clanid != 0 && rival->Clan->clanid != 0 && m_player->Clan->clanid != rival->Clan->clanid )
+                        {
+                            float d = GServer->distance( m_player->Position->current, rival->Position->current );
+                            if ( d <= 25.0f )
+                            {
+                                m_lastClanRivalryTime = now;
+                                char warCry[96];
+                                snprintf( warCry, sizeof(warCry), "Faction Clash! For Clan %u, attack %s!",
+                                    m_player->Clan->clanid, rival->CharInfo->charname );
+                                Say( warCry );
+                                StartDuel( rival );
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     // Private Message Whispers & Social Interaction
@@ -3784,6 +3896,11 @@ void CPlayerBot::HandleCombat( )
         if ( mob && mob->IsDead( ) )
         {
             CheckBountyProgress( mob );
+            if ( m_isCompanion )
+            {
+                bool isEpic = ( mob->Stats->MaxHP >= 4000 || mob->montype >= 400 || ( m_followTarget && IsMonsterQuestTarget( mob, m_followTarget ) ) );
+                AddAffinity( isEpic ? 5 : 1 );
+            }
             if ( m_isCompanion && m_followTarget && IsMonsterQuestTarget( mob, m_followTarget ) )
             {
                 char progMsg[96];
@@ -3794,6 +3911,7 @@ void CPlayerBot::HandleCombat( )
         }
         ClearBattle( m_player->Battle );
         m_targetMobCid = 0;
+        m_isPullingTarget = false;
 
         // In a party, respect leader's loot: only grab drops right under feet (< 3.0m)
         if ( m_followTarget )
@@ -3832,6 +3950,31 @@ void CPlayerBot::HandleCombat( )
         SetState( BOT_STATE_IDLE );
         return;
     }
+
+    // Pulling Stance / Action: If kiting target back to party anchor
+    if ( m_isPullingTarget )
+    {
+        float distToAnchor = GServer->distance( m_player->Position->current, m_pullAnchorPos );
+        if ( distToAnchor > 5.0f )
+        {
+            MoveTo( m_pullAnchorPos );
+            return;
+        }
+        else
+        {
+            m_isPullingTarget = false;
+            Say( "Target lured into range! Ambush now!" );
+        }
+    }
+
+    // Minion Peeling: DPS peel off boss if adds attack healer/leader
+    if ( CheckMinionPeel( ) ) return;
+
+    // Boss Cleave Facing & AOE Dodging
+    HandleBossCleaveAndTactics( mob );
+
+    // Spell Channel Interrupt
+    CheckSpellInterrupt( mob );
 
     // Target is valid: check attack range
     float dist = GServer->distance( m_player->Position->current, mob->Position->current );
@@ -4041,6 +4184,72 @@ void CPlayerBot::HandleFollow( )
     // Synchronized resting check
     if ( m_isCompanion && CheckSynchronizedRest( ) ) return;
 
+    // Synchronized PAT Convoy Mount Driving
+    if ( m_isCompanion && m_followTarget )
+    {
+        if ( m_followTarget->Status && m_followTarget->Status->Stance == DRIVING )
+        {
+            if ( m_player->Stats->Level >= 30 && m_player->Status->Stance != DRIVING && !m_player->IsOnBattle( ) )
+            {
+                if ( m_player->Stats->Level >= 70 )
+                {
+                    m_player->items[135].itemnum = 367; // Castle Gear Body
+                    m_player->items[136].itemnum = 31;  // Engine
+                    m_player->items[136].lifespan = 1000;
+                    m_player->items[137].itemnum = 377; // Legs
+                    m_player->items[138].itemnum = 387; // Arms
+                }
+                else
+                {
+                    m_player->items[135].itemnum = 2;   // Cart Body
+                    m_player->items[136].itemnum = 35;  // Engine
+                    m_player->items[136].lifespan = 1000;
+                    m_player->items[137].itemnum = 68;  // Wheels
+                    m_player->items[138].itemnum = 0;
+                }
+
+                m_player->Status->Stance = DRIVING;
+                BEGINPACKET( pakStance, 0x0782 );
+                ADDWORD    ( pakStance, m_player->clientid );
+                ADDBYTE    ( pakStance, 0x04 ); // DRIVING
+                ADDWORD    ( pakStance, m_player->Stats->Base_Speed );
+                GServer->SendToVisible( &pakStance, m_player );
+
+                clock_t nowTime = clock( );
+                if ( ( nowTime - m_lastConvoyMountTime ) >= ( 60 * CLOCKS_PER_SEC ) )
+                {
+                    m_lastConvoyMountTime = nowTime;
+                    Say( "Mounting up with the leader! Convoy rolling out!" );
+                }
+            }
+        }
+        else if ( m_player->Status && m_player->Status->Stance == DRIVING )
+        {
+            m_player->Status->Stance = RUNNING;
+            BEGINPACKET( pakStance, 0x0782 );
+            ADDWORD    ( pakStance, m_player->clientid );
+            ADDBYTE    ( pakStance, 0x03 ); // RUNNING
+            ADDWORD    ( pakStance, m_player->Stats->Base_Speed );
+            GServer->SendToVisible( &pakStance, m_player );
+        }
+    }
+
+    // Check squad target focus (/party bot mark)
+    if ( m_markedTargetCid != 0 && ( m_stance != BOT_STANCE_PASSIVE ) )
+    {
+        CMonster* markedMob = map->GetMonsterInMap( m_markedTargetCid );
+        if ( markedMob && !markedMob->IsDead( ) && markedMob->Stats->HP > 0 && !markedMob->IsBonfire( ) )
+        {
+            AttackTarget( markedMob );
+            SetState( BOT_STATE_COMBAT );
+            return;
+        }
+        else
+        {
+            m_markedTargetCid = 0;
+        }
+    }
+
     // Periodic Quest Mob Scanner & Callouts
     clock_t now = clock( );
     if ( m_isCompanion && m_followTarget && ( now - m_lastQuestScanTime ) > (clock_t)( 25 * CLOCKS_PER_SEC ) )
@@ -4231,7 +4440,23 @@ void CPlayerBot::HandleTownStroll( )
             dest.z = 0;
             MoveTo( dest );
 
-            if ( rand( ) % 2 == 0 )
+            int routineRoll = rand( ) % 6;
+            if ( routineRoll == 0 )
+            {
+                Say( "Browsing the merchant stalls... any rare items for sale?" );
+                DoEmote( 2 ); // Nod
+            }
+            else if ( routineRoll == 1 )
+            {
+                Say( "Heading over toward the forge to check weapon durability." );
+                DoEmote( 1 ); // Wave
+            }
+            else if ( routineRoll == 2 )
+            {
+                Say( "Town is bustling today! Good time to rest between expeditions." );
+                DoEmote( 3 ); // Cheer
+            }
+            else if ( rand( ) % 2 == 0 )
             {
                 BYTE emotes[] = { 1, 2, 3, 4, 6 };
                 DoEmote( emotes[rand( ) % 5] );
@@ -5826,6 +6051,233 @@ void CPlayerBot::AdjustSpecToRole( BotRole role, int level )
     if ( !m_player ) return;
     m_role = role;
     SyncLevelToLeader( level );
+}
+
+void CPlayerBot::AddAffinity( int amount )
+{
+    int oldAffinity = m_affinity;
+    m_affinity += amount;
+    if ( m_affinity > 100 ) m_affinity = 100;
+    if ( m_affinity < 0 ) m_affinity = 0;
+
+    // Check tier crossing & celebratory banter
+    if ( m_isCompanion && m_followTarget )
+    {
+        clock_t now = clock( );
+        if ( ( now - m_lastAffinityBanterTime ) >= ( 30 * CLOCKS_PER_SEC ) )
+        {
+            if ( oldAffinity < 70 && m_affinity >= 70 )
+            {
+                m_lastAffinityBanterTime = now;
+                Say( "You have my absolute loyalty, leader! Together we are unstoppable!" );
+                DoEmote( 3 ); // Cheer
+            }
+            else if ( oldAffinity < 90 && m_affinity >= 90 )
+            {
+                m_lastAffinityBanterTime = now;
+                Say( "Soulbound bond achieved! I will fight to the last breath for this squad!" );
+                DoEmote( 6 ); // Dance
+            }
+        }
+    }
+}
+
+const char* CPlayerBot::GetAffinityTierString( ) const
+{
+    if ( m_affinity >= 90 ) return "Soulbound Champion";
+    if ( m_affinity >= 70 ) return "Loyal";
+    if ( m_affinity >= 30 ) return "Friendly";
+    return "Hesitant";
+}
+
+const char* CPlayerBot::GetPersonalityString( ) const
+{
+    switch ( m_role )
+    {
+        case BOT_ROLE_TANK: return "Loyal Knight";
+        case BOT_ROLE_HEALER: return "Caring Healer";
+        case BOT_ROLE_DPS_MAGIC: return "Sassy Elementalist";
+        case BOT_ROLE_DPS_PHYS_RANGED: return "Cocky Sharpshooter";
+        case BOT_ROLE_DPS_PHYS_MELEE: return "Valiant Striker";
+        default: return "Eager Adventurer";
+    }
+}
+
+bool CPlayerBot::IsDungeonMap( UINT mapId ) const
+{
+    // Goblin Caves (51, 52), Marsh of Ghosts / Pyramids (53), Crystal Cave (61) or special dungeon maps
+    return ( ( mapId >= 51 && mapId <= 65 ) || mapId == 24 || mapId == 25 );
+}
+
+void CPlayerBot::StartPullTarget( CMonster* mob, fPoint returnPos )
+{
+    if ( !mob || !m_player ) return;
+    m_isPullingTarget = true;
+    m_pullAnchorPos = returnPos;
+    m_targetMobCid = mob->clientid;
+    AttackTarget( mob );
+    SetState( BOT_STATE_COMBAT );
+    Say( "Pulling the target mob back to the squad! Stand by for ambush!" );
+}
+
+bool CPlayerBot::EquipGiftedItem( int slot, const CItem& itm )
+{
+    if ( !m_player || itm.itemnum == 0 ) return false;
+    if ( slot < 1 || slot > 8 ) return false;
+
+    m_player->items[slot] = itm;
+    m_player->items[slot].count = 1;
+    m_player->items[slot].appraised = true;
+    m_player->SetStats( );
+
+    // Broadcast visual change (0x7a5)
+    BEGINPACKET( pak, 0x7a5 );
+    ADDWORD    ( pak, m_player->clientid );
+    ADDWORD    ( pak, slot );
+    ADDWORD    ( pak, m_player->items[slot].itemnum );
+    ADDWORD    ( pak, GServer->BuildItemRefine( &m_player->items[slot] ) );
+    ADDWORD    ( pak, m_player->Stats->Move_Speed );
+    GServer->SendToVisible( &pak, m_player );
+
+    AddAffinity( 15 );
+
+    char giftMsg[96];
+    snprintf( giftMsg, sizeof(giftMsg), "Thank you so much! This gear feels amazing on me!" );
+    Say( giftMsg );
+    DoEmote( 4 ); // Bow
+    return true;
+}
+
+bool CPlayerBot::CheckMinionPeel( )
+{
+    if ( !m_player || !m_player->Party || !m_player->Party->party ) return false;
+    // Only DPS roles peel off bosses to clear adds
+    if ( m_role != BOT_ROLE_DPS_PHYS_MELEE && m_role != BOT_ROLE_DPS_PHYS_RANGED && m_role != BOT_ROLE_DPS_MAGIC )
+        return false;
+
+    CMap* map = GetMap( );
+    if ( !map ) return false;
+
+    CParty* party = m_player->Party->party;
+    CPlayer* leader = GetPartyLeader( );
+    CPlayer* healer = NULL;
+    for ( size_t i = 0; i < party->Members.size( ); i++ )
+    {
+        CPlayer* mem = party->Members[i];
+        if ( mem && mem->is_bot && mem->bot_ai && mem->bot_ai->GetRole( ) == BOT_ROLE_HEALER )
+        {
+            healer = mem;
+            break;
+        }
+    }
+
+    // Check if any minion/add is attacking healer or leader
+    for ( UINT i = 0; i < map->MonsterList.size( ); i++ )
+    {
+        CMonster* add = map->MonsterList[i];
+        if ( !add || add->IsDead( ) || add->Stats->HP <= 0 || add->IsBonfire( ) ) continue;
+        if ( add->clientid == m_targetMobCid ) continue;
+
+        bool threat = false;
+        if ( healer && add->Battle && add->Battle->target == healer->clientid ) threat = true;
+        if ( leader && add->Battle && add->Battle->target == leader->clientid ) threat = true;
+
+        if ( threat )
+        {
+            float d = GServer->distance( m_player->Position->current, add->Position->current );
+            if ( d <= 25.0f )
+            {
+                AttackTarget( add );
+                m_targetMobCid = add->clientid;
+                SetState( BOT_STATE_COMBAT );
+                Say( "Peeling minion off the squad! Clearing adds!" );
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool CPlayerBot::CheckSpellInterrupt( CMonster* mob )
+{
+    if ( !mob || !m_player || mob->IsDead( ) || mob->Stats->HP <= 0 ) return false;
+    if ( !m_player->Status->CanCastSkill || m_player->Stats->MP < 20 ) return false;
+
+    // Check if monster is casting a skill
+    if ( !mob->Battle || mob->Battle->skillid == 0 ) return false;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastInterruptTime ) < (clock_t)( 8.0f * CLOCKS_PER_SEC ) ) return false;
+
+    UINT interruptSkill = 0;
+    if ( m_role == BOT_ROLE_TANK || m_player->CharInfo->Job == 111 || m_player->CharInfo->Job == 121 )
+    {
+        interruptSkill = HasSkill( 351 ) ? 351 : ( HasSkill( 261 ) ? 261 : 0 );
+    }
+    else if ( m_role == BOT_ROLE_DPS_PHYS_RANGED || m_player->CharInfo->Job == 311 || m_player->CharInfo->Job == 322 )
+    {
+        interruptSkill = HasSkill( 1501 ) ? 1501 : 0;
+    }
+    else if ( m_role == BOT_ROLE_DPS_MAGIC || m_player->CharInfo->Job == 211 || m_player->CharInfo->Job == 221 )
+    {
+        interruptSkill = HasSkill( 821 ) ? 821 : 0;
+    }
+
+    if ( interruptSkill != 0 )
+    {
+        m_lastInterruptTime = now;
+        m_lastSkillCastTime = now;
+        m_player->StartAction( mob, SKILL_ATTACK, interruptSkill );
+        // Cancel monster channel
+        mob->Battle->skillid = 0;
+        mob->Battle->skilltarget = 0;
+
+        const char* shout = ( m_role == BOT_ROLE_TANK ) ? "Shield Bash! Spell channel cancelled!" :
+                            ( ( m_role == BOT_ROLE_DPS_PHYS_RANGED ) ? "Stun Arrow! Interrupted mob cast!" : "Counter-spell cast! Interrupted!" );
+        Say( shout );
+        return true;
+    }
+    return false;
+}
+
+void CPlayerBot::HandleBossCleaveAndTactics( CMonster* mob )
+{
+    if ( !mob || !m_player || !m_followTarget || !m_followTarget->Position ) return;
+
+    bool isBoss = ( mob->Stats->MaxHP >= 4000 || mob->montype >= 400 );
+    if ( !isBoss ) return;
+
+    // A. Tank Cleave Facing: Position Tank on opposite side of boss facing away from leader
+    if ( m_role == BOT_ROLE_TANK )
+    {
+        float dx = mob->Position->current.x - m_followTarget->Position->current.x;
+        float dy = mob->Position->current.y - m_followTarget->Position->current.y;
+        float len = sqrt( dx * dx + dy * dy );
+        if ( len > 0.5f )
+        {
+            dx /= len;
+            dy /= len;
+            fPoint tankPos;
+            tankPos.x = mob->Position->current.x + dx * 2.2f;
+            tankPos.y = mob->Position->current.y + dy * 2.2f;
+            tankPos.z = mob->Position->current.z;
+
+            float curDist = GServer->distance( m_player->Position->current, tankPos );
+            if ( curDist > 1.8f && curDist < 15.0f )
+            {
+                MoveTo( tankPos );
+            }
+        }
+    }
+    // B. Ranged / Healer AOE Dodging: If too close to a melee boss (< 6.5m), backpedal
+    else if ( m_role == BOT_ROLE_DPS_PHYS_RANGED || m_role == BOT_ROLE_DPS_MAGIC || m_role == BOT_ROLE_HEALER )
+    {
+        float distToBoss = GServer->distance( m_player->Position->current, mob->Position->current );
+        if ( distToBoss < 6.5f )
+        {
+            KiteTarget( mob );
+        }
+    }
 }
 
 BotRole CBotManager::GetPlayerRole( CPlayer* player )

@@ -29,6 +29,7 @@ Recommended Client to use with Server : https://162.35.161.103/downloads/Rose-cl
    - [Milestone 7 — Dynamic Dungeon Instancing & Mail System](#milestone-7--dynamic-dungeon-instancing--mail-system-completed--verified)
    - [Milestone 8 — Combat Mechanics Polish, Spawn Physics & Vanguard AI](#milestone-8--combat-mechanics-polish-spawn-physics--vanguard-ai-completed--verified)
    - [Milestone 9 — Intelligent AI Companion & Party Bot System](#milestone-9--intelligent-ai-companion--party-bot-system-completed--verified)
+   - [Milestone 10 — Advanced Companion Tactics, Convoy PAT Driving & Squad Affinity](#milestone-10--advanced-companion-tactics-convoy-pat-driving--squad-affinity-completed--verified)
 3. [Roadmap & Upcoming Milestones](#roadmap--upcoming-milestones)
 4. [Intelligent AI Companion & PlayerBot Deep-Dive](#intelligent-ai-companion--playerbot-deep-dive)
    - [1. Real Player Auto-Grouping](#1-real-player-auto-grouping)
@@ -240,9 +241,29 @@ RosE Resurrected utilizes a distributed 3-tier server model communicating via TC
 
 ---
 
+### Milestone 10 — Advanced Companion Tactics, Convoy PAT Driving & Squad Affinity (Completed & Verified)
+- **Synchronized PAT Convoy Mount Driving**: Companion bots automatically mount Carts (Level 30–69) or Castle Gear (Level 70+) alongside the party leader when the leader drives (`0x0782`), keeping pace as a convoy and automatically dismounting on foot when the leader stops driving.
+- **Emergency Leader Resurrection & Medical Protocol**: Reviving a fallen party leader receives absolute highest priority. Healer bots immediately drop combat to cast Resurrection (`1051`), while non-healers deploy an Emergency Medical Kit / Revival Scroll. Leader is restored to 40% HP / 30% MP with wire HP (`0x79f`) and stamina/exp packets (`0x79b`), accompanied by emergency squad callouts.
+- **Smart Boss Mechanics & Cleave Facing**: Vanguard Tanks automatically reposition 180° opposite the party leader behind bosses, turning boss frontal cone cleaves away from squishies; Healers and Ranged DPS backpedal from melee AOEs.
+- **Dynamic Spell Channel Interrupts**: Companion bots detect enemy spell casting channels (`skillid != 0`); Tanks (Shield Bash / Voltage Crash) and Scouts (Stun Arrow `1501`) instantly cast interrupts to cancel the boss's channel with callouts (*"Shield Bash! Spell channel cancelled!"*).
+- **Minion & Add Prioritization**: DPS bots automatically peel off bosses to burst down adds attacking the Healer or Leader before returning to the main boss.
+- **Gear Gifting & Custom Appearance (`/party bot equip <slot> [bot]`)**: Players can gift weapons, shields, and armor from their inventory slots directly to companion bots. The bot equips the item, broadcasts visual change packets (`0x7a5`), bows gratefully, and gains +15 Affinity.
+- **Companion Personalities, Banter & Squad Affinity System**:
+  - **Affinity Score (0–100)**: Increases through grinding (+1), boss kills & quest completion (+5), emergency revives (+10), and gifted gear (+15).
+  - **4 Affinity Tiers**: *Hesitant* (0–29), *Friendly* (30–69), *Loyal* (70–89), and *Soulbound Champion* (90–100, granting squad-wide combat perks).
+  - **Archetypal Personalities**: Loyal Knight (Tank), Caring Healer (Cleric), Sassy Elementalist (Mage), Cocky Sharpshooter (Scout), and Valiant Striker (Melee DPS) with situational contextual dialogue.
+- **Target Priority & Focus Marking**:
+  - `/party bot mark`: Squad companion bots lock onto and focus-fire the marked target.
+  - `/party bot pull`: Commands the party Tank to run out, tag the target mob, and kite it back to the squad's ambush perimeter.
+- **Dungeon Corridor Tight-Column Formations**: Cave and dungeon maps (`IsDungeonMap`, maps 51–65) automatically switch wide flank formations into tight, staggered single/double file marching columns to prevent snagging on walls and doorways.
+- **Ambient Faction Wars in PvP Zones**: Roaming bots in PvP-enabled maps (`allowpvp != 0`) detect rival clan tags and automatically engage in open-world faction skirmishes with clan battle cries.
+- **Living Town Routines for Roaming Bots**: Town bots visit forge anvils to inspect equipment, browse marketplace stalls, and perform friendly social emotes when passing players.
+
+---
+
 ## Roadmap & Upcoming Milestones
 
-### Milestone 10 — Advanced World Events, Raids & Planetary Expansion (In Design)
+### Milestone 11 — Advanced World Events, Raids & Planetary Expansion (In Design)
 - [ ] **Planet Luna & Orlo Expansion Polish**: Review and verify space flight transitions, low-gravity physics, and unique monster spawn definitions.
 - [ ] **World Boss Multi-Phase Mechanics**: Implement multi-phase enrage timers, area-of-effect telegraphs, and tiered reward chests for world bosses (*King Spider*, *Chapeau*, *Karkome*).
 - [ ] **Seasonal Event Automation**: Automated in-game holidays (Halloween pumpkin drops, Christmas gift boxes, Summer festival events).
@@ -366,11 +387,45 @@ Players have complete command over their squad's tactical behavior:
 - `/party bot defensive` (or `/party bot guard`): **Bodyguard Stance (Default)** — Bots maintain formation and defend the leader and party members from aggressive attackers.
 - `/party bot passive` (or `/party bot hold`): **Pacifist Stance** — Bots hold fire, cease all attacks, and strictly follow the leader in formation (ideal for dodging aggro in dungeon corridors).
 - `/party bot assist` (or `/party bot focus`): **Focus Fire Stance** — Immediately focuses all squad members' attacks onto the monster currently targeted by the player.
+- `/party bot mark`: **Squad Focus Lock** — Designates the player's active target as the priority target for all bots in the party.
+- `/party bot pull`: **Tank Ambush Pull** — Commands the party Tank to run out, tag the target mob, and kite it back to the squad's ambush perimeter.
+- `/party bot equip <slot> [bot]`: **Gear Gifting** — Gifts weapons, shields, or armor from the player's inventory slot directly to a companion bot, updating its 3D model and boosting Affinity (+15).
 - `/party bot buff`: Forces all Muse/Cleric party bots to refresh party charms immediately.
 - `/party bot follow`: Breaks combat engagements and rallies all bots into formation behind the player.
-- `/party bot info`: Displays active squad member names, levels, jobs, HP/MP percentages, stances, and states.
+- `/party bot info`: Displays active squad member names, levels, personality archetypes, Affinity tier, HP/MP percentages, stances, and active Soulbound perks.
 
-### 7. Dynamic 2D Trigonometric Formations & Distance Tethering
+### 10. Synchronized PAT Convoy Mount Driving
+When the party leader boards a Cart or Castle Gear (`Status->Stance == DRIVING`), companion bots Level 30+ automatically equip matching vehicle frames, engines, and wheels/legs, broadcasting drive packets (`0x0782`) to travel alongside the leader as a high-speed mechanized convoy. When the leader dismounts, all companions dismount in unison to fight on foot.
+
+### 11. Emergency Leader Resurrection & Medical Protocol
+Reviving a fallen party leader receives the highest AI priority:
+- Muse/Cleric bots immediately break combat and cast Resurrection (`1051`).
+- If no Healer is available, non-healer companions (Soldiers, Hawkers, Dealers) deploy Emergency Medical Kits / Revival Scrolls.
+- The leader is revived directly into combat with 40% HP / 30% MP, receiving wire HP (`0x79f`) and stamina/exp packets (`0x79b`) alongside supportive callouts.
+
+### 12. Smart Boss Mechanics, Cleave Facing & CC Interrupts
+- **Boss Frontal Cleave Facing**: Vanguard Tanks detect bosses and elites (`MaxHP >= 4000` or `montype >= 400`) and automatically navigate to position 180° opposite the party leader, turning dangerous frontal cleaves away from squishies.
+- **Ranged & Healer AOE Dodging**: Squishy backline bots backpedal to safe distance (12m–15m) when melee bosses close in.
+- **Dynamic Spell Channel Interrupts**: Companion bots detect boss spell channels (`skillid != 0`); Tanks (Shield Bash / Voltage Crash) and Scouts (Stun Arrow `1501`) instantly cast crowd-control interrupts to cancel the boss's cast with callouts.
+- **Minion & Add Peeling**: DPS bots automatically peel off bosses to burst down adds attacking the Healer or Leader before resuming boss attacks.
+
+### 13. Companion Personalities & Squad Affinity System
+Companion bots track an **Affinity Score (0–100)**:
+- **Gaining Affinity**: +1 every 5 monster kills together, +5 for boss kills and quest target completions, +10 for emergency revives, and +15 for gifted gear.
+- **Affinity Tiers**:
+  - *Hesitant* (0–29): Basic companion cooperation.
+  - *Friendly* (30–69): Warm social banter and increased willingness to assist.
+  - *Loyal* (70–89): Absolute squad loyalty (*"You have my absolute loyalty, leader!"*).
+  - *Soulbound Champion* (90–100): Grants passive +5% squad stats and celebratory cheers.
+- **Distinct Personality Archetypes**: Loyal Knight (Tank), Caring Healer (Cleric), Sassy Elementalist (Mage), Cocky Sharpshooter (Scout), and Valiant Striker (Melee DPS) with rich situational dialogue.
+
+### 14. Dungeon Corridor Tight-Column Formations
+In cave and dungeon maps (`IsDungeonMap`, maps 51–65 such as Goblin Cave, Marsh of Ghosts, Pyramids, Crystal Cave), companion bots automatically compress wide lateral formations into tight, staggered single/double file marching columns behind the leader, preventing bots from bumping or snagging on dungeon corridor walls.
+
+### 15. Ambient Faction Wars in PvP Zones
+Roaming non-companion bots in PvP-enabled maps (`allowpvp != 0`) detect rival clan tags and automatically engage in open-world faction skirmishes with battle cries (*"Faction Clash! For Clan X, attack [Target]!"*).
+
+### 16. Dynamic 2D Trigonometric Formations & Distance Tethering
 Party bots maintain realistic tactical formations using 2D trigonometric rotation relative to the leader's heading vector:
 - **Frontline Vanguards (Slots 0 & 1)**: 2.6m ahead, 1.2m left/right.
 - **Ranged Flankers (Slots 2 & 3)**: 1.8m back, 3.2m left/right.
@@ -378,18 +433,19 @@ Party bots maintain realistic tactical formations using 2D trigonometric rotatio
 - **Separation & Flocking**: Repulsion vectors prevent bots from stacking on top of each other or the player.
 - **Distance Tethering**: If the leader moves $> 25\text{--}32\text{m}$ away, changes zones, or teleports, companion bots instantly despawn and respawn alongside the leader.
 
-### 8. Session Persistence & Relog Refilling
+### 17. Session Persistence & Relog Refilling
 If a player leaves the party, kicks companion bots, or logs out and reconnects, `CBotManager::RefillPartyCompanions` automatically restores missing squad slots up to party capacity.
 
-### 9. Guild Wars 2 Style Open-World Auto-Sharing
+### 18. Guild Wars 2 Style Open-World Auto-Sharing
 Eliminates kill-stealing frustration by encouraging cooperative open-world play:
 - **Universal Full EXP Sharing**: Every contributor who damaged a monster receives 100% monster EXP plus a 15% cooperative bonus.
 - **Shared Drops**: Monsters drop loot that can be picked up by any contributor.
 - **Universal Quest Credit**: Every participant receives full kill credit towards active quests.
 
-### 10. Ambient Grinding Bots & D&D Dice Engine
+### 19. Ambient Grinding Bots & D&D Dice Engine
 Over 100 ambient bots roam the world living authentic player lives:
 - **1,200m Map-Wide Sensory Radius**: Bots roam and hunt across entire zones, migrating to monster territories when cities are peaceful.
+- **Living Town Routines**: Bots visit blacksmith anvils to inspect weapons, browse market stalls, and exchange friendly emotes with passers-by.
 - **D&D Probabilistic Dice Rolls ($d20$ / $d100$)**:
   - Proximity Greetings: $d20 \ge 15$ (~30% chance).
   - Stranger Buffing: $d20 \ge 14$ (~35% chance for Muses/Clerics).
@@ -399,7 +455,7 @@ Over 100 ambient bots roam the world living authentic player lives:
 - **PAT Vehicles**: Bots level 30+ mount Carts, and level 70+ mount Castle Gear robots for long-distance travel.
 - **Resting & Recovery**: Bots sit (`Status->Stance = SITTING`) when HP < 40% or MP < 30% to regenerate.
 
-### 11. Worldwide Grind-Spot Buff Bots (The Cleric Sisters)
+### 20. Worldwide Grind-Spot Buff Bots (The Cleric Sisters)
 Stationed at prime leveling areas across Planet Junon:
 
 | Sister | Location | Zone / Region |
