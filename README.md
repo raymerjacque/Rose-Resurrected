@@ -30,6 +30,7 @@ Recommended Client to use with Server : https://162.35.161.103/downloads/Rose-cl
    - [Milestone 8 — Combat Mechanics Polish, Spawn Physics & Vanguard AI](#milestone-8--combat-mechanics-polish-spawn-physics--vanguard-ai-completed--verified)
    - [Milestone 9 — Intelligent AI Companion & Party Bot System](#milestone-9--intelligent-ai-companion--party-bot-system-completed--verified)
    - [Milestone 10 — Advanced Companion Tactics, Convoy PAT Driving & Squad Affinity](#milestone-10--advanced-companion-tactics-convoy-pat-driving--squad-affinity-completed--verified)
+   - [Milestone 11 — Tactical Gambits, Field Services, Mercenary Hiring & Squad Arena](#milestone-11--tactical-gambits-field-services-mercenary-hiring--squad-arena-completed--verified)
 3. [Roadmap & Upcoming Milestones](#roadmap--upcoming-milestones)
 4. [Intelligent AI Companion & PlayerBot Deep-Dive](#intelligent-ai-companion--playerbot-deep-dive)
    - [1. Real Player Auto-Grouping](#1-real-player-auto-grouping)
@@ -261,9 +262,33 @@ RosE Resurrected utilizes a distributed 3-tier server model communicating via TC
 
 ---
 
+### Milestone 11 — Tactical Gambits, Field Services, Mercenary Hiring & Squad Arena (Completed & Verified)
+- **Tactical Gambits System (`/party bot tactic <speedrun|safe|eco|balanced>`)**:
+  - **Balanced (Default)**: Standard offensive and defensive pacing with 70% triage heal threshold.
+  - **Speedrun**: Maximum DPS burst aggression, zero mana conservation, aggressive pulling, and emergency-only healing (<40% HP).
+  - **Safe**: Highly defensive posture, frequent crowd control, and emergency triage heals/shields whenever any ally falls below 85% HP.
+  - **Eco**: Maximum mana conservation, basic attacks only, and triage heals at <30% HP for sustainable long-term grinding.
+- **On-Demand Field Utility Services**:
+  - `/party bot appraise`: Companion bots inspect all unidentified items in the player's inventory bag, instantly identifying them, unlocking hidden bonus attributes, and saving to database with client sync (`0x718`).
+  - `/party bot repair`: Companions immediately repair all equipped weapons, shields, and armor (and damaged bag gear) back to peak durability (50/50).
+  - `/party bot salvage <slot>`: Converts unwanted bag items directly into Zulies credited immediately to the squad fund with wire sync (`0x71d`).
+- **Autonomous Ammunition Resupply**: Companion bots monitor the leader's arrow (slot 132) and bullet (slot 133) reserves. Whenever ammunition dips below 100 rounds, bots automatically supply a fresh 500-round pack with callouts.
+- **Clan Crest Synchronization & Hall Sharing**:
+  - Companion bots automatically mirror the leader's Clan ID, grade, emblem logo, and back banner (`0x7e0`).
+  - Defeating elite or dungeon boss monsters automatically awards the leader's Clan hall **+5 Clan Points (CP)** and **10,000 Zulies**.
+- **Tactical Off-Target Crowd Control**: During chaotic multi-target encounters, secondary casters and rangers detect adds attacking party squishies and cast Ice Bolt (freezing slow) or Stun Shot to disable them without breaking focus on the primary target.
+- **Dungeon Puzzle & Switch Awareness**: In dungeon maps (`IsDungeonMap`), companions spot switches, levers, locked gates, and chest mechanisms, perform a salute emote (`DoEmote 4`), and notify the party leader.
+- **Tavern Mercenary Recruitment (`/party bot recruit <name>`)**:
+  - Players can recruit renowned seasoned specialists: **Brom** (Knight Tank), **Lyra** (Cleric Healer), **Ignis** (Mage DPS), **Sylvia** (Scout DPS), and **Barnaby** (Artisan Logistics).
+  - Mercenaries start with seasoned veteran trust (**80 Affinity**) and specialized roles.
+- **Akram 4v4 Squad Arena Deployment (`/party bot arena`)**:
+  - Deploys the player and their full bot fireteam directly into Akram Arena, auto-registering all members into match teams and launching the battle.
+
+---
+
 ## Roadmap & Upcoming Milestones
 
-### Milestone 11 — Advanced World Events, Raids & Planetary Expansion (In Design)
+### Milestone 12 — Advanced World Events, Raids & Planetary Expansion (In Design)
 - [ ] **Planet Luna & Orlo Expansion Polish**: Review and verify space flight transitions, low-gravity physics, and unique monster spawn definitions.
 - [ ] **World Boss Multi-Phase Mechanics**: Implement multi-phase enrage timers, area-of-effect telegraphs, and tiered reward chests for world bosses (*King Spider*, *Chapeau*, *Karkome*).
 - [ ] **Seasonal Event Automation**: Automated in-game holidays (Halloween pumpkin drops, Christmas gift boxes, Summer festival events).
@@ -482,10 +507,22 @@ Stationed at prime leveling areas across Planet Junon:
 - **Open-World Duels (`/duel <BotName>`)**: Players can challenge any bot to a duel. Bots yield at 10% HP with a polite bow.
 - **Direct Trading (`/trade <BotName>`)**: Bots accept trades, placing 25,000 Zulies into the trade window.
 - **Party Bot Chat Commands**:
+  - `/party bot aggressive`: Sets Hunter stance (proactively pulls mobs).
+  - `/party bot defensive`: Sets Bodyguard stance (defends squad).
+  - `/party bot passive`: Sets Pacifist stance (holds fire, strictly follows).
+  - `/party bot assist`: Sets Focus Fire stance on player's target.
+  - `/party bot mark`: Marks target mob for squad focus-fire.
+  - `/party bot pull`: Commands Tank to pull target mob back to party.
+  - `/party bot tactic <speedrun|safe|eco|balanced>`: Selects combat pacing and resource gambit.
+  - `/party bot appraise`: Orders companion bot to appraise unidentified bag items.
+  - `/party bot repair`: Orders companion bot to restore gear durability (50/50).
+  - `/party bot salvage <slot>`: Converts bag item into Zulies for squad fund.
+  - `/party bot recruit <name>`: Hires veteran mercenary (Brom, Lyra, Ignis, Sylvia, Barnaby).
+  - `/party bot arena`: Queues and launches full fireteam into Akram 4v4 Arena.
+  - `/party bot equip <slot> [bot]`: Gifts weapon/armor to companion bot.
   - `/party bot buff`: Forces healers to buff the party immediately.
-  - `/party bot follow`: Orders all bots to cease combat and follow.
-  - `/party bot assist`: Focuses fire on the leader's target.
-  - `/party bot info`: Displays bot health, mana, and roles.
+  - `/party bot follow`: Orders all bots into formation.
+  - `/party bot info`: Displays squad roster, roles, stances, tactics, affinity, and stats.
 - **GM Fast Teleport Suite (`/tele <name>` & `/go <name>`)**:
   - *Cities & Fields*: `/tele zant`, `/tele adventure`, `/tele junonpolis` (`/go junon`), `/tele eucar`, `/tele xitasanctuary` (`/tele xita`), `/tele luxem`, `/tele breezy`, `/tele elvergel`, `/tele animalake`, `/tele kenji`, `/tele forestofwisdom`, `/tele desertofthedead`.
   - *Dungeons & Arenas*: `/tele goblincaveb1` through `b3`, `/tele georgecaveb1` through `b2`, `/tele forgottentempleb1` through `b2`, `/tele clanfield`, `/tele teamdeathmatcharena`.

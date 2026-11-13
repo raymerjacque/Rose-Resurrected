@@ -468,5 +468,15 @@ MILESTONE 10 — Advanced Companion Tactics, Convoy PAT Driving & Squad Affinity
 [x] Ambient Faction Wars in PvP Zones: Roaming non-companion bots in PvP-enabled maps (`allowpvp != 0`) detect rival clan bots and initiate automatic open-world faction skirmishes with battle cries.
 [x] Living Town Routines for Roaming Bots: Ambient town bots dynamically visit the forge/blacksmith, browse marketplace stalls, and perform friendly social emotes when passing players.
 
+MILESTONE 11 — Tactical Gambits, Field Services, Mercenary Hiring & Squad Arena (COMPLETED & VERIFIED)
+[x] Tactical Gambits System: Dynamic party pacing and resource management via `/party bot tactic <speedrun|safe|eco|balanced>`. Safe mode prioritizes triage shields & heals at >85% HP with maximum CC; Speedrun mode unleashes full DPS burst with emergency heals at <40% HP; Eco mode minimizes mana consumption with basic attacks and heals at <30% HP; Balanced mode provides standard pacing.
+[x] Field Logistics & Utility Services: On-demand companion field services via `/party bot appraise` (appraises unidentified items and unlocks hidden stats), `/party bot repair` (restores equipped and bag items to 50/50 durability), and `/party bot salvage <slot>` (converts unwanted inventory items into squad Zulies).
+[x] Automated Ammunition Resupply: Companions monitor leader's arrow/bullet ammunition count in bag slots 132 and 133, automatically delivering fresh 500-round supply packs when running low (<100).
+[x] Clan Crest Synchronization & Contribution Sharing: Companion bots mirror the leader's Clan ID, grade, emblem logo, back, and crest banner (`0x7e0`). Eliminating elite and boss monsters automatically contributes +5 Clan Points and 10,000 Zulies to the leader's Clan hall.
+[x] Tactical Off-Target Crowd Control: Companions detect secondary add mobs attacking party squishies during combat and apply crowd control disables (Ice Bolt freeze/slow, Stun Shot, Shield Bash) while maintaining primary boss focus.
+[x] Dungeon Puzzle & Switch Interaction: In dungeon instances, companions detect nearby switches, levers, gates, and chest triggers, saluting (`DoEmote 4`) and notifying the leader.
+[x] Tavern Mercenary Recruitment: Implemented `/party bot recruit <Brom|Lyra|Ignis|Sylvia|Barnaby>` allowing players to hire veteran specialists with unique combat roles and 80 initial Affinity.
+[x] Akram 4v4 Squad Arena Deployment: Implemented `/party bot arena` to queue and deploy the player and their full bot fireteam into Akram Arena match battles.
+
 ================================================================================
 

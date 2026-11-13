@@ -70,6 +70,13 @@ enum BotStance {
     BOT_STANCE_ASSIST = 3      // Focus Fire: focuses leader's combat/selected target
 };
 
+enum BotTactic {
+    BOT_TACTIC_BALANCED = 0, // Balanced mix of offense, defense, and resource management (default)
+    BOT_TACTIC_SPEEDRUN = 1, // Max DPS burst, aggressive pulling, ignores mana conservation
+    BOT_TACTIC_SAFE = 2,     // Ultra-defensive, high CC, emergency shields & triage healing > 70% HP
+    BOT_TACTIC_ECO = 3       // Resource saver: minimal mana expenditure, basic attacks, heals < 30% HP
+};
+
 class CPlayerBot {
 public:
     CPlayerBot( CPlayer* player );
@@ -242,6 +249,7 @@ public:
     bool IsPullingTarget( ) const { return m_isPullingTarget; }
 
     int GetAffinity( ) const { return m_affinity; }
+    void SetAffinity( int affinity ) { m_affinity = ( affinity > 100 ) ? 100 : ( ( affinity < 0 ) ? 0 : affinity ); }
     void AddAffinity( int amount );
     const char* GetAffinityTierString( ) const;
     const char* GetPersonalityString( ) const;
@@ -250,6 +258,19 @@ public:
     void HandleBossCleaveAndTactics( CMonster* mob );
     bool CheckMinionPeel( );
     bool CheckSpellInterrupt( CMonster* mob );
+
+    // Phase 5: Field Services, Gambits, Mercenaries & Squad Arena
+    BotTactic GetTactic( ) const { return m_tactic; }
+    void SetTactic( BotTactic tactic ) { m_tactic = tactic; }
+    const char* GetTacticString( ) const;
+
+    int DoFieldAppraisal( );
+    int DoFieldRepair( );
+    bool DoFieldSalvage( int slot );
+    void CheckAmmunitionResupply( );
+    void CheckClanSync( );
+    bool HandleOffTargetCrowdControl( CMonster* primaryMob );
+    bool CheckPuzzleInteraction( );
 
 private:
     CPlayer* m_player;
@@ -367,6 +388,13 @@ private:
     clock_t m_lastAffinityBanterTime;
     clock_t m_lastInterruptTime;
     clock_t m_lastConvoyMountTime;
+
+    // Phase 5: Tactical Gambits & Field Services
+    BotTactic m_tactic;
+    clock_t m_lastResupplyTime;
+    clock_t m_lastClanSyncTime;
+    clock_t m_lastCcTime;
+    clock_t m_lastPuzzleCheck;
 };
 
 class CBotManager {
@@ -409,6 +437,7 @@ public:
     void CheckPartyRoleBalance( CPlayer* realPlayer );
     void RefillPartyCompanions( CPlayer* realPlayer );
     CPlayer* SpawnCompanionBot( const char* name, BotRole role, int level, int mapId, fPoint pos, CPlayer* leader );
+    bool RecruitMercenary( CPlayer* leader, const char* mercName );
     void CheckPlayerCompanions( );
     void SendPartyFullUpdate( CParty* party );
 

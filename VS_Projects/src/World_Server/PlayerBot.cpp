@@ -1297,7 +1297,12 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_affinity( 50 ),
       m_lastAffinityBanterTime( 0 ),
       m_lastInterruptTime( 0 ),
-      m_lastConvoyMountTime( 0 )
+      m_lastConvoyMountTime( 0 ),
+      m_tactic( BOT_TACTIC_BALANCED ),
+      m_lastResupplyTime( 0 ),
+      m_lastClanSyncTime( 0 ),
+      m_lastCcTime( 0 ),
+      m_lastPuzzleCheck( 0 )
 {
     m_pullAnchorPos.x = 0.0f;
     m_pullAnchorPos.y = 0.0f;
@@ -2549,11 +2554,17 @@ bool CPlayerBot::CheckPartyHeal( )
     CSkills* sk = GServer->GetSkillByID( healSkill );
     if ( !sk ) return false;
 
+    // Tactical Gambit thresholding
+    int healThreshold = 70;
+    if ( m_tactic == BOT_TACTIC_SAFE ) healThreshold = 85;
+    else if ( m_tactic == BOT_TACTIC_SPEEDRUN ) healThreshold = 40;
+    else if ( m_tactic == BOT_TACTIC_ECO ) healThreshold = 30;
+
     // 1. Check Party Leader (Real Player) - Highest Priority!
     CPlayer* leader = GetPartyLeader( );
     if ( leader && !leader->IsDead( ) && leader->Position && leader->Position->Map == m_player->Position->Map )
     {
-        if ( leader->Stats->HP < ( leader->Stats->MaxHP * 75 / 100 ) &&
+        if ( leader->Stats->HP < ( leader->Stats->MaxHP * healThreshold / 100 ) &&
              GServer->distance( m_player->Position->current, leader->Position->current ) <= 25.0f )
         {
             m_player->StartAction( leader, SKILL_BUFF, healSkill );
@@ -2575,7 +2586,7 @@ bool CPlayerBot::CheckPartyHeal( )
             if ( !member || member->IsDead( ) || member->Position->Map != m_player->Position->Map ) continue;
             if ( member->CharInfo->Job == 121 || member->CharInfo->Job == 111 ) // Tank
             {
-                if ( member->Stats->HP < ( member->Stats->MaxHP * 65 / 100 ) &&
+                if ( member->Stats->HP < ( member->Stats->MaxHP * ( healThreshold - 5 ) / 100 ) &&
                      GServer->distance( m_player->Position->current, member->Position->current ) <= 25.0f )
                 {
                     m_player->StartAction( member, SKILL_BUFF, healSkill );
@@ -2590,7 +2601,7 @@ bool CPlayerBot::CheckPartyHeal( )
     }
 
     // 3. Check Self
-    if ( m_player->Stats->HP < ( m_player->Stats->MaxHP * 60 / 100 ) )
+    if ( m_player->Stats->HP < ( m_player->Stats->MaxHP * ( healThreshold - 10 ) / 100 ) )
     {
         m_player->StartAction( m_player, SKILL_BUFF, healSkill );
         m_lastSkillCastTime = now;
@@ -2607,7 +2618,7 @@ bool CPlayerBot::CheckPartyHeal( )
             CPlayer* member = party->Members[i];
             if ( member && !member->IsDead( ) && member != leader && member->Position->Map == m_player->Position->Map )
             {
-                if ( member->Stats->HP < ( member->Stats->MaxHP * 65 / 100 ) &&
+                if ( member->Stats->HP < ( member->Stats->MaxHP * ( healThreshold - 5 ) / 100 ) &&
                      GServer->distance( m_player->Position->current, member->Position->current ) <= 22.0f )
                 {
                     m_player->StartAction( member, SKILL_BUFF, healSkill );
@@ -3900,6 +3911,14 @@ void CPlayerBot::HandleCombat( )
             {
                 bool isEpic = ( mob->Stats->MaxHP >= 4000 || mob->montype >= 400 || ( m_followTarget && IsMonsterQuestTarget( mob, m_followTarget ) ) );
                 AddAffinity( isEpic ? 5 : 1 );
+
+                // Milestone 11: Clan Contribution Sharing on Epic / Boss Kill
+                if ( isEpic && m_followTarget && m_followTarget->Clan && m_followTarget->Clan->clanid != 0 )
+                {
+                    m_followTarget->GiveCP( 5 );
+                    m_followTarget->Clan->money += 10000;
+                    Say( "Epic enemy vanquished! Contributed +5 Clan Points and 10,000 Zulies to the guild hall!" );
+                }
             }
             if ( m_isCompanion && m_followTarget && IsMonsterQuestTarget( mob, m_followTarget ) )
             {
@@ -3969,6 +3988,9 @@ void CPlayerBot::HandleCombat( )
 
     // Minion Peeling: DPS peel off boss if adds attack healer/leader
     if ( CheckMinionPeel( ) ) return;
+
+    // Milestone 11: Tactical Crowd Control on off-target adds
+    if ( m_tactic != BOT_TACTIC_ECO && HandleOffTargetCrowdControl( mob ) ) return;
 
     // Boss Cleave Facing & AOE Dodging
     HandleBossCleaveAndTactics( mob );
@@ -4265,6 +4287,11 @@ void CPlayerBot::HandleFollow( )
             Say( questCallout );
         }
     }
+
+    // Milestone 11: Ammunition resupply, clan synchronization & dungeon puzzle awareness
+    CheckAmmunitionResupply( );
+    CheckClanSync( );
+    CheckPuzzleInteraction( );
 
     // 2. Party Member Support: Heals, Resurrections, Buffs (Always active)
     if ( CheckPartyHeal( ) ) return;
@@ -6280,6 +6307,257 @@ void CPlayerBot::HandleBossCleaveAndTactics( CMonster* mob )
     }
 }
 
+const char* CPlayerBot::GetTacticString( ) const
+{
+    switch ( m_tactic )
+    {
+        case BOT_TACTIC_SPEEDRUN: return "Speedrun";
+        case BOT_TACTIC_SAFE:     return "Safe";
+        case BOT_TACTIC_ECO:      return "Eco";
+        default:                  return "Balanced";
+    }
+}
+
+int CPlayerBot::DoFieldAppraisal( )
+{
+    if ( !m_followTarget || m_followTarget->is_bot ) return 0;
+    int count = 0;
+    for ( int i = 1; i < 140; i++ )
+    {
+        CItem& itm = m_followTarget->items[i];
+        if ( itm.itemnum > 0 && !itm.appraised )
+        {
+            itm.appraised = true;
+            if ( itm.stats == 0 )
+            {
+                itm.stats = ( rand( ) % 30 ) + 1;
+            }
+            m_followTarget->UpdateInventory( i, 0xffff, true );
+            count++;
+        }
+    }
+    if ( count > 0 )
+    {
+        char msg[128];
+        snprintf( msg, sizeof(msg), "Appraised %d unidentified items in your bag, %s! Hidden powers unlocked!",
+            count, m_followTarget->CharInfo->charname );
+        Say( msg );
+    }
+    return count;
+}
+
+int CPlayerBot::DoFieldRepair( )
+{
+    if ( !m_followTarget || m_followTarget->is_bot ) return 0;
+    int count = 0;
+    for ( int i = 1; i < 140; i++ )
+    {
+        CItem& itm = m_followTarget->items[i];
+        if ( itm.itemnum > 0 && itm.durability < 50 )
+        {
+            itm.durability = 50;
+            m_followTarget->UpdateInventory( i, 0xffff, true );
+            count++;
+        }
+    }
+    if ( count > 0 )
+    {
+        char msg[128];
+        snprintf( msg, sizeof(msg), "Repaired %d pieces of gear back to full durability (50/50), %s!",
+            count, m_followTarget->CharInfo->charname );
+        Say( msg );
+    }
+    return count;
+}
+
+bool CPlayerBot::DoFieldSalvage( int slot )
+{
+    if ( !m_followTarget || m_followTarget->is_bot ) return false;
+    if ( slot < 9 || slot >= 140 ) return false;
+
+    CItem& itm = m_followTarget->items[slot];
+    if ( itm.itemnum == 0 ) return false;
+
+    uint64_t scrapValue = (uint64_t)( itm.count > 0 ? itm.count : 1 ) * 650ULL;
+    ClearItem( itm );
+    m_followTarget->UpdateInventory( slot, 0xffff, true );
+    m_followTarget->CharInfo->Zulies += scrapValue;
+
+    BEGINPACKET( pak, 0x71d );
+    ADDQWORD( pak, m_followTarget->CharInfo->Zulies );
+    m_followTarget->client->SendPacket( &pak );
+
+    char msg[128];
+    snprintf( msg, sizeof(msg), "Salvaged item in bag slot %d into %llu Zulies for the squad fund!",
+        slot, (unsigned long long)scrapValue );
+    Say( msg );
+    return true;
+}
+
+void CPlayerBot::CheckAmmunitionResupply( )
+{
+    if ( !m_isCompanion || !m_followTarget || m_followTarget->is_bot ) return;
+    clock_t now = clock( );
+    if ( ( now - m_lastResupplyTime ) < (clock_t)( 20.0f * CLOCKS_PER_SEC ) ) return;
+    m_lastResupplyTime = now;
+
+    int wType = m_followTarget->getWeaponType( );
+    if ( wType == BOW || wType == CROSSBOW )
+    {
+        if ( m_followTarget->items[132].count < 100 )
+        {
+            m_followTarget->items[132].itemtype = NATURAL;
+            m_followTarget->items[132].itemnum = 1;
+            m_followTarget->items[132].count = 500;
+            m_followTarget->items[132].appraised = true;
+            m_followTarget->UpdateInventory( 132, 0xffff, true );
+            Say( "Here is a fresh quiver of arrows, leader! Keep firing!" );
+        }
+    }
+    else if ( wType == GUN || wType == LAUNCHER )
+    {
+        if ( m_followTarget->items[133].count < 100 )
+        {
+            m_followTarget->items[133].itemtype = NATURAL;
+            m_followTarget->items[133].itemnum = 1;
+            m_followTarget->items[133].count = 500;
+            m_followTarget->items[133].appraised = true;
+            m_followTarget->UpdateInventory( 133, 0xffff, true );
+            Say( "Fresh ammo magazine loaded for you, leader! Full auto!" );
+        }
+    }
+}
+
+void CPlayerBot::CheckClanSync( )
+{
+    if ( !m_isCompanion || !m_player || !m_followTarget || m_followTarget->is_bot ) return;
+    clock_t now = clock( );
+    if ( ( now - m_lastClanSyncTime ) < (clock_t)( 15.0f * CLOCKS_PER_SEC ) ) return;
+    m_lastClanSyncTime = now;
+
+    if ( m_followTarget->Clan && m_followTarget->Clan->clanid != 0 )
+    {
+        if ( m_player->Clan->clanid != m_followTarget->Clan->clanid )
+        {
+            m_player->Clan->clanid = m_followTarget->Clan->clanid;
+            m_player->Clan->clanrank = 1;
+            m_player->Clan->grade = m_followTarget->Clan->grade;
+            m_player->Clan->logo = m_followTarget->Clan->logo;
+            m_player->Clan->back = m_followTarget->Clan->back;
+            strncpy( m_player->Clan->clanname, m_followTarget->Clan->clanname, sizeof(m_player->Clan->clanname) - 1 );
+
+            BEGINPACKET( pak, 0x7e0 );
+            ADDBYTE    ( pak, 0x35 );
+            ADDWORD    ( pak, m_player->clientid );
+            ADDWORD    ( pak, m_player->Clan->clanid );
+            ADDWORD    ( pak, 0x0000 );
+            ADDWORD    ( pak, m_player->Clan->back );
+            ADDWORD    ( pak, m_player->Clan->logo );
+            ADDBYTE    ( pak, m_player->Clan->grade );
+            ADDBYTE    ( pak, m_player->Clan->clanrank );
+            ADDSTRING  ( pak, m_player->Clan->clanname );
+            ADDBYTE    ( pak, 0x00 );
+            GServer->SendToVisible( &pak, m_player );
+        }
+    }
+    else if ( m_player->Clan && m_player->Clan->clanid != 0 && ( !m_followTarget->Clan || m_followTarget->Clan->clanid == 0 ) )
+    {
+        m_player->Clan->clanid = 0;
+        m_player->Clan->clanname[0] = '\0';
+    }
+}
+
+bool CPlayerBot::HandleOffTargetCrowdControl( CMonster* primaryMob )
+{
+    if ( !m_player || !m_followTarget || !primaryMob ) return false;
+    if ( !m_player->Status->CanCastSkill || m_player->Stats->MP < 25 ) return false;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastCcTime ) < (clock_t)( 10.0f * CLOCKS_PER_SEC ) ) return false;
+
+    CMap* map = GetMap( );
+    if ( !map ) return false;
+
+    CMonster* secondaryTarget = NULL;
+    for ( UINT i = 0; i < map->MonsterList.size( ); i++ )
+    {
+        CMonster* mob = map->MonsterList[i];
+        if ( !mob || mob == primaryMob || mob->IsDead( ) || mob->Stats->HP <= 0 || mob->IsBonfire( ) ) continue;
+        if ( !mob->Battle || mob->Battle->target == 0 ) continue;
+
+        if ( mob->Battle->target == m_followTarget->clientid || mob->Battle->target == m_player->clientid )
+        {
+            float d = GServer->distance( m_player->Position->current, mob->Position->current );
+            if ( d <= 20.0f )
+            {
+                secondaryTarget = mob;
+                break;
+            }
+        }
+    }
+
+    if ( !secondaryTarget ) return false;
+
+    UINT ccSkill = 0;
+    const char* ccPhrase = NULL;
+
+    if ( m_role == BOT_ROLE_DPS_MAGIC || m_player->CharInfo->Job == 211 || m_player->CharInfo->Job == 221 )
+    {
+        ccSkill = HasSkill( 821 ) ? 821 : 0;
+        ccPhrase = "Ice Bolt crowd control! Freezing off-target add!";
+    }
+    else if ( m_role == BOT_ROLE_DPS_PHYS_RANGED || m_player->CharInfo->Job == 311 || m_player->CharInfo->Job == 322 )
+    {
+        ccSkill = HasSkill( 1501 ) ? 1501 : 0;
+        ccPhrase = "Pinning down off-target add with Stun Shot!";
+    }
+    else if ( m_role == BOT_ROLE_TANK || m_player->CharInfo->Job == 111 || m_player->CharInfo->Job == 121 )
+    {
+        ccSkill = HasSkill( 351 ) ? 351 : ( HasSkill( 261 ) ? 261 : 0 );
+        ccPhrase = "Secondary add peeled and stunned! Keep focus on the boss!";
+    }
+
+    if ( ccSkill != 0 )
+    {
+        m_lastCcTime = now;
+        m_lastSkillCastTime = now;
+        m_player->StartAction( secondaryTarget, SKILL_ATTACK, ccSkill );
+        if ( ccPhrase ) Say( ccPhrase );
+        return true;
+    }
+    return false;
+}
+
+bool CPlayerBot::CheckPuzzleInteraction( )
+{
+    if ( !m_isCompanion || !m_player || !m_player->Position ) return false;
+    if ( !IsDungeonMap( m_player->Position->Map ) ) return false;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastPuzzleCheck ) < (clock_t)( 15.0f * CLOCKS_PER_SEC ) ) return false;
+    m_lastPuzzleCheck = now;
+
+    CMap* map = GetMap( );
+    if ( !map ) return false;
+
+    for ( UINT i = 0; i < map->NPCList.size( ); i++ )
+    {
+        CNPC* npc = map->NPCList[i];
+        if ( !npc ) continue;
+        float d = GServer->distance( m_player->Position->current, npc->pos );
+        if ( d <= 10.0f )
+        {
+            DoEmote( 4 );
+            char puzzleMsg[96];
+            snprintf( puzzleMsg, sizeof(puzzleMsg), "Dungeon mechanism spotted! Ready to activate it on your mark, %s!",
+                m_followTarget ? m_followTarget->CharInfo->charname : "leader" );
+            Say( puzzleMsg );
+            return true;
+        }
+    }
+    return false;
+}
+
 BotRole CBotManager::GetPlayerRole( CPlayer* player )
 {
     if ( !player || !player->CharInfo ) return BOT_ROLE_GENERAL_VISITOR;
@@ -6618,3 +6896,113 @@ void CBotManager::CheckPlayerCompanions( )
         }
     }
 }
+
+bool CBotManager::RecruitMercenary( CPlayer* leader, const char* mercName )
+{
+    if ( !leader || leader->is_bot || !mercName ) return false;
+
+    BotRole role = BOT_ROLE_DPS_PHYS_MELEE;
+    int job = 121;
+    if ( strcasecmp( mercName, "Brom" ) == 0 )
+    {
+        role = BOT_ROLE_TANK;
+        job = 121; // Knight
+    }
+    else if ( strcasecmp( mercName, "Lyra" ) == 0 )
+    {
+        role = BOT_ROLE_HEALER;
+        job = 222; // Cleric
+    }
+    else if ( strcasecmp( mercName, "Ignis" ) == 0 )
+    {
+        role = BOT_ROLE_DPS_MAGIC;
+        job = 221; // Mage
+    }
+    else if ( strcasecmp( mercName, "Sylvia" ) == 0 )
+    {
+        role = BOT_ROLE_DPS_PHYS_RANGED;
+        job = 322; // Scout
+    }
+    else if ( strcasecmp( mercName, "Barnaby" ) == 0 )
+    {
+        role = BOT_ROLE_DPS_PHYS_RANGED;
+        job = 422; // Bourgeois / Artisan
+    }
+    else
+    {
+        return false;
+    }
+
+    if ( !leader->Party || !leader->Party->party )
+    {
+        EnsurePlayerCompanionParty( leader );
+    }
+    CParty* party = leader->Party->party;
+    if ( !party ) return false;
+
+    // Check if mercenary is already in party
+    for ( size_t i = 0; i < party->Members.size( ); i++ )
+    {
+        CPlayer* mem = party->Members[i];
+        if ( mem && strcasecmp( mem->CharInfo->charname, mercName ) == 0 )
+        {
+            return false;
+        }
+    }
+
+    // If party is full (4 members), dismiss companion matching role or non-leader
+    if ( party->Members.size( ) >= 4 )
+    {
+        CPlayer* toDismiss = NULL;
+        for ( size_t i = 0; i < party->Members.size( ); i++ )
+        {
+            CPlayer* mem = party->Members[i];
+            if ( mem && mem->is_bot && mem->bot_ai )
+            {
+                CPlayerBot* botAi = reinterpret_cast<CPlayerBot*>( mem->bot_ai );
+                if ( botAi->GetRole( ) == role )
+                {
+                    toDismiss = mem;
+                    break;
+                }
+                if ( !toDismiss ) toDismiss = mem;
+            }
+        }
+
+        if ( toDismiss )
+        {
+            party->RemovePlayer( toDismiss );
+            toDismiss->Party->party = NULL;
+            RemoveBot( toDismiss->CharInfo->charname );
+        }
+    }
+
+    // Spawn the mercenary
+    fPoint spawnPos = leader->Position->current;
+    spawnPos.x += ( ( rand( ) % 6 ) - 3 );
+    spawnPos.y += ( ( rand( ) % 6 ) - 3 );
+
+    CPlayer* bot = SpawnBot( mercName, job, leader->Stats->Level, leader->Position->Map, spawnPos, false );
+    if ( bot && bot->bot_ai )
+    {
+        CPlayerBot* botAi = reinterpret_cast<CPlayerBot*>( bot->bot_ai );
+        botAi->SetCompanion( true, leader );
+        botAi->SetRole( role );
+        botAi->SetFollowTarget( leader );
+        botAi->SetState( BOT_STATE_FOLLOW );
+        botAi->SyncLevelToLeader( leader->Stats->Level );
+        botAi->SetAffinity( 80 ); // Seasoned veteran initial trust
+
+        party->AddPlayer( bot );
+        bot->Party->party = party;
+        SendPartyFullUpdate( party );
+
+        char intro[128];
+        snprintf( intro, sizeof(intro), "Veteran Mercenary %s reporting for duty! Lead the way, %s!",
+            mercName, leader->CharInfo->charname );
+        botAi->Say( intro );
+        return true;
+    }
+    return false;
+}
+

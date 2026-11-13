@@ -591,6 +591,12 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                 SendPM(thisclient, "/party bot defensive   - Set Bodyguard stance (protects party)");
                 SendPM(thisclient, "/party bot passive     - Set Pacifist stance (holds fire, follows)");
                 SendPM(thisclient, "/party bot assist      - Set Focus Fire stance on your target");
+                SendPM(thisclient, "/party bot tactic <speedrun|safe|eco|balanced> - Set tactical combat gambit");
+                SendPM(thisclient, "/party bot appraise    - Order bot to appraise unidentified bag items");
+                SendPM(thisclient, "/party bot repair      - Order bot to restore gear durability (50/50)");
+                SendPM(thisclient, "/party bot salvage <slot> - Order bot to convert bag item into Zulies");
+                SendPM(thisclient, "/party bot recruit <name> - Hire veteran mercenary (Brom, Lyra, Ignis, etc)");
+                SendPM(thisclient, "/party bot arena       - Deploy full fireteam into Akram 4v4 Arena");
                 SendPM(thisclient, "/party bot mark        - Mark your current target for squad focus-fire");
                 SendPM(thisclient, "/party bot pull        - Command Tank to pull target mob back to party");
                 SendPM(thisclient, "/party bot equip <slot> [bot] - Gift armor/weapon to companion bot");
@@ -884,6 +890,174 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                 SendPM(thisclient, "[Party Bot] %d bots switched to ASSIST (Focus Fire) stance. Select a target to focus-fire.", botCount);
                 return true;
             }
+            else if (strcmp(botAction, "tactic") == 0)
+            {
+                char* tacticMode = strtok(NULL, " ");
+                BotTactic newTactic = BOT_TACTIC_BALANCED;
+                const char* desc = "Balanced pacing and resource usage";
+                if (!tacticMode || strcasecmp(tacticMode, "balanced") == 0)
+                {
+                    newTactic = BOT_TACTIC_BALANCED;
+                    desc = "Balanced pacing (70% heal triage, moderate skill rotation)";
+                }
+                else if (strcasecmp(tacticMode, "speedrun") == 0 || strcasecmp(tacticMode, "burst") == 0)
+                {
+                    newTactic = BOT_TACTIC_SPEEDRUN;
+                    desc = "Speedrun mode (Max DPS burst, emergency heals <40%, zero mana preservation)";
+                }
+                else if (strcasecmp(tacticMode, "safe") == 0 || strcasecmp(tacticMode, "defensive") == 0)
+                {
+                    newTactic = BOT_TACTIC_SAFE;
+                    desc = "Safe mode (Defensive priority, high CC, triage heals >85% HP)";
+                }
+                else if (strcasecmp(tacticMode, "eco") == 0 || strcasecmp(tacticMode, "farm") == 0)
+                {
+                    newTactic = BOT_TACTIC_ECO;
+                    desc = "Eco mode (Mana conservation, basic attacks, heals <30% HP)";
+                }
+                else
+                {
+                    SendPM(thisclient, "Usage: /party bot tactic <speedrun|safe|eco|balanced>");
+                    return true;
+                }
+
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        m->bot_ai->SetTactic(newTactic);
+                        botCount++;
+                    }
+                }
+                SendPM(thisclient, "[Party Bot] Set tactical gambit to %s for %d party bots (%s).",
+                    (newTactic == BOT_TACTIC_SPEEDRUN ? "SPEEDRUN" : (newTactic == BOT_TACTIC_SAFE ? "SAFE" : (newTactic == BOT_TACTIC_ECO ? "ECO" : "BALANCED"))),
+                    botCount, desc);
+                return true;
+            }
+            else if (strcmp(botAction, "appraise") == 0)
+            {
+                int totalAppraised = 0;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        totalAppraised += m->bot_ai->DoFieldAppraisal();
+                        break;
+                    }
+                }
+                if (totalAppraised == 0)
+                {
+                    SendPM(thisclient, "[Party Bot] No unappraised items found in your inventory.");
+                }
+                else
+                {
+                    SendPM(thisclient, "[Party Bot] Field appraisal complete: %d items identified and endowed with stats!", totalAppraised);
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "repair") == 0)
+            {
+                int totalRepaired = 0;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        totalRepaired += m->bot_ai->DoFieldRepair();
+                        break;
+                    }
+                }
+                if (totalRepaired == 0)
+                {
+                    SendPM(thisclient, "[Party Bot] All equipped and inventory gear is already in peak condition (50/50 durability).");
+                }
+                else
+                {
+                    SendPM(thisclient, "[Party Bot] Field repair complete: %d damaged gear pieces restored to 50/50 durability!", totalRepaired);
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "salvage") == 0)
+            {
+                char* slotStr = strtok(NULL, " ");
+                if (!slotStr)
+                {
+                    SendPM(thisclient, "Usage: /party bot salvage <bag_slot_number (9-139)>");
+                    return true;
+                }
+                int slot = atoi(slotStr);
+                if (slot < 9 || slot >= 140)
+                {
+                    SendPM(thisclient, "[Party Bot] Invalid bag slot. Must be between 9 and 139 (equipped gear cannot be salvaged).");
+                    return true;
+                }
+
+                bool salvaged = false;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        salvaged = m->bot_ai->DoFieldSalvage(slot);
+                        break;
+                    }
+                }
+                if (!salvaged)
+                {
+                    SendPM(thisclient, "[Party Bot] Failed to salvage item in slot %d (slot is empty or invalid).", slot);
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "recruit") == 0)
+            {
+                char* mercName = strtok(NULL, " ");
+                if (!mercName)
+                {
+                    SendPM(thisclient, "=== Available Tavern Mercenaries ===");
+                    SendPM(thisclient, "• Brom (Knight Tank - frontline defense, shield taunts)");
+                    SendPM(thisclient, "• Lyra (Cleric Healer - triage heals, high tier buffs)");
+                    SendPM(thisclient, "• Ignis (Mage DPS - explosive AoE fire & ice control)");
+                    SendPM(thisclient, "• Sylvia (Scout DPS - rapid bow shots, critical traps)");
+                    SendPM(thisclient, "• Barnaby (Artisan Support - ammunition crate supplier, field repairs)");
+                    SendPM(thisclient, "Usage: /party bot recruit <Brom|Lyra|Ignis|Sylvia|Barnaby>");
+                    return true;
+                }
+
+                if (CBotManager::GetInstance()->RecruitMercenary(thisclient, mercName))
+                {
+                    SendPM(thisclient, "[Party Bot] Veteran mercenary '%s' has joined your party!", mercName);
+                }
+                else
+                {
+                    SendPM(thisclient, "[Party Bot] Could not recruit '%s'. Choose from Brom, Lyra, Ignis, Sylvia, or Barnaby.", mercName);
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "arena") == 0)
+            {
+                CArenaManager* arenaMgr = CArenaManager::GetInstance();
+                arenaMgr->JoinArena(thisclient);
+                int squadCount = 1;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        arenaMgr->JoinArena(m);
+                        squadCount++;
+                    }
+                }
+
+                if (arenaMgr->GetState() == ARENA_STATE_IDLE)
+                {
+                    arenaMgr->StartMatch();
+                }
+
+                SendPM(thisclient, "[Akram Arena] Full squad of %d combatants deployed into Akram Arena! Match active!", squadCount);
+                return true;
+            }
             else if (strcmp(botAction, "info") == 0)
             {
                 SendPM(thisclient, "=== Party Bot Roster ===");
@@ -894,9 +1068,9 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                     {
                         int hpPct = (m->Stats->MaxHP > 0) ? (m->Stats->HP * 100 / m->Stats->MaxHP) : 100;
                         int mpPct = (m->Stats->MaxMP > 0) ? (m->Stats->MP * 100 / m->Stats->MaxMP) : 100;
-                        SendPM(thisclient, "Bot: %s (Lvl %d, %s) | HP: %d%% MP: %d%% | Stance: %s | Affinity: %d/100 (%s)%s",
+                        SendPM(thisclient, "Bot: %s (Lvl %d, %s) | HP: %d%% MP: %d%% | Stance: %s | Tactic: %s | Affinity: %d/100 (%s)%s",
                             m->CharInfo->charname, m->Stats->Level, m->bot_ai->GetPersonalityString(),
-                            hpPct, mpPct, m->bot_ai->GetStanceString(),
+                            hpPct, mpPct, m->bot_ai->GetStanceString(), m->bot_ai->GetTacticString(),
                             m->bot_ai->GetAffinity(), m->bot_ai->GetAffinityTierString(),
                             (m->bot_ai->GetAffinity() >= 90) ? " [Soulbound Perk Active]" : "");
                         botCount++;
