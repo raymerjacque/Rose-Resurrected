@@ -2,7 +2,7 @@
 
 ***
 
-Recommended Client to use with Server : https://162.35.161.103/downloads/Rose-client.
+Recommended Client to use with Server : https://162.35.161.103/downloads/Rose-client.zip
 
 ***
 
