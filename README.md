@@ -1,6 +1,10 @@
 # RosE Resurrected — Server Emulator
 
-Recommended Client to use with Server : https://162.35.161.103/downloads/Rose-client.zip
+***
+
+Recommended Client to use with Server : https://162.35.161.103/downloads/Rose-client.
+
+***
 
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 [![C++ Standard](https://img.shields.io/badge/C%2B%2B-14-blue.svg)]()
