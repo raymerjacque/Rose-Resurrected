@@ -448,9 +448,12 @@ MILESTONE 9 — Intelligent Automated AI Companion / Party Bot System (COMPLETED
 [x] Real Player Auto-Grouping: Automatically group entering players with AI companion bots upon world entry (`pakDoID`).
 [x] Dynamic Role Balancing & Smart Composition: Detect player spec (Tank, Healer, DPS, Visitor) and fill party with complementary roles. Dynamically adapt bot specs when player changes jobs.
 [x] Level Synchronization & Auto Gear/Skill Progression: Bots auto level up or down to match player level with synchronized tiered gear, weapons, spells, and skills. Dynamic job tier adjustment (Visitor < 10, 1st Job 10-69, 2nd Job 70+) and full skill memory wipe upon level down to strictly prevent high-level skill/buff exploitation at low levels. Auto-sync on player level-up.
-[x] Spec-Specific Combat Strategies & Rotations: Tactical rotations for Tank (aggro peel/taunt), Healer (prioritized healing & buff maintenance), and DPS (focus-fire nukes/shots).
+[x] Spec-Specific Combat Strategies & Rotations: Tactical rotations for Tank (aggro peel/taunt), Healer (prioritized healing & buff maintenance), and DPS (focus-fire nukes/shots). Stateful multi-step synergy combos with crowd control (Ice Bolt 40% slow, Clamp Arrow pin, Stun Arrow), armor breaking (Fatal Thrust), and tank aggro threat lock.
 [x] Formation Flocking & Distance Tethering: Role-based formation positions (Tank front, DPS flanks, Healer rear) with separation push and jitter. Instant map/distance teleportation back to leader when separated.
 [x] Session Persistence & Relog Refilling: Auto-refill missing party companion slots upon player relog or leaving/kicking party members.
+[x] Tactical Party Stances: Full `/party bot <aggressive|defensive|passive|assist|buff|follow|info>` suite controlling squad engagement posture, proactive mob pulling (Hunter mode), bodyguard defense, or pacifist movement.
+[x] Quest Objective Awareness & Tactical Callouts: Real-time scanning of player's active quests (`die_quest`), prioritizing quest targets, calling out nearby objectives, and celebrating quest target eliminations.
+[x] Synchronized Camp Resting & Potion Recovery: Loyal synchronized sitting/resting with party leader with friendly camp chatter, and in-combat HP/MP potion consumption.
 
 ================================================================================
 

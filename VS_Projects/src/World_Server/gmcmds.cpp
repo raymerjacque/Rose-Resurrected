@@ -587,10 +587,13 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
             if (!botAction || strcmp(botAction, "help") == 0)
             {
                 SendPM(thisclient, "=== Party Bot Commands ===");
-                SendPM(thisclient, "/party bot buff   - Order Cleric/Muse bots to refresh buffs");
-                SendPM(thisclient, "/party bot follow - Order all party bots into formation");
-                SendPM(thisclient, "/party bot assist - Order party bots to attack your target");
-                SendPM(thisclient, "/party bot info   - List party bots and roles");
+                SendPM(thisclient, "/party bot aggressive - Set Hunter stance (proactively pulls mobs)");
+                SendPM(thisclient, "/party bot defensive  - Set Bodyguard stance (protects party)");
+                SendPM(thisclient, "/party bot passive    - Set Pacifist stance (holds fire, follows)");
+                SendPM(thisclient, "/party bot assist     - Set Focus Fire stance on your target");
+                SendPM(thisclient, "/party bot buff       - Order Cleric/Muse bots to refresh buffs");
+                SendPM(thisclient, "/party bot follow     - Order all party bots into formation");
+                SendPM(thisclient, "/party bot info       - Display squad roles, stances & stats");
                 return true;
             }
 
@@ -603,7 +606,51 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
             CParty* party = thisclient->Party->party;
             int botCount = 0;
 
-            if (strcmp(botAction, "buff") == 0)
+            if (strcmp(botAction, "aggressive") == 0 || strcmp(botAction, "hunt") == 0)
+            {
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        m->bot_ai->SetStance(BOT_STANCE_AGGRESSIVE);
+                        botCount++;
+                    }
+                }
+                SendPM(thisclient, "[Party Bot] %d bots switched to AGGRESSIVE (Hunter) stance. They will proactively pull quest and nearby monsters.", botCount);
+                return true;
+            }
+            else if (strcmp(botAction, "defensive") == 0 || strcmp(botAction, "guard") == 0)
+            {
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        m->bot_ai->SetStance(BOT_STANCE_DEFENSIVE);
+                        botCount++;
+                    }
+                }
+                SendPM(thisclient, "[Party Bot] %d bots switched to DEFENSIVE (Bodyguard) stance. They will defend you and party members.", botCount);
+                return true;
+            }
+            else if (strcmp(botAction, "passive") == 0 || strcmp(botAction, "hold") == 0)
+            {
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        m->bot_ai->SetStance(BOT_STANCE_PASSIVE);
+                        m->bot_ai->SetState(BOT_STATE_FOLLOW);
+                        ClearBattle(m->Battle);
+                        botCount++;
+                    }
+                }
+                SendPM(thisclient, "[Party Bot] %d bots switched to PASSIVE (Hold Fire) stance. They will strictly follow formation without engaging.", botCount);
+                return true;
+            }
+            else if (strcmp(botAction, "buff") == 0)
             {
                 for (UINT i = 0; i < party->Members.size(); i++)
                 {
@@ -632,32 +679,40 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                 SendPM(thisclient, "[Party Bot] %d bots rallied into formation behind you.", botCount);
                 return true;
             }
-            else if (strcmp(botAction, "assist") == 0)
+            else if (strcmp(botAction, "assist") == 0 || strcmp(botAction, "focus") == 0)
             {
-                if (thisclient->Battle->target == 0)
-                {
-                    SendPM(thisclient, "[Party Bot] You have no target selected to attack.");
-                    return true;
-                }
-                CMap* map = GServer->MapList.Index[thisclient->Position->Map];
-                if (!map) return true;
-                CMonster* mob = map->GetMonsterInMap(thisclient->Battle->target);
-                if (!mob || mob->IsDead() || mob->Stats->HP <= 0)
-                {
-                    SendPM(thisclient, "[Party Bot] Target is not a valid alive monster.");
-                    return true;
-                }
                 for (UINT i = 0; i < party->Members.size(); i++)
                 {
                     CPlayer* m = party->Members[i];
                     if (m && m->is_bot && m->bot_ai)
                     {
-                        m->bot_ai->AttackTarget(mob);
-                        m->bot_ai->SetState(BOT_STATE_COMBAT);
+                        m->bot_ai->SetStance(BOT_STANCE_ASSIST);
                         botCount++;
                     }
                 }
-                SendPM(thisclient, "[Party Bot] %d bots ordered to attack target!", botCount);
+                if (thisclient->Battle->target != 0)
+                {
+                    CMap* map = GServer->MapList.Index[thisclient->Position->Map];
+                    if (map)
+                    {
+                        CMonster* mob = map->GetMonsterInMap(thisclient->Battle->target);
+                        if (mob && !mob->IsDead() && mob->Stats->HP > 0)
+                        {
+                            for (UINT i = 0; i < party->Members.size(); i++)
+                            {
+                                CPlayer* m = party->Members[i];
+                                if (m && m->is_bot && m->bot_ai)
+                                {
+                                    m->bot_ai->AttackTarget(mob);
+                                    m->bot_ai->SetState(BOT_STATE_COMBAT);
+                                }
+                            }
+                            SendPM(thisclient, "[Party Bot] %d bots set to ASSIST stance and ordered to focus-fire your target!", botCount);
+                            return true;
+                        }
+                    }
+                }
+                SendPM(thisclient, "[Party Bot] %d bots switched to ASSIST (Focus Fire) stance. Select a target to focus-fire.", botCount);
                 return true;
             }
             else if (strcmp(botAction, "info") == 0)
@@ -668,8 +723,11 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                     CPlayer* m = party->Members[i];
                     if (m && m->is_bot && m->bot_ai)
                     {
-                        SendPM(thisclient, "Bot: %s (Lvl %d, Job %d, State: %s)",
-                            m->CharInfo->charname, m->Stats->Level, m->CharInfo->Job, m->bot_ai->GetStateString());
+                        int hpPct = (m->Stats->MaxHP > 0) ? (m->Stats->HP * 100 / m->Stats->MaxHP) : 100;
+                        int mpPct = (m->Stats->MaxMP > 0) ? (m->Stats->MP * 100 / m->Stats->MaxMP) : 100;
+                        SendPM(thisclient, "Bot: %s (Lvl %d, Job %d) | HP: %d%% MP: %d%% | Stance: %s | State: %s",
+                            m->CharInfo->charname, m->Stats->Level, m->CharInfo->Job,
+                            hpPct, mpPct, m->bot_ai->GetStanceString(), m->bot_ai->GetStateString());
                         botCount++;
                     }
                 }

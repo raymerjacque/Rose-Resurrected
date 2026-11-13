@@ -21,6 +21,7 @@
 #include "character.h"
 #include "worldserver.h"
 #include "Arena.h"
+#include "PlayerBot.h"
 //#define USE_PERCENT_METHOD
 
 void CCharacter::DoAttack( )
@@ -479,6 +480,19 @@ void CCharacter::NormalAttack( CCharacter* Enemy )
     {
         Enemy->AddDamage( this, hitpower );
         Enemy->damagecounter += hitpower;// is for AI
+        if ( IsPlayer() )
+        {
+            CPlayer* player = reinterpret_cast<CPlayer*>( this );
+            if ( player && player->is_bot && player->bot_ai )
+            {
+                CPlayerBot* bAi = reinterpret_cast<CPlayerBot*>( player->bot_ai );
+                if ( bAi && bAi->GetRole() == BOT_ROLE_TANK && Enemy->Battle )
+                {
+                    Enemy->Battle->target = this->clientid;
+                    Enemy->Battle->hitby = this->clientid;
+                }
+            }
+        }
     }
     Enemy->Stats->HP -= hitpower;
     //if(IsPlayer())
@@ -1853,6 +1867,19 @@ void CCharacter::UseAtkSkill( CCharacter* Enemy, CSkills* skill, bool deBuff )
     {
         Enemy->AddDamage( this, (long long) skillpower );
         Enemy->damagecounter+= (long long) skillpower;// is for AI
+        if ( IsPlayer() )
+        {
+            CPlayer* player = reinterpret_cast<CPlayer*>( this );
+            if ( player && player->is_bot && player->bot_ai )
+            {
+                CPlayerBot* bAi = reinterpret_cast<CPlayerBot*>( player->bot_ai );
+                if ( bAi && bAi->GetRole() == BOT_ROLE_TANK && Enemy->Battle )
+                {
+                    Enemy->Battle->target = this->clientid;
+                    Enemy->Battle->hitby = this->clientid;
+                }
+            }
+        }
     }
 
 	//Damage reflect

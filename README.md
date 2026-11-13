@@ -317,19 +317,58 @@ A common issue in emulators is bots retaining high-level skills after scaling do
   - *Clerics (Level 50+)*: Unlock Party Heal (`1031`), Resilience Charm (`1004`), Battle Charm (`1254`), Precision Charm (`1019`), and Resurrection (`1051`).
 - **Verification Before Casting**: Methods `GetLearnedSkill()` and `HasSkill()` verify that a skill exists in the bot's learned skill list with a valid level before casting.
 
-### 6. Spec-Specific Combat Strategies & Rotations
-- **Tank (Soldier / Knight)**:
-  - Continuously scans for monsters attacking the party leader or squishy allies (`CheckPartyTaunt`).
-  - Intercepts monsters within 25m, casting Double Attack (`261`) or Piercing Lunge (`336`) while shouting taunts (*"Leave [Leader] alone! Over here, beast!"*).
+### 6. Spec-Specific Combat Strategies & Multi-Step Synergy Combos
+- **Tank (Soldier / Knight / Champion)**:
+  - Continuously scans for monsters attacking the party leader or squishy allies (`CheckPartyTaunt`), immediately locking monster target and threat.
+  - **3-Step Tank Combo**:
+    - *Step 0 (Opener & Taunt)*: Piercing Lunge (`336`) or Double Attack (`261`) with threat shout (*"Piercing Lunge! Eyes on me, monster!"*).
+    - *Step 1 (Armor Break)*: Fatal Thrust (`291`) to pierce and lower enemy defense.
+    - *Step 2 (Finisher & Aggro Lock)*: Voltage Crash (`351`) ground slam.
 - **Healer / Buffer (Muse / Cleric)**:
   - Strict triage healing loop: Leader (HP < 75%) $\rightarrow$ Tank (HP < 65%) $\rightarrow$ Self (HP < 60%) $\rightarrow$ Other Party Members.
   - Maintains 5 core charms (Hustle, Clobber, Resilience, Battle, Precision) when out of combat or during lulls.
   - Revives fallen party members within 20m (`CheckPartyResurrect`), granting 35% HP / 25% MP.
-- **DPS (Mage / Scout / Hawker / Dealer)**:
-  - Focus-fires the party leader's current target.
-  - Executes tactical ranged rotations (Mana Bolt, Ice Bolt, Mana Spear, Double Arrow, Stun Arrow).
+  - When party HP is safe, assists with Ice Bolt (`821`) to slow enemies by 40% and Mana Spear (`861`).
+- **Magic DPS (Muse / Mage)**:
+  - **3-Step Spell Combo**:
+    - *Step 0 (Crowd Control)*: Ice Bolt (`821`) chilling and slowing enemy movement speed by 40% (*"Ice Bolt! Chilling and slowing target!"*).
+    - *Step 1 (Arcane Burst)*: Mana Spear (`861`) dealing heavy burst damage.
+    - *Step 2 (Overload Finisher)*: Voltage Jolt (`871`) lightning finisher.
+- **Ranged DPS (Hawker / Scout)**:
+  - **3-Step Archer Combo**:
+    - *Step 0 (Crippler / Pin)*: Clamp Arrow (`1431`) pinning enemy movement (*"Clamp Arrow! You can't run!"*).
+    - *Step 1 (Volley Burst)*: Triple Arrow (`1486`) / Double Arrow (`1441`).
+    - *Step 2 (CC Finisher)*: Stun Arrow (`1501`) stunning the target (*"Stun Arrow! Hold still, beast!"*).
+- **Dealer / Bourgeois**:
+  - Gun & Artillery rotations: Twin Shot opener $\rightarrow$ Sniping / Triple Shot $\rightarrow$ Demolition Expertise finisher.
 - **Novice / Visitor (Level 1–9)**:
-  - Executes basic melee novice rotations using Dual Scratch (`101`) and standard attacks.
+  - Basic melee novice rotations using Dual Scratch (`101`) with enthusiastic beginner battle shouts.
+- **In-Combat Potion Consumption**:
+  - When HP drops below 35%, bots consume HP potions (`0x7a3` effect, restoring 35% MaxHP) and call out (*"Using an HP Potion to stay in the fight!"*).
+  - When MP drops below 40%, bots consume MP potions (restoring 40% MaxMP).
+
+### 7. Quest-Aware Target Prioritization & Callouts
+Companion bots actively scan and assist with the leader's quest journal:
+- **Quest Objective Scanner**: Inspects `m_followTarget->quest.quests[0..9]` to cross-reference nearby monsters with active `die_quest` triggers.
+- **Spotted Target Callouts**: Scans every 25 seconds and notifies the leader when quest mobs are within 25 meters (*"Spotted a quest target nearby! Ready when you are, [Leader]!"*).
+- **Proactive Pulling (Hunter Mode)**: In Aggressive stance, bots pull quest targets directly to the leader's formation.
+- **Quest Completion Celebrations**: When a quest objective is slain, bots celebrate in chat (*"Quest target down! Great teamwork, [Leader]!"*).
+
+### 8. Synchronized Camp Resting
+Companion bots loyally mirror the leader's stance:
+- When the leader sits down (`/sit` or stance 2), companion bots automatically take a seat in a perimeter circle around the leader to regenerate HP and MP together.
+- Companions engage in friendly camp banter (*"Resting up with you, leader."*, *"Good fight! Taking a quick breather by the camp."*).
+- When the leader stands up, all bots instantly stand and resume formation.
+
+### 9. Tactical Party Stances & Commands (`/party bot <mode>`)
+Players have complete command over their squad's tactical behavior:
+- `/party bot aggressive` (or `/party bot hunt`): **Hunter Stance** — Bots proactively pull quest targets and nearby level-appropriate monsters within 22m back to the leader to grind efficiently.
+- `/party bot defensive` (or `/party bot guard`): **Bodyguard Stance (Default)** — Bots maintain formation and defend the leader and party members from aggressive attackers.
+- `/party bot passive` (or `/party bot hold`): **Pacifist Stance** — Bots hold fire, cease all attacks, and strictly follow the leader in formation (ideal for dodging aggro in dungeon corridors).
+- `/party bot assist` (or `/party bot focus`): **Focus Fire Stance** — Immediately focuses all squad members' attacks onto the monster currently targeted by the player.
+- `/party bot buff`: Forces all Muse/Cleric party bots to refresh party charms immediately.
+- `/party bot follow`: Breaks combat engagements and rallies all bots into formation behind the player.
+- `/party bot info`: Displays active squad member names, levels, jobs, HP/MP percentages, stances, and states.
 
 ### 7. Dynamic 2D Trigonometric Formations & Distance Tethering
 Party bots maintain realistic tactical formations using 2D trigonometric rotation relative to the leader's heading vector:

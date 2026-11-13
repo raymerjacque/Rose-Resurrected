@@ -1287,7 +1287,11 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_lastCasualChatterTime( 0 ),
       m_isCompanion( false ),
       m_companionOwner( NULL ),
-      m_role( BOT_ROLE_GENERAL_VISITOR )
+      m_role( BOT_ROLE_GENERAL_VISITOR ),
+      m_stance( BOT_STANCE_DEFENSIVE ),
+      m_comboStep( 0 ),
+      m_lastQuestScanTime( 0 ),
+      m_lastRestBanterTime( 0 )
 {
     if ( player && player->CharInfo )
     {
@@ -1370,6 +1374,18 @@ const char* CPlayerBot::GetStateString( ) const
     }
 }
 
+const char* CPlayerBot::GetStanceString( ) const
+{
+    switch ( m_stance )
+    {
+        case BOT_STANCE_AGGRESSIVE: return "Aggressive (Hunter)";
+        case BOT_STANCE_PASSIVE:    return "Passive (Hold Fire)";
+        case BOT_STANCE_ASSIST:     return "Assist (Focus Fire)";
+        case BOT_STANCE_DEFENSIVE:
+        default:                    return "Defensive (Bodyguard)";
+    }
+}
+
 void CPlayerBot::SetState( BotState state )
 {
     m_state = state;
@@ -1424,7 +1440,14 @@ void CPlayerBot::ConsumePotions( )
             ADDWORD    ( pak, 301 );
             GServer->SendToVisible( &pak, m_player );
 
-            SayChatter( "low_hp" );
+            if ( m_isCompanion && m_state == BOT_STATE_COMBAT )
+            {
+                Say( "Using an HP Potion to stay in the fight!" );
+            }
+            else
+            {
+                SayChatter( "low_hp" );
+            }
         }
     }
 
@@ -1447,6 +1470,11 @@ void CPlayerBot::ConsumePotions( )
             ADDWORD    ( pak, m_player->clientid );
             ADDWORD    ( pak, 311 );
             GServer->SendToVisible( &pak, m_player );
+
+            if ( m_isCompanion && m_state == BOT_STATE_COMBAT )
+            {
+                Say( "Drinking a Mana Potion for skill energy!" );
+            }
         }
     }
 }
@@ -2282,62 +2310,183 @@ bool CPlayerBot::CastCombatSkill( CCharacter* target )
     if ( !m_player->Status->CanCastSkill || m_player->Stats->MP < 15 ) return false;
 
     clock_t now = clock( );
-    if ( ( now - m_lastSkillCastTime ) < (clock_t)( 3.5f * CLOCKS_PER_SEC ) ) return false;
+    if ( ( now - m_lastSkillCastTime ) < (clock_t)( 3.0f * CLOCKS_PER_SEC ) ) return false;
 
     int job = m_player->CharInfo->Job;
     int lvl = m_player->Stats->Level;
     UINT chosenSkill = 101; // Dual Scratch fallback
+    const char* comboSay = NULL;
 
-    // Level 1-9 or Visitor has NO class skills, only basic Dual Scratch
+    // Level 1-9 or Visitor has NO class skills, only basic novice Dual Scratch
     if ( lvl < 10 || job == 0 )
     {
         chosenSkill = 101;
+        if ( m_isCompanion && ( rand( ) % 4 == 0 ) )
+        {
+            comboSay = "Novice strike! Dual Scratch!";
+        }
     }
     else if ( job == 111 || job == 121 ) // Tank (Soldier / Knight)
     {
-        if ( lvl >= 50 && HasSkill( 351 ) && ( rand( ) % 3 == 0 ) ) chosenSkill = 351; // Voltage Crash
-        else if ( lvl >= 35 && HasSkill( 336 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 336; // Piercing Lunge
-        else if ( lvl >= 20 && HasSkill( 291 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 291; // Fatal Thrust
-        else if ( HasSkill( 261 ) ) chosenSkill = 261; // Double Attack
-        else chosenSkill = 101; // Dual Scratch
+        // 3-Step Tank Synergy Combo:
+        // Step 0: Opener & Taunt (Piercing Lunge / Double Attack)
+        // Step 1: Armor Break (Fatal Thrust)
+        // Step 2: High Threat Finisher (Voltage Crash)
+        if ( m_comboStep == 0 )
+        {
+            if ( lvl >= 35 && HasSkill( 336 ) ) { chosenSkill = 336; comboSay = "Piercing Lunge! Eyes on me, monster!"; }
+            else if ( HasSkill( 261 ) ) { chosenSkill = 261; comboSay = "Double Attack! Focus on my shield!"; }
+            else { chosenSkill = 101; }
+            m_comboStep = 1;
+        }
+        else if ( m_comboStep == 1 )
+        {
+            if ( lvl >= 20 && HasSkill( 291 ) ) { chosenSkill = 291; comboSay = "Fatal Thrust! Piercing defenses!"; }
+            else if ( HasSkill( 261 ) ) { chosenSkill = 261; }
+            else { chosenSkill = 101; }
+            m_comboStep = 2;
+        }
+        else // Step 2
+        {
+            if ( lvl >= 50 && HasSkill( 351 ) ) { chosenSkill = 351; comboSay = "Voltage Crash! Threat locked down!"; }
+            else if ( lvl >= 35 && HasSkill( 336 ) ) { chosenSkill = 336; }
+            else if ( HasSkill( 261 ) ) { chosenSkill = 261; }
+            else { chosenSkill = 101; }
+            m_comboStep = 0;
+        }
+
+        // Taunt lock: ensure monster focuses the tank!
+        if ( target->Battle )
+        {
+            target->Battle->target = m_player->clientid;
+            target->Battle->hitby = m_player->clientid;
+        }
     }
     else if ( job == 122 || job == 321 || job == 422 ) // Melee DPS (Champion / Raider / Artisan)
     {
-        if ( lvl >= 50 && HasSkill( 351 ) && ( rand( ) % 3 == 0 ) ) chosenSkill = 351; // Voltage Crash
-        else if ( lvl >= 20 && HasSkill( 291 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 291; // Fatal Thrust
-        else if ( HasSkill( 261 ) ) chosenSkill = 261; // Double Attack
-        else chosenSkill = 101; // Dual Scratch
-    }
-    else if ( job == 222 ) // Healer (Cleric)
-    {
-        if ( lvl >= 35 && HasSkill( 861 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 861; // Mana Spear
-        else if ( lvl >= 20 && HasSkill( 821 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 821; // Ice Bolt
-        else if ( HasSkill( 851 ) ) chosenSkill = 851; // Mana Bolt
-        else chosenSkill = 101;
+        // 3-Step Melee Burst Combo:
+        if ( m_comboStep == 0 )
+        {
+            if ( HasSkill( 261 ) ) { chosenSkill = 261; comboSay = "Double Attack!"; }
+            else { chosenSkill = 101; }
+            m_comboStep = 1;
+        }
+        else if ( m_comboStep == 1 )
+        {
+            if ( lvl >= 20 && HasSkill( 291 ) ) { chosenSkill = 291; comboSay = "Fatal Thrust! Heavy puncture!"; }
+            else if ( HasSkill( 261 ) ) { chosenSkill = 261; }
+            else { chosenSkill = 101; }
+            m_comboStep = 2;
+        }
+        else
+        {
+            if ( lvl >= 50 && HasSkill( 351 ) ) { chosenSkill = 351; comboSay = "Voltage Crash finisher!"; }
+            else if ( HasSkill( 261 ) ) { chosenSkill = 261; }
+            else { chosenSkill = 101; }
+            m_comboStep = 0;
+        }
     }
     else if ( job == 211 || job == 221 ) // Magic DPS (Muse / Mage)
     {
-        if ( lvl >= 50 && HasSkill( 871 ) && ( rand( ) % 3 == 0 ) ) chosenSkill = 871; // Voltage Jolt
-        else if ( lvl >= 35 && HasSkill( 861 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 861; // Mana Spear
-        else if ( lvl >= 20 && HasSkill( 821 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 821; // Ice Bolt
-        else if ( HasSkill( 851 ) ) chosenSkill = 851; // Mana Bolt
-        else chosenSkill = 101;
+        // 3-Step Spell Synergy Combo:
+        // Step 0: CC / Movement Slow (Ice Bolt)
+        // Step 1: Magic Burst (Mana Spear)
+        // Step 2: Finisher (Voltage Jolt)
+        if ( m_comboStep == 0 )
+        {
+            if ( lvl >= 20 && HasSkill( 821 ) ) { chosenSkill = 821; comboSay = "Ice Bolt! Chilling and slowing target!"; }
+            else if ( HasSkill( 851 ) ) { chosenSkill = 851; comboSay = "Mana Bolt!"; }
+            else { chosenSkill = 101; }
+            m_comboStep = 1;
+        }
+        else if ( m_comboStep == 1 )
+        {
+            if ( lvl >= 35 && HasSkill( 861 ) ) { chosenSkill = 861; comboSay = "Mana Spear! High arcane damage!"; }
+            else if ( HasSkill( 851 ) ) { chosenSkill = 851; }
+            else { chosenSkill = 101; }
+            m_comboStep = 2;
+        }
+        else
+        {
+            if ( lvl >= 50 && HasSkill( 871 ) ) { chosenSkill = 871; comboSay = "Voltage Jolt! Lightning overload!"; }
+            else if ( lvl >= 35 && HasSkill( 861 ) ) { chosenSkill = 861; }
+            else if ( HasSkill( 851 ) ) { chosenSkill = 851; }
+            else { chosenSkill = 101; }
+            m_comboStep = 0;
+        }
+    }
+    else if ( job == 222 ) // Healer (Cleric)
+    {
+        // Healer offensive support combo (when party HP is safe)
+        if ( m_comboStep == 0 )
+        {
+            if ( lvl >= 20 && HasSkill( 821 ) ) { chosenSkill = 821; comboSay = "Frost magic support! Slowing mob down!"; }
+            else if ( HasSkill( 851 ) ) { chosenSkill = 851; }
+            else { chosenSkill = 101; }
+            m_comboStep = 1;
+        }
+        else
+        {
+            if ( lvl >= 35 && HasSkill( 861 ) ) { chosenSkill = 861; }
+            else if ( HasSkill( 851 ) ) { chosenSkill = 851; }
+            else { chosenSkill = 101; }
+            m_comboStep = 0;
+        }
     }
     else if ( job == 311 || job == 322 ) // Hawker / Scout
     {
-        if ( lvl >= 50 && HasSkill( 1501 ) && ( rand( ) % 3 == 0 ) ) chosenSkill = 1501; // Stun Arrow
-        else if ( lvl >= 35 && HasSkill( 1486 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 1486; // Triple Arrow
-        else if ( lvl >= 20 && HasSkill( 1431 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 1431; // Clamp Arrow
-        else if ( HasSkill( 1441 ) ) chosenSkill = 1441; // Double Arrow
-        else chosenSkill = 101;
+        // 3-Step Ranged Combo:
+        // Step 0: Pin / Cripple (Clamp Arrow)
+        // Step 1: Rapid Volley (Triple Arrow / Double Arrow)
+        // Step 2: Stun Arrow
+        if ( m_comboStep == 0 )
+        {
+            if ( lvl >= 20 && HasSkill( 1431 ) ) { chosenSkill = 1431; comboSay = "Clamp Arrow! You are pinned!"; }
+            else if ( HasSkill( 1441 ) ) { chosenSkill = 1441; comboSay = "Double Arrow!"; }
+            else { chosenSkill = 101; }
+            m_comboStep = 1;
+        }
+        else if ( m_comboStep == 1 )
+        {
+            if ( lvl >= 35 && HasSkill( 1486 ) ) { chosenSkill = 1486; comboSay = "Triple Arrow burst!"; }
+            else if ( HasSkill( 1441 ) ) { chosenSkill = 1441; }
+            else { chosenSkill = 101; }
+            m_comboStep = 2;
+        }
+        else
+        {
+            if ( lvl >= 50 && HasSkill( 1501 ) ) { chosenSkill = 1501; comboSay = "Stun Arrow! Hold still, beast!"; }
+            else if ( lvl >= 35 && HasSkill( 1486 ) ) { chosenSkill = 1486; }
+            else if ( HasSkill( 1441 ) ) { chosenSkill = 1441; }
+            else { chosenSkill = 101; }
+            m_comboStep = 0;
+        }
     }
     else if ( job == 411 || job == 421 ) // Dealer / Bourgeois
     {
-        if ( lvl >= 55 && HasSkill( 2076 ) && ( rand( ) % 3 == 0 ) ) chosenSkill = 2076; // Demolition Expertise
-        else if ( lvl >= 40 && HasSkill( 2301 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 2301; // Triple Shot
-        else if ( lvl >= 25 && HasSkill( 2061 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 2061; // Sniping
-        else if ( HasSkill( 2036 ) ) chosenSkill = 2036; // Twin Shot
-        else chosenSkill = 101;
+        // 3-Step Gun / PAT Heavy Fire Combo
+        if ( m_comboStep == 0 )
+        {
+            if ( HasSkill( 2036 ) ) { chosenSkill = 2036; comboSay = "Twin Shot volley!"; }
+            else { chosenSkill = 101; }
+            m_comboStep = 1;
+        }
+        else if ( m_comboStep == 1 )
+        {
+            if ( lvl >= 25 && HasSkill( 2061 ) ) { chosenSkill = 2061; comboSay = "Precision Sniping!"; }
+            else if ( lvl >= 40 && HasSkill( 2301 ) ) { chosenSkill = 2301; comboSay = "Triple Shot burst!"; }
+            else if ( HasSkill( 2036 ) ) { chosenSkill = 2036; }
+            else { chosenSkill = 101; }
+            m_comboStep = 2;
+        }
+        else
+        {
+            if ( lvl >= 55 && HasSkill( 2076 ) ) { chosenSkill = 2076; comboSay = "Demolition blast!"; }
+            else if ( lvl >= 40 && HasSkill( 2301 ) ) { chosenSkill = 2301; }
+            else if ( HasSkill( 2036 ) ) { chosenSkill = 2036; }
+            else { chosenSkill = 101; }
+            m_comboStep = 0;
+        }
     }
 
     UINT finalSkillId = chosenSkill;
@@ -2358,6 +2507,12 @@ bool CPlayerBot::CastCombatSkill( CCharacter* target )
     m_player->Battle->contatk = true;
     m_player->StartAction( target, SKILL_ATTACK, finalSkillId );
     m_lastSkillCastTime = now;
+
+    if ( m_isCompanion && comboSay && ( rand( ) % 3 == 0 ) )
+    {
+        Say( comboSay );
+    }
+
     return true;
 }
 
@@ -3098,6 +3253,128 @@ bool CPlayerBot::IsMobReserved( CMonster* mob )
     return false;
 }
 
+bool CPlayerBot::IsMonsterQuestTarget( CMonster* mob, CPlayer* leader )
+{
+    if ( !mob || !leader || !leader->Position || !mob->Position ) return false;
+    if ( mob->IsDead( ) || mob->Stats->HP <= 0 || mob->IsBonfire( ) ) return false;
+
+    bool hasActiveQuest = false;
+    for ( int q = 0; q < 10; q++ )
+    {
+        if ( leader->quest.quests[q].QuestID != 0 )
+        {
+            hasActiveQuest = true;
+            break;
+        }
+    }
+    if ( !hasActiveQuest ) return false;
+
+    // 1. Direct die_quest trigger in monster data
+    if ( mob->die_quest != 0 ) return true;
+    if ( mob->thisnpc && mob->thisnpc->die_quest != 0 ) return true;
+
+    // 2. Leader is actively engaging or targeting this monster
+    if ( leader->Battle && leader->Battle->target == mob->clientid ) return true;
+
+    return false;
+}
+
+CMonster* CPlayerBot::FindNearbyQuestMonster( float radius )
+{
+    CPlayer* leader = GetPartyLeader( );
+    if ( !leader || !leader->Position ) return NULL;
+
+    CMap* map = GetMap( );
+    if ( !map || !m_player || !m_player->Position ) return NULL;
+
+    fPoint leaderPos = leader->Position->current;
+    CMonster* bestMob = NULL;
+    float bestDistSq = radius * radius;
+
+    for ( UINT i = 0; i < map->MonsterList.size( ); i++ )
+    {
+        CMonster* mob = map->MonsterList[i];
+        if ( !mob || !mob->Position ) continue;
+        if ( mob->IsDead( ) || mob->Stats->HP <= 0 || mob->IsBonfire( ) ) continue;
+
+        if ( !IsMonsterQuestTarget( mob, leader ) ) continue;
+
+        float dx = leaderPos.x - mob->Position->current.x;
+        if ( dx > radius || dx < -radius ) continue;
+        float dy = leaderPos.y - mob->Position->current.y;
+        if ( dy > radius || dy < -radius ) continue;
+
+        float distSq = dx * dx + dy * dy;
+        if ( distSq < bestDistSq )
+        {
+            bestDistSq = distSq;
+            bestMob = mob;
+        }
+    }
+
+    return bestMob;
+}
+
+bool CPlayerBot::CheckSynchronizedRest( )
+{
+    if ( !m_isCompanion || !m_player || !m_player->Position ) return false;
+    CPlayer* leader = GetPartyLeader( );
+    if ( !leader || !leader->Position || !leader->Status ) return false;
+    if ( m_player->Position->Map != leader->Position->Map ) return false;
+
+    // Stance 2 is SITTING in ROSE Online
+    bool leaderSitting = ( leader->Status->Stance == 2 );
+    bool selfSitting = ( m_player->Status && m_player->Status->Stance == 2 );
+
+    if ( leaderSitting )
+    {
+        // If we are fighting, don't sit down unless monster is dead
+        if ( m_state == BOT_STATE_COMBAT )
+        {
+            if ( !m_player->IsOnBattle( ) || m_player->Battle->target == 0 )
+            {
+                SetState( BOT_STATE_REST );
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        if ( !selfSitting )
+        {
+            SitDown( );
+            SetState( BOT_STATE_REST );
+
+            clock_t now = clock( );
+            if ( ( now - m_lastRestBanterTime ) > (clock_t)( 20 * CLOCKS_PER_SEC ) )
+            {
+                m_lastRestBanterTime = now;
+                const char* restQuotes[] = {
+                    "Resting up with you, leader.",
+                    "Good fight! Taking a quick breather by the camp.",
+                    "Catching my breath. Ready when you are!",
+                    "Sitting down to recover health and mana."
+                };
+                Say( restQuotes[rand( ) % 4] );
+            }
+        }
+        return true;
+    }
+    else
+    {
+        // Leader stood up or is moving!
+        if ( selfSitting || m_state == BOT_STATE_REST )
+        {
+            StandUp( );
+            SetState( BOT_STATE_FOLLOW );
+            return true;
+        }
+    }
+
+    return false;
+}
+
 CMonster* CPlayerBot::FindNearbyMonster( float radius )
 {
     CMap* map = GetMap( );
@@ -3286,6 +3563,14 @@ void CPlayerBot::Update( )
         if ( leader )
         {
             m_followTarget = leader;
+
+            // Synchronized resting: loyally sit/stand with party leader
+            if ( m_isCompanion && CheckSynchronizedRest( ) && leader->Status && leader->Status->Stance == 2 )
+            {
+                HandleRest( );
+                return;
+            }
+
             float distToLeader = ( m_player->Position->Map == leader->Position->Map ) ?
                 GServer->distance( m_player->Position->current, leader->Position->current ) : 9999.0f;
 
@@ -3499,6 +3784,13 @@ void CPlayerBot::HandleCombat( )
         if ( mob && mob->IsDead( ) )
         {
             CheckBountyProgress( mob );
+            if ( m_isCompanion && m_followTarget && IsMonsterQuestTarget( mob, m_followTarget ) )
+            {
+                char progMsg[96];
+                snprintf( progMsg, sizeof(progMsg), "Quest target down! Great teamwork, %s!",
+                    m_followTarget->CharInfo->charname );
+                Say( progMsg );
+            }
         }
         ClearBattle( m_player->Battle );
         m_targetMobCid = 0;
@@ -3656,6 +3948,12 @@ void CPlayerBot::HandleRest( )
             SetState( BOT_STATE_FOLLOW );
             return;
         }
+
+        // If leader is resting/sitting, companion bot loyally stays sitting with leader!
+        if ( m_isCompanion && m_followTarget->Status && m_followTarget->Status->Stance == 2 )
+        {
+            return;
+        }
     }
 
     if ( m_player->Stats->HP >= ( m_player->Stats->MaxHP * 95 / 100 ) &&
@@ -3740,40 +4038,113 @@ void CPlayerBot::HandleFollow( )
         return;
     }
 
-    // 2. Party Member Support: Heals, Resurrections, Buffs, and Taunts
-    if ( CheckPartyHeal( ) ) return;
-    if ( CheckPartyResurrect( ) ) return;
-    if ( CheckPartyBuffs( ) ) return;
-    if ( CheckPartyTaunt( ) ) return;
+    // Synchronized resting check
+    if ( m_isCompanion && CheckSynchronizedRest( ) ) return;
 
-    // 3. Assist Party Leader in Combat: check if leader is attacking a monster
-    if ( m_followTarget->IsOnBattle( ) && m_followTarget->Battle->target != 0 )
+    // Periodic Quest Mob Scanner & Callouts
+    clock_t now = clock( );
+    if ( m_isCompanion && m_followTarget && ( now - m_lastQuestScanTime ) > (clock_t)( 25 * CLOCKS_PER_SEC ) )
     {
-        CMonster* leaderMob = map->GetMonsterInMap( m_followTarget->Battle->target );
-        if ( leaderMob && !leaderMob->IsDead( ) && leaderMob->Stats->HP > 0 && !leaderMob->IsBonfire( ) )
+        m_lastQuestScanTime = now;
+        CMonster* questMob = FindNearbyQuestMonster( 25.0f );
+        if ( questMob )
         {
-            AttackTarget( leaderMob );
-            SetState( BOT_STATE_COMBAT );
-            return;
+            char questCallout[96];
+            snprintf( questCallout, sizeof(questCallout),
+                "Spotted a quest target nearby! Ready when you are, %s!",
+                m_followTarget->CharInfo->charname );
+            Say( questCallout );
         }
     }
 
-    // 4. Defend Party Members: check if any monster is attacking leader or any party member within 60m
-    for ( UINT i = 0; i < map->MonsterList.size( ); i++ )
+    // 2. Party Member Support: Heals, Resurrections, Buffs (Always active)
+    if ( CheckPartyHeal( ) ) return;
+    if ( CheckPartyResurrect( ) ) return;
+    if ( CheckPartyBuffs( ) ) return;
+
+    // Stance Routing:
+    if ( m_stance == BOT_STANCE_PASSIVE )
     {
-        CMonster* mob = map->MonsterList[i];
-        if ( mob && !mob->IsDead( ) && mob->Stats->HP > 0 && !mob->IsBonfire( ) )
+        // Passive stance: Pacifist / Hold Fire mode. Strictly follows formation without engaging.
+    }
+    else if ( m_stance == BOT_STANCE_ASSIST )
+    {
+        // Assist stance: Focus fire strictly on the leader's active target
+        if ( m_followTarget->IsOnBattle( ) && m_followTarget->Battle->target != 0 )
         {
-            float distToLeader = GServer->distance( m_followTarget->Position->current, mob->Position->current );
-            if ( distToLeader <= 60.0f && mob->Battle && mob->Battle->target != 0 )
+            CMonster* leaderMob = map->GetMonsterInMap( m_followTarget->Battle->target );
+            if ( leaderMob && !leaderMob->IsDead( ) && leaderMob->Stats->HP > 0 && !leaderMob->IsBonfire( ) )
             {
-                for ( size_t m = 0; m < m_player->Party->party->Members.size( ); m++ )
+                AttackTarget( leaderMob );
+                SetState( BOT_STATE_COMBAT );
+                return;
+            }
+        }
+    }
+    else
+    {
+        // Defensive (Bodyguard) or Aggressive (Hunter) stance
+        if ( CheckPartyTaunt( ) ) return;
+
+        // 3. Assist Party Leader in Combat: check if leader is attacking a monster
+        if ( m_followTarget->IsOnBattle( ) && m_followTarget->Battle->target != 0 )
+        {
+            CMonster* leaderMob = map->GetMonsterInMap( m_followTarget->Battle->target );
+            if ( leaderMob && !leaderMob->IsDead( ) && leaderMob->Stats->HP > 0 && !leaderMob->IsBonfire( ) )
+            {
+                AttackTarget( leaderMob );
+                SetState( BOT_STATE_COMBAT );
+                return;
+            }
+        }
+
+        // 4. Defend Party Members: check if any monster is attacking leader or any party member within 60m
+        for ( UINT i = 0; i < map->MonsterList.size( ); i++ )
+        {
+            CMonster* mob = map->MonsterList[i];
+            if ( mob && !mob->IsDead( ) && mob->Stats->HP > 0 && !mob->IsBonfire( ) )
+            {
+                float distToLeader = GServer->distance( m_followTarget->Position->current, mob->Position->current );
+                if ( distToLeader <= 60.0f && mob->Battle && mob->Battle->target != 0 )
                 {
-                    CPlayer* pm = m_player->Party->party->Members[m];
-                    if ( pm && mob->Battle->target == pm->clientid )
+                    for ( size_t m = 0; m < m_player->Party->party->Members.size( ); m++ )
                     {
-                        AttackTarget( mob );
+                        CPlayer* pm = m_player->Party->party->Members[m];
+                        if ( pm && mob->Battle->target == pm->clientid )
+                        {
+                            AttackTarget( mob );
+                            SetState( BOT_STATE_COMBAT );
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Aggressive Stance (Hunter): Proactively pulls quest monsters or nearby mobs if party is idle!
+        if ( m_stance == BOT_STANCE_AGGRESSIVE && m_isCompanion )
+        {
+            if ( m_role == BOT_ROLE_TANK || m_role == BOT_ROLE_DPS_MAGIC || m_role == BOT_ROLE_DPS_PHYS_RANGED || m_role == BOT_ROLE_DPS_PHYS_MELEE )
+            {
+                CMonster* questMob = FindNearbyQuestMonster( 22.0f );
+                CMonster* pullMob = questMob ? questMob : FindNearbyMonster( 18.0f );
+                if ( pullMob && !pullMob->IsDead( ) && pullMob->Stats->HP > 0 && !pullMob->IsBonfire( ) )
+                {
+                    float distToLeader = GServer->distance( m_followTarget->Position->current, pullMob->Position->current );
+                    if ( distToLeader <= 22.0f )
+                    {
+                        AttackTarget( pullMob );
                         SetState( BOT_STATE_COMBAT );
+                        if ( questMob )
+                        {
+                            char pullMsg[96];
+                            snprintf( pullMsg, sizeof(pullMsg), "Engaging quest target, %s!", m_followTarget->CharInfo->charname );
+                            Say( pullMsg );
+                        }
+                        else if ( rand( ) % 3 == 0 )
+                        {
+                            Say( "Aggressive stance: pulling a monster for the group to grind!" );
+                        }
                         return;
                     }
                 }

@@ -63,6 +63,13 @@ enum BotRole {
     BOT_ROLE_GENERAL_VISITOR
 };
 
+enum BotStance {
+    BOT_STANCE_DEFENSIVE = 0, // Bodyguard: protects leader & party members (default)
+    BOT_STANCE_AGGRESSIVE = 1, // Hunter: proactively pulls quest & nearby level-matched mobs
+    BOT_STANCE_PASSIVE = 2,    // Pacifist: holds fire, sprints with leader, ignores aggro
+    BOT_STANCE_ASSIST = 3      // Focus Fire: focuses leader's combat/selected target
+};
+
 class CPlayerBot {
 public:
     CPlayerBot( CPlayer* player );
@@ -216,6 +223,13 @@ public:
     CPlayer* GetCompanionOwner( ) const { return m_companionOwner; }
     BotRole GetRole( ) const { return m_role; }
     void SetRole( BotRole role ) { m_role = role; }
+    BotStance GetStance( ) const { return m_stance; }
+    void SetStance( BotStance stance ) { m_stance = stance; }
+    const char* GetStanceString( ) const;
+
+    bool IsMonsterQuestTarget( CMonster* mob, CPlayer* leader );
+    CMonster* FindNearbyQuestMonster( float radius );
+    bool CheckSynchronizedRest( );
 
     void SyncLevelToLeader( int targetLevel );
     void AdjustSpecToRole( BotRole role, int level );
@@ -275,6 +289,10 @@ private:
     bool m_isCompanion;
     CPlayer* m_companionOwner;
     BotRole m_role;
+    BotStance m_stance;
+    int m_comboStep;
+    clock_t m_lastQuestScanTime;
+    clock_t m_lastRestBanterTime;
 
     // Current Targets
     UINT m_targetMobCid;
