@@ -1,5 +1,7 @@
 # RosE Resurrected — Server Emulator
 
+Recommended Client to use with Server : https://162.35.161.103/downloads/Rose-client.zip
+
 [![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)]()
 [![C++ Standard](https://img.shields.io/badge/C%2B%2B-14-blue.svg)]()
 [![CMake](https://img.shields.io/badge/CMake-3.12%2B-orange.svg)]()
