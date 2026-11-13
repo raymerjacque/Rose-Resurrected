@@ -160,6 +160,8 @@ public:
     // Progression, Skills & Equipment
     void EquipTieredGear( bool broadcast = true );
     void UpdateSkills( );
+    bool GetLearnedSkill( UINT baseSkillId, UINT& outSkillId, int& outSkillLevel );
+    bool HasSkill( UINT baseSkillId );
     bool CastCombatSkill( CCharacter* target );
     bool CheckPartyHeal( );
     bool CheckPartyBuffs( );

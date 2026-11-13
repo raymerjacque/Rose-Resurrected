@@ -2140,80 +2140,139 @@ void CPlayerBot::EquipTieredGear( bool broadcast )
     }
 }
 
+bool CPlayerBot::GetLearnedSkill( UINT baseSkillId, UINT& outSkillId, int& outSkillLevel )
+{
+    if ( !m_player ) return false;
+    for ( int i = 0; i < MAX_ALL_SKILL; i++ )
+    {
+        if ( m_player->cskills[i].id == baseSkillId && m_player->cskills[i].level > 0 )
+        {
+            outSkillLevel = m_player->cskills[i].level;
+            outSkillId = m_player->cskills[i].id + outSkillLevel - 1;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool CPlayerBot::HasSkill( UINT baseSkillId )
+{
+    UINT dummyId = 0;
+    int dummyLvl = 0;
+    return GetLearnedSkill( baseSkillId, dummyId, dummyLvl );
+}
+
 void CPlayerBot::UpdateSkills( )
 {
     if ( !m_player ) return;
     int job = m_player->CharInfo->Job;
     int lvl = m_player->Stats->Level;
 
+    // 1. Completely clear all skill slots so previous high-level skills are erased
+    for ( int i = 0; i < MAX_ALL_SKILL; i++ )
+    {
+        m_player->cskills[i].id = 0;
+        m_player->cskills[i].level = 0;
+        m_player->cskills[i].cooldown_skill = 0;
+        m_player->cskills[i].thisskill = NULL;
+    }
+
     std::vector<UINT> skillsToLearn;
 
-    // Visitor / Universal
+    // Visitor / Universal novice attack (available to all levels, including level 1)
     skillsToLearn.push_back( 101 ); // Dual Scratch
 
-    if ( job == 111 || job == 121 || job == 122 ) // Soldier
+    // Strictly enforce level and job requirements: below level 10, characters have NO CLASS and NO CLASS SKILLS!
+    if ( lvl >= 10 && job != 0 )
     {
-        if ( lvl >= 10 ) skillsToLearn.push_back( 261 ); // Double Attack
-        if ( lvl >= 20 ) skillsToLearn.push_back( 291 ); // Fatal Thrust
-        if ( lvl >= 35 ) skillsToLearn.push_back( 336 ); // Piercing Lunge
-        if ( lvl >= 50 ) skillsToLearn.push_back( 351 ); // Voltage Crash
-    }
-    else if ( job == 211 || job == 221 || job == 222 ) // Muse / Mage / Cleric
-    {
-        if ( lvl >= 10 ) { skillsToLearn.push_back( 851 ); skillsToLearn.push_back( 921 ); } // Mana Bolt, Cure
-        if ( lvl >= 20 ) { skillsToLearn.push_back( 821 ); skillsToLearn.push_back( 926 ); skillsToLearn.push_back( 930 ); } // Ice Bolt, Hustle Charm
-        if ( lvl >= 35 ) { skillsToLearn.push_back( 861 ); skillsToLearn.push_back( 981 ); skillsToLearn.push_back( 1270 ); } // Mana Spear, Recovery, Clobber Charm
-        if ( lvl >= 50 ) { skillsToLearn.push_back( 871 ); skillsToLearn.push_back( 1031 ); skillsToLearn.push_back( 1004 ); skillsToLearn.push_back( 1254 ); skillsToLearn.push_back( 1019 ); skillsToLearn.push_back( 1051 ); } // Voltage Jolt, Party Heal, Resilience, Battle, Precision, Resurrection
-    }
-    else if ( job == 311 || job == 321 || job == 322 ) // Hawker
-    {
-        if ( lvl >= 10 ) skillsToLearn.push_back( 1441 ); // Double Arrow
-        if ( lvl >= 20 ) skillsToLearn.push_back( 1431 ); // Clamp Arrow
-        if ( lvl >= 35 ) skillsToLearn.push_back( 1486 ); // Triple Arrow
-        if ( lvl >= 50 ) skillsToLearn.push_back( 1501 ); // Stun Arrow
-    }
-    else if ( job == 411 || job == 421 || job == 422 ) // Dealer
-    {
-        if ( lvl >= 10 ) skillsToLearn.push_back( 2036 ); // Twin Shot
-        if ( lvl >= 25 ) skillsToLearn.push_back( 2061 ); // Sniping
-        if ( lvl >= 40 ) skillsToLearn.push_back( 2301 ); // Triple Shot
-        if ( lvl >= 55 ) skillsToLearn.push_back( 2076 ); // Demolition Expertise
-    }
-    else // Visitor (job 0)
-    {
-        if ( m_role == BOT_ROLE_TANK || m_role == BOT_ROLE_DPS_PHYS_MELEE )
+        if ( job == 111 || job == 121 || job == 122 ) // Soldier / Knight / Champion
         {
-            skillsToLearn.push_back( 261 ); // Double Attack
+            skillsToLearn.push_back( 261 ); // Double Attack (Lv 10+)
+            if ( lvl >= 20 ) skillsToLearn.push_back( 291 ); // Fatal Thrust (Lv 20+)
+            if ( lvl >= 35 ) skillsToLearn.push_back( 336 ); // Piercing Lunge (Lv 35+)
+            if ( lvl >= 50 ) skillsToLearn.push_back( 351 ); // Voltage Crash (Lv 50+)
         }
-        else if ( m_role == BOT_ROLE_HEALER )
+        else if ( job == 211 || job == 221 || job == 222 ) // Muse / Mage / Cleric
         {
-            skillsToLearn.push_back( 921 ); // Cure
-            skillsToLearn.push_back( 930 ); // Hustle Charm
+            // Level 10 Muse: Cure & Mana Bolt
+            skillsToLearn.push_back( 921 ); // Cure (Lv 10+)
+            skillsToLearn.push_back( 851 ); // Mana Bolt (Lv 10+)
+
+            // Level 20 Muse: Ice Bolt & Hustle Charm
+            if ( lvl >= 20 )
+            {
+                skillsToLearn.push_back( 821 ); // Ice Bolt
+                skillsToLearn.push_back( 926 ); // Hustle Charm (Base ID 926, Dash / Move speed)
+            }
+
+            // Level 35 Muse: Mana Spear, Recovery, Clobber Charm
+            if ( lvl >= 35 )
+            {
+                skillsToLearn.push_back( 861 ); // Mana Spear
+                skillsToLearn.push_back( 976 ); // Recovery (Base ID 976)
+                skillsToLearn.push_back( 1266 ); // Clobber Charm (Base ID 1266, Attack power)
+            }
+
+            // Level 50+ Cleric / High Muse
+            if ( lvl >= 50 )
+            {
+                if ( job == 222 || job == 211 ) // Cleric or high Muse
+                {
+                    skillsToLearn.push_back( 996 );  // Resilience Charm (Base ID 996, Defense)
+                    skillsToLearn.push_back( 1246 ); // Battle Charm (Base ID 1246, Attack speed)
+                    skillsToLearn.push_back( 1011 ); // Precision Charm (Base ID 1011, Accuracy)
+                    skillsToLearn.push_back( 1031 ); // Party Heal
+                    skillsToLearn.push_back( 1051 ); // Resurrection
+                }
+                if ( job == 221 ) // Mage
+                {
+                    skillsToLearn.push_back( 871 ); // Voltage Jolt
+                }
+            }
         }
-        else if ( m_role == BOT_ROLE_DPS_MAGIC )
+        else if ( job == 311 || job == 321 || job == 322 ) // Hawker / Raider / Scout
         {
-            skillsToLearn.push_back( 851 ); // Mana Bolt
-            skillsToLearn.push_back( 821 ); // Ice Bolt
+            skillsToLearn.push_back( 1441 ); // Double Arrow (Lv 10+)
+            if ( lvl >= 20 ) skillsToLearn.push_back( 1431 ); // Clamp Arrow (Lv 20+)
+            if ( lvl >= 35 ) skillsToLearn.push_back( 1486 ); // Triple Arrow (Lv 35+)
+            if ( lvl >= 50 ) skillsToLearn.push_back( 1501 ); // Stun Arrow (Lv 50+)
         }
-        else if ( m_role == BOT_ROLE_DPS_PHYS_RANGED )
+        else if ( job == 411 || job == 421 || job == 422 ) // Dealer / Bourgeois / Artisan
         {
-            skillsToLearn.push_back( 1441 ); // Double Arrow
+            skillsToLearn.push_back( 2036 ); // Twin Shot (Lv 10+)
+            if ( lvl >= 25 ) skillsToLearn.push_back( 2061 ); // Sniping (Lv 25+)
+            if ( lvl >= 40 ) skillsToLearn.push_back( 2301 ); // Triple Shot (Lv 40+)
+            if ( lvl >= 55 ) skillsToLearn.push_back( 2076 ); // Demolition Expertise (Lv 55+)
         }
     }
 
-    int skillLvl = 1 + ( lvl / 10 );
-    if ( skillLvl > 10 ) skillLvl = 10;
-
+    // Populate cskills with appropriate skill levels strictly scaled to current level
     for ( size_t i = 0; i < skillsToLearn.size( ) && i < MAX_ALL_SKILL; i++ )
     {
         UINT skId = skillsToLearn[i];
+        CSkills* baseSk = GServer->GetSkillByID( skId );
+        int skillLvl = 1;
+        if ( baseSk )
+        {
+            int maxLvl = (int)baseSk->MaxLevel;
+            if ( maxLvl < 1 ) maxLvl = 1;
+            int reqLvl = (int)baseSk->clevel;
+            if ( reqLvl < 10 ) reqLvl = 10;
+            if ( lvl > reqLvl )
+            {
+                skillLvl = 1 + ( ( lvl - reqLvl ) / 7 );
+            }
+            if ( skillLvl > maxLvl ) skillLvl = maxLvl;
+            if ( skillLvl < 1 ) skillLvl = 1;
+        }
+
         m_player->cskills[i].id = skId;
         m_player->cskills[i].level = skillLvl;
         m_player->cskills[i].cooldown_skill = 0;
         m_player->cskills[i].thisskill = GServer->GetSkillByID( skId + skillLvl - 1 );
     }
 
-    // Spend skill points
+    // Reset skill points
     m_player->CharInfo->SkillPoints = 0;
 }
 
@@ -2229,56 +2288,64 @@ bool CPlayerBot::CastCombatSkill( CCharacter* target )
     int lvl = m_player->Stats->Level;
     UINT chosenSkill = 101; // Dual Scratch fallback
 
-    if ( m_role == BOT_ROLE_TANK || job == 111 || job == 121 ) // Tank (Soldier / Knight)
+    // Level 1-9 or Visitor has NO class skills, only basic Dual Scratch
+    if ( lvl < 10 || job == 0 )
     {
-        if ( lvl >= 50 && ( rand( ) % 3 == 0 ) ) chosenSkill = 351; // Voltage Crash
-        else if ( lvl >= 35 && ( rand( ) % 2 == 0 ) ) chosenSkill = 336; // Piercing Lunge
-        else if ( lvl >= 20 && ( rand( ) % 2 == 0 ) ) chosenSkill = 291; // Fatal Thrust
-        else if ( lvl >= 10 ) chosenSkill = 261; // Double Attack
+        chosenSkill = 101;
+    }
+    else if ( job == 111 || job == 121 ) // Tank (Soldier / Knight)
+    {
+        if ( lvl >= 50 && HasSkill( 351 ) && ( rand( ) % 3 == 0 ) ) chosenSkill = 351; // Voltage Crash
+        else if ( lvl >= 35 && HasSkill( 336 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 336; // Piercing Lunge
+        else if ( lvl >= 20 && HasSkill( 291 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 291; // Fatal Thrust
+        else if ( HasSkill( 261 ) ) chosenSkill = 261; // Double Attack
         else chosenSkill = 101; // Dual Scratch
     }
-    else if ( m_role == BOT_ROLE_DPS_PHYS_MELEE || job == 122 || job == 321 || job == 422 ) // Melee DPS (Champion / Raider / Artisan)
+    else if ( job == 122 || job == 321 || job == 422 ) // Melee DPS (Champion / Raider / Artisan)
     {
-        if ( lvl >= 50 && ( rand( ) % 3 == 0 ) ) chosenSkill = 351; // Voltage Crash
-        else if ( lvl >= 20 && ( rand( ) % 2 == 0 ) ) chosenSkill = 291; // Fatal Thrust
-        else if ( lvl >= 10 ) chosenSkill = 261; // Double Attack
+        if ( lvl >= 50 && HasSkill( 351 ) && ( rand( ) % 3 == 0 ) ) chosenSkill = 351; // Voltage Crash
+        else if ( lvl >= 20 && HasSkill( 291 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 291; // Fatal Thrust
+        else if ( HasSkill( 261 ) ) chosenSkill = 261; // Double Attack
         else chosenSkill = 101; // Dual Scratch
     }
-    else if ( m_role == BOT_ROLE_HEALER || job == 222 ) // Healer (Cleric)
+    else if ( job == 222 ) // Healer (Cleric)
     {
-        if ( lvl >= 35 && ( rand( ) % 2 == 0 ) ) chosenSkill = 861; // Mana Spear
-        else if ( lvl >= 20 && ( rand( ) % 2 == 0 ) ) chosenSkill = 821; // Ice Bolt
-        else if ( lvl >= 10 ) chosenSkill = 851; // Mana Bolt
+        if ( lvl >= 35 && HasSkill( 861 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 861; // Mana Spear
+        else if ( lvl >= 20 && HasSkill( 821 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 821; // Ice Bolt
+        else if ( HasSkill( 851 ) ) chosenSkill = 851; // Mana Bolt
         else chosenSkill = 101;
     }
-    else if ( m_role == BOT_ROLE_DPS_MAGIC || job == 211 || job == 221 ) // Magic DPS (Mage)
+    else if ( job == 211 || job == 221 ) // Magic DPS (Muse / Mage)
     {
-        if ( lvl >= 50 && ( rand( ) % 3 == 0 ) ) chosenSkill = 871; // Voltage Jolt
-        else if ( lvl >= 35 && ( rand( ) % 2 == 0 ) ) chosenSkill = 861; // Mana Spear
-        else if ( lvl >= 20 && ( rand( ) % 2 == 0 ) ) chosenSkill = 821; // Ice Bolt
-        else if ( lvl >= 10 ) chosenSkill = 851; // Mana Bolt
+        if ( lvl >= 50 && HasSkill( 871 ) && ( rand( ) % 3 == 0 ) ) chosenSkill = 871; // Voltage Jolt
+        else if ( lvl >= 35 && HasSkill( 861 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 861; // Mana Spear
+        else if ( lvl >= 20 && HasSkill( 821 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 821; // Ice Bolt
+        else if ( HasSkill( 851 ) ) chosenSkill = 851; // Mana Bolt
         else chosenSkill = 101;
     }
-    else if ( m_role == BOT_ROLE_DPS_PHYS_RANGED || job == 311 || job == 322 ) // Hawker / Scout
+    else if ( job == 311 || job == 322 ) // Hawker / Scout
     {
-        if ( lvl >= 50 && ( rand( ) % 3 == 0 ) ) chosenSkill = 1501; // Stun Arrow
-        else if ( lvl >= 35 && ( rand( ) % 2 == 0 ) ) chosenSkill = 1486; // Triple Arrow
-        else if ( lvl >= 20 && ( rand( ) % 2 == 0 ) ) chosenSkill = 1431; // Clamp Arrow
-        else if ( lvl >= 10 ) chosenSkill = 1441; // Double Arrow
+        if ( lvl >= 50 && HasSkill( 1501 ) && ( rand( ) % 3 == 0 ) ) chosenSkill = 1501; // Stun Arrow
+        else if ( lvl >= 35 && HasSkill( 1486 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 1486; // Triple Arrow
+        else if ( lvl >= 20 && HasSkill( 1431 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 1431; // Clamp Arrow
+        else if ( HasSkill( 1441 ) ) chosenSkill = 1441; // Double Arrow
         else chosenSkill = 101;
     }
     else if ( job == 411 || job == 421 ) // Dealer / Bourgeois
     {
-        if ( lvl >= 55 && ( rand( ) % 3 == 0 ) ) chosenSkill = 2076; // Demolition Expertise
-        else if ( lvl >= 40 && ( rand( ) % 2 == 0 ) ) chosenSkill = 2301; // Triple Shot
-        else if ( lvl >= 25 && ( rand( ) % 2 == 0 ) ) chosenSkill = 2061; // Sniping
-        else if ( lvl >= 10 ) chosenSkill = 2036; // Twin Shot
+        if ( lvl >= 55 && HasSkill( 2076 ) && ( rand( ) % 3 == 0 ) ) chosenSkill = 2076; // Demolition Expertise
+        else if ( lvl >= 40 && HasSkill( 2301 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 2301; // Triple Shot
+        else if ( lvl >= 25 && HasSkill( 2061 ) && ( rand( ) % 2 == 0 ) ) chosenSkill = 2061; // Sniping
+        else if ( HasSkill( 2036 ) ) chosenSkill = 2036; // Twin Shot
         else chosenSkill = 101;
     }
 
-    int skillLvl = 1 + ( lvl / 10 );
-    if ( skillLvl > 10 ) skillLvl = 10;
-    UINT finalSkillId = chosenSkill + skillLvl - 1;
+    UINT finalSkillId = chosenSkill;
+    int finalSkillLvl = 1;
+    if ( !GetLearnedSkill( chosenSkill, finalSkillId, finalSkillLvl ) )
+    {
+        finalSkillId = 101;
+    }
 
     CSkills* sk = GServer->GetSkillByID( finalSkillId );
     if ( !sk )
@@ -2298,19 +2365,25 @@ bool CPlayerBot::CheckPartyHeal( )
 {
     if ( !m_player || !m_player->Status->CanCastSkill || m_player->Stats->MP < 20 ) return false;
     int job = m_player->CharInfo->Job;
-    if ( m_role != BOT_ROLE_HEALER && job != 211 && job != 221 && job != 222 ) return false;
+    // Strictly Muse (211) and Cleric (222) only; Visitors (0) and Mages (221) cannot heal!
+    if ( job != 211 && job != 222 ) return false;
+    if ( m_player->Stats->Level < 10 ) return false; // Minimum Level 10 required for Cure
 
     clock_t now = clock( );
     if ( ( now - m_lastSkillCastTime ) < (clock_t)( 2.5f * CLOCKS_PER_SEC ) ) return false;
 
-    UINT healSkill = ( m_player->Stats->Level >= 35 ) ? 981 : 921; // Recovery or Cure
-    CSkills* sk = GServer->GetSkillByID( healSkill );
-    if ( !sk )
+    UINT healSkill = 0;
+    int healLvl = 0;
+    if ( !GetLearnedSkill( 976, healSkill, healLvl ) ) // Recovery
     {
-        healSkill = 921;
-        sk = GServer->GetSkillByID( healSkill );
-        if ( !sk ) return false;
+        if ( !GetLearnedSkill( 921, healSkill, healLvl ) ) // Cure
+        {
+            return false;
+        }
     }
+
+    CSkills* sk = GServer->GetSkillByID( healSkill );
+    if ( !sk ) return false;
 
     // 1. Check Party Leader (Real Player) - Highest Priority!
     CPlayer* leader = GetPartyLeader( );
@@ -2393,7 +2466,9 @@ bool CPlayerBot::CheckPartyBuffs( )
     if ( !m_player->Status->CanCastSkill || m_player->Stats->MP < 20 ) return false;
 
     int job = m_player->CharInfo->Job;
-    if ( m_role != BOT_ROLE_HEALER && job != 211 && job != 221 && job != 222 ) return false; // Healer / Muse / Mage / Cleric only
+    // Strictly Muse (211) and Cleric (222) only! Visitors (0) and Mages (221) CANNOT buff!
+    if ( job != 211 && job != 222 ) return false;
+    if ( m_player->Stats->Level < 20 ) return false; // Earliest buff (Hustle Charm) requires Level 20!
 
     clock_t now = clock( );
     if ( ( now - m_lastPartyBuffTime ) < (clock_t)( 2.5f * CLOCKS_PER_SEC ) ) return false;
@@ -2422,39 +2497,42 @@ bool CPlayerBot::CheckPartyBuffs( )
         if ( !member || member->IsDead( ) || member->Position->Map != m_player->Position->Map ) continue;
         if ( GServer->distance( m_player->Position->current, member->Position->current ) > 22.0f ) continue;
 
-        // Check for missing buffs in priority order
-        if ( member->Status->Dash_up == 0xff )
+        UINT castId = 0;
+        int castLvl = 0;
+
+        // Check for missing buffs in priority order, strictly verifying the bot has learned them
+        if ( member->Status->Dash_up == 0xff && GetLearnedSkill( 926, castId, castLvl ) )
         {
             targetToBuff = member;
-            skillToCast = 930; // Hustle Charm Lv 5 (Move speed)
+            skillToCast = castId; // Exact learned level of Hustle Charm
             buffName = "Hustle";
             break;
         }
-        else if ( member->Status->Attack_up == 0xff )
+        else if ( member->Status->Attack_up == 0xff && GetLearnedSkill( 1266, castId, castLvl ) )
         {
             targetToBuff = member;
-            skillToCast = 1270; // Clobber Charm Lv 5 (Attack power)
+            skillToCast = castId; // Exact learned level of Clobber Charm
             buffName = "Clobber Charm";
             break;
         }
-        else if ( member->Status->Defense_up == 0xff )
+        else if ( member->Status->Defense_up == 0xff && GetLearnedSkill( 996, castId, castLvl ) )
         {
             targetToBuff = member;
-            skillToCast = 1004; // Resilience Charm Lv 9 (Defense)
+            skillToCast = castId; // Exact learned level of Resilience Charm
             buffName = "Resilience";
             break;
         }
-        else if ( member->Status->Haste_up == 0xff )
+        else if ( member->Status->Haste_up == 0xff && GetLearnedSkill( 1246, castId, castLvl ) )
         {
             targetToBuff = member;
-            skillToCast = 1254; // Battle Charm Lv 9 (Attack speed)
+            skillToCast = castId; // Exact learned level of Battle Charm
             buffName = "Battle Charm";
             break;
         }
-        else if ( member->Status->Accuracy_up == 0xff )
+        else if ( member->Status->Accuracy_up == 0xff && GetLearnedSkill( 1011, castId, castLvl ) )
         {
             targetToBuff = member;
-            skillToCast = 1019; // Precision Charm Lv 9 (Accuracy)
+            skillToCast = castId; // Exact learned level of Precision Charm
             buffName = "Precision";
             break;
         }
@@ -2497,9 +2575,10 @@ bool CPlayerBot::CheckProximityBuffs( )
     if ( !m_player ) return false;
     if ( !m_player->Status->CanCastSkill || m_player->Stats->MP < 30 ) return false;
 
-    // Only Muse (211), Mage (221), Cleric (222) can perform proximity buffing
+    // Only Muse (211) and Cleric (222) can perform proximity buffing; Visitors (0) CANNOT!
     int job = m_player->CharInfo->Job;
-    if ( job != 211 && job != 221 && job != 222 ) return false;
+    if ( job != 211 && job != 222 ) return false;
+    if ( m_player->Stats->Level < 20 ) return false; // Minimum Level 20 required for any buffs
 
     clock_t now = clock( );
     if ( ( now - m_lastPartyBuffTime ) < (clock_t)( 5.0f * CLOCKS_PER_SEC ) ) return false;
@@ -2531,57 +2610,55 @@ bool CPlayerBot::CheckProximityBuffs( )
             float dist = GServer->distance( m_player->Position->current, p->Position->current );
             if ( dist > 16.0f ) continue;
 
-            // 3. Priority checks for missing buffs or healing
+            UINT castId = 0;
+            int castLvl = 0;
+
+            // Priority checks for missing buffs or healing, strictly using learned skills
             if ( p->Stats->HP < ( p->Stats->MaxHP * 85 / 100 ) )
             {
-                targetToBuff = p;
-                skillToCast = 985; // Recovery
-                buffName = "Heal";
+                if ( GetLearnedSkill( 976, castId, castLvl ) || GetLearnedSkill( 921, castId, castLvl ) )
+                {
+                    targetToBuff = p;
+                    skillToCast = castId;
+                    buffName = "Heal";
+                    break;
+                }
             }
-            else if ( p->Status->Dash_up == 0xff )
+            if ( p->Status->Dash_up == 0xff && GetLearnedSkill( 926, castId, castLvl ) )
             {
                 targetToBuff = p;
-                skillToCast = 930; // Hustle Charm (Move Speed)
+                skillToCast = castId;
                 buffName = "Hustle";
+                break;
             }
-            else if ( p->Status->Haste_up == 0xff )
+            else if ( p->Status->Attack_up == 0xff && GetLearnedSkill( 1266, castId, castLvl ) )
             {
                 targetToBuff = p;
-                skillToCast = 1254; // Battle Charm (Attack Speed)
-                buffName = "Battle Charm";
-            }
-            else if ( p->Status->Attack_up == 0xff )
-            {
-                targetToBuff = p;
-                skillToCast = 1270; // Clobber Charm (Attack Power)
+                skillToCast = castId;
                 buffName = "Clobber Charm";
+                break;
             }
-            else if ( p->Status->Defense_up == 0xff )
+            else if ( p->Status->Defense_up == 0xff && GetLearnedSkill( 996, castId, castLvl ) )
             {
                 targetToBuff = p;
-                skillToCast = 1004; // Resilience Charm (Defense)
+                skillToCast = castId;
                 buffName = "Resilience";
+                break;
             }
-            else if ( p->Status->Accuracy_up == 0xff )
+            else if ( p->Status->Haste_up == 0xff && GetLearnedSkill( 1246, castId, castLvl ) )
             {
                 targetToBuff = p;
-                skillToCast = 1019; // Precision Charm (Accuracy)
+                skillToCast = castId;
+                buffName = "Battle Charm";
+                break;
+            }
+            else if ( p->Status->Accuracy_up == 0xff && GetLearnedSkill( 1011, castId, castLvl ) )
+            {
+                targetToBuff = p;
+                skillToCast = castId;
                 buffName = "Precision";
+                break;
             }
-            else if ( p->Status->Critical_up == 0xff )
-            {
-                targetToBuff = p;
-                skillToCast = 1284; // Critical Charm (Crit Rate)
-                buffName = "Critical Charm";
-            }
-            else if ( p->Status->ExtraDamage_up == 0xff )
-            {
-                targetToBuff = p;
-                skillToCast = 1294; // Valkyrie Charm (Extra Damage)
-                buffName = "Valkyrie Charm";
-            }
-
-            if ( targetToBuff ) break;
         }
     }
 
@@ -2590,7 +2667,6 @@ bool CPlayerBot::CheckProximityBuffs( )
         CSkills* sk = GServer->GetSkillByID( skillToCast );
         if ( sk && m_player->IsTargetReached( targetToBuff, sk ) )
         {
-            // Cast buff from current position without chasing or moving towards the player
             m_player->StartAction( targetToBuff, SKILL_BUFF, skillToCast );
             m_lastPartyBuffTime = now;
             m_lastSkillCastTime = now;
@@ -2663,7 +2739,9 @@ bool CPlayerBot::CheckPartyTaunt( )
 {
     if ( !m_player || !m_player->Party || !m_player->Party->party ) return false;
     int job = m_player->CharInfo->Job;
-    if ( m_role != BOT_ROLE_TANK && job != 111 && job != 121 && job != 122 ) return false; // Tank / Soldier / Knight only
+    // Strictly Soldier (111), Knight (121), Champion (122) only; Visitors (0) cannot taunt!
+    if ( job != 111 && job != 121 && job != 122 ) return false;
+    if ( m_player->Stats->Level < 10 ) return false; // Minimum Level 10 required
 
     clock_t now = clock( );
     if ( ( now - m_lastTauntTime ) < (clock_t)( 3.0f * CLOCKS_PER_SEC ) ) return false;
@@ -2673,6 +2751,16 @@ bool CPlayerBot::CheckPartyTaunt( )
 
     CParty* party = m_player->Party->party;
     CPlayer* leader = GetPartyLeader( );
+
+    UINT tauntSkill = 0;
+    int tauntLvl = 0;
+    if ( !GetLearnedSkill( 336, tauntSkill, tauntLvl ) ) // Piercing Lunge
+    {
+        if ( !GetLearnedSkill( 261, tauntSkill, tauntLvl ) ) // Double Attack
+        {
+            return false;
+        }
+    }
 
     for ( UINT i = 0; i < map->MonsterList.size( ); i++ )
     {
@@ -2690,9 +2778,9 @@ bool CPlayerBot::CheckPartyTaunt( )
                 AttackTarget( mob );
                 SetState( BOT_STATE_COMBAT );
 
-                if ( m_player->Stats->Level >= 10 && m_player->Stats->MP >= 15 )
+                if ( m_player->Stats->MP >= 15 )
                 {
-                    m_player->StartAction( mob, SKILL_ATTACK, ( m_player->Stats->Level >= 35 ) ? 336 : 261 );
+                    m_player->StartAction( mob, SKILL_ATTACK, tauntSkill );
                 }
 
                 char tauntMsg[64];
@@ -2715,9 +2803,9 @@ bool CPlayerBot::CheckPartyTaunt( )
                     AttackTarget( mob );
                     SetState( BOT_STATE_COMBAT );
 
-                    if ( m_player->Stats->Level >= 10 && m_player->Stats->MP >= 15 )
+                    if ( m_player->Stats->MP >= 15 )
                     {
-                        m_player->StartAction( mob, SKILL_ATTACK, ( m_player->Stats->Level >= 35 ) ? 336 : 261 );
+                        m_player->StartAction( mob, SKILL_ATTACK, tauntSkill );
                     }
 
                     char tauntMsg[64];
@@ -2728,6 +2816,7 @@ bool CPlayerBot::CheckPartyTaunt( )
             }
         }
     }
+
     return false;
 }
 
@@ -3604,7 +3693,7 @@ void CPlayerBot::HandleFollow( )
     m_followTarget = leader;
 
     // Auto Level Sync: Keep companion bot level matched with party leader
-    if ( m_followTarget && m_followTarget->Stats && m_player->Stats->Level != m_followTarget->Stats->Level )
+    if ( m_followTarget && m_followTarget->Stats )
     {
         SyncLevelToLeader( m_followTarget->Stats->Level );
     }
@@ -5210,8 +5299,64 @@ void CPlayerBot::SyncLevelToLeader( int targetLevel )
     if ( targetLevel > GServer->Config.MaxLevel ) targetLevel = GServer->Config.MaxLevel;
 
     int oldLevel = m_player->Stats->Level;
-    if ( oldLevel == targetLevel && m_lastKnownLevel == targetLevel ) return;
 
+    // Determine the expected Job/Class matching the target level tier and bot role
+    int expectedJob = 0;
+    if ( targetLevel < 10 )
+    {
+        expectedJob = 0; // Below level 10: strictly Visitor (no class yet)
+    }
+    else if ( targetLevel < 70 )
+    {
+        // 1st Job tier (levels 10-69)
+        switch ( m_role )
+        {
+            case BOT_ROLE_TANK:
+            case BOT_ROLE_DPS_PHYS_MELEE:
+                expectedJob = 111; // Soldier
+                break;
+            case BOT_ROLE_HEALER:
+            case BOT_ROLE_DPS_MAGIC:
+                expectedJob = 211; // Muse
+                break;
+            case BOT_ROLE_DPS_PHYS_RANGED:
+                expectedJob = 311; // Hawker
+                break;
+            default:
+                expectedJob = 111;
+                break;
+        }
+    }
+    else
+    {
+        // 2nd Job tier (levels 70+)
+        switch ( m_role )
+        {
+            case BOT_ROLE_TANK:
+                expectedJob = 121; // Knight
+                break;
+            case BOT_ROLE_DPS_PHYS_MELEE:
+                expectedJob = 122; // Champion
+                break;
+            case BOT_ROLE_HEALER:
+                expectedJob = 222; // Cleric
+                break;
+            case BOT_ROLE_DPS_MAGIC:
+                expectedJob = 221; // Mage
+                break;
+            case BOT_ROLE_DPS_PHYS_RANGED:
+                expectedJob = 322; // Scout
+                break;
+            default:
+                expectedJob = 121;
+                break;
+        }
+    }
+
+    if ( oldLevel == targetLevel && m_lastKnownLevel == targetLevel && m_player->CharInfo->Job == (UINT)expectedJob )
+        return;
+
+    m_player->CharInfo->Job = expectedJob;
     m_player->Stats->Level = targetLevel;
     m_lastKnownLevel = targetLevel;
 
@@ -5309,38 +5454,6 @@ void CPlayerBot::AdjustSpecToRole( BotRole role, int level )
 {
     if ( !m_player ) return;
     m_role = role;
-
-    int newJob = 0;
-    if ( level < 10 )
-    {
-        newJob = 0; // Visitor with role specialization
-    }
-    else
-    {
-        switch ( role )
-        {
-            case BOT_ROLE_TANK:
-                newJob = ( level >= 70 ) ? 121 : 111; // Knight or Soldier
-                break;
-            case BOT_ROLE_HEALER:
-                newJob = ( level >= 70 ) ? 222 : 211; // Cleric or Muse
-                break;
-            case BOT_ROLE_DPS_MAGIC:
-                newJob = ( level >= 70 ) ? 221 : 211; // Mage or Muse
-                break;
-            case BOT_ROLE_DPS_PHYS_RANGED:
-                newJob = ( level >= 70 ) ? 322 : 311; // Scout or Hawker
-                break;
-            case BOT_ROLE_DPS_PHYS_MELEE:
-                newJob = ( level >= 70 ) ? 122 : 111; // Champion or Soldier
-                break;
-            default:
-                newJob = 0;
-                break;
-        }
-    }
-
-    m_player->CharInfo->Job = newJob;
     SyncLevelToLeader( level );
 }
 
@@ -5482,10 +5595,7 @@ void CBotManager::EnsurePlayerCompanionParty( CPlayer* realPlayer )
             {
                 CPlayerBot* botAi = reinterpret_cast<CPlayerBot*>( mem->bot_ai );
                 botAi->SetCompanion( true, realPlayer );
-                if ( mem->Stats->Level != realPlayer->Stats->Level )
-                {
-                    botAi->SyncLevelToLeader( realPlayer->Stats->Level );
-                }
+                botAi->SyncLevelToLeader( realPlayer->Stats->Level );
             }
         }
         SendPartyFullUpdate( party );
@@ -5574,14 +5684,26 @@ void CBotManager::EnsurePlayerCompanionParty( CPlayer* realPlayer )
                 botAi->SetState( BOT_STATE_FOLLOW );
 
                 const char* roleGreeting = "I'm with you, leader! Let's hunt!";
-                if ( role == BOT_ROLE_TANK ) roleGreeting = "Shield up! I will protect you and hold aggro, leader!";
-                else if ( role == BOT_ROLE_HEALER ) roleGreeting = "Divine blessings upon you! Your health is my priority!";
-                else if ( role == BOT_ROLE_DPS_MAGIC ) roleGreeting = "Arcane energies ready! I will vaporize our enemies!";
-                else if ( role == BOT_ROLE_DPS_PHYS_RANGED ) roleGreeting = "Quiver full, bow strung! Focusing on your targets!";
-                else if ( role == BOT_ROLE_DPS_PHYS_MELEE ) roleGreeting = "Blades drawn! Ready for combat!";
+                if ( playerLevel < 10 )
+                {
+                    if ( role == BOT_ROLE_TANK ) roleGreeting = "Ready with sword and shield! Let's level up together, leader!";
+                    else if ( role == BOT_ROLE_HEALER ) roleGreeting = "I'll support and watch your back! Let's train to level 10!";
+                    else roleGreeting = "Ready to hunt monsters with you, leader!";
+                }
+                else
+                {
+                    if ( role == BOT_ROLE_TANK ) roleGreeting = "Shield up! I will protect you and hold aggro, leader!";
+                    else if ( role == BOT_ROLE_HEALER ) roleGreeting = "Divine blessings upon you! Your health is my priority!";
+                    else if ( role == BOT_ROLE_DPS_MAGIC ) roleGreeting = "Arcane energies ready! I will vaporize our enemies!";
+                    else if ( role == BOT_ROLE_DPS_PHYS_RANGED ) roleGreeting = "Quiver full, bow strung! Focusing on your targets!";
+                    else if ( role == BOT_ROLE_DPS_PHYS_MELEE ) roleGreeting = "Blades drawn! Ready for combat!";
+                }
 
                 botAi->Say( roleGreeting );
-                botAi->ForcePartyBuff( );
+                if ( playerLevel >= 20 )
+                {
+                    botAi->ForcePartyBuff( );
+                }
             }
         }
     }
@@ -5666,10 +5788,7 @@ void CBotManager::CheckPlayerCompanions( )
                     if ( mem && mem->is_bot && mem->bot_ai )
                     {
                         CPlayerBot* botAi = reinterpret_cast<CPlayerBot*>( mem->bot_ai );
-                        if ( mem->Stats->Level != player->Stats->Level )
-                        {
-                            botAi->SyncLevelToLeader( player->Stats->Level );
-                        }
+                        botAi->SyncLevelToLeader( player->Stats->Level );
                     }
                 }
             }
