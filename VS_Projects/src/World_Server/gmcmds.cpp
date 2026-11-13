@@ -592,6 +592,13 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                 SendPM(thisclient, "/party bot passive     - Set Pacifist stance (holds fire, follows)");
                 SendPM(thisclient, "/party bot assist      - Set Focus Fire stance on your target");
                 SendPM(thisclient, "/party bot tactic <speedrun|safe|eco|balanced> - Set tactical combat gambit");
+                SendPM(thisclient, "/party bot ultimate    - Unleash full squad unison Limit Break attack");
+                SendPM(thisclient, "/party bot refine <slot> - Artisan companion refines gear (+1 to +9)");
+                SendPM(thisclient, "/party bot socket <slot> <gem_slot> - Artisan embeds gem into gear");
+                SendPM(thisclient, "/party bot feast       - Cook campfire feast (+15% EXP & stats)");
+                SendPM(thisclient, "/party bot story [bot] - Hear companion backstory & claim loyalty aura");
+                SendPM(thisclient, "/party bot dance       - Synchronized party dance routine");
+                SendPM(thisclient, "/party bot siege <attack|defend|normal> - Set Castle Siege warfare posture");
                 SendPM(thisclient, "/party bot appraise    - Order bot to appraise unidentified bag items");
                 SendPM(thisclient, "/party bot repair      - Order bot to restore gear durability (50/50)");
                 SendPM(thisclient, "/party bot salvage <slot> - Order bot to convert bag item into Zulies");
@@ -1058,6 +1065,151 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                 SendPM(thisclient, "[Akram Arena] Full squad of %d combatants deployed into Akram Arena! Match active!", squadCount);
                 return true;
             }
+            else if (strcmp(botAction, "ultimate") == 0 || strcmp(botAction, "unison") == 0)
+            {
+                bool executed = false;
+                int curSynergy = 0;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        curSynergy = m->bot_ai->GetSynergy();
+                        if (m->bot_ai->ExecuteUnisonUltimate())
+                        {
+                            executed = true;
+                            break;
+                        }
+                    }
+                }
+                if (!executed)
+                {
+                    SendPM(thisclient, "[Squad Unison] Synergy meter is at %d%% (requires 100%%). Land skill combos, interrupt bosses, and defeat mobs to build synergy!", curSynergy);
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "refine") == 0)
+            {
+                char* slotStr = strtok(NULL, " ");
+                if (!slotStr)
+                {
+                    SendPM(thisclient, "Usage: /party bot refine <inventory_slot_number (1-139)>");
+                    return true;
+                }
+                int slot = atoi(slotStr);
+                bool refined = false;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        refined = m->bot_ai->DoFieldRefine(slot);
+                        break;
+                    }
+                }
+                if (!refined)
+                {
+                    SendPM(thisclient, "[Party Bot] Failed to refine item in slot %d (slot is empty or invalid).", slot);
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "socket") == 0)
+            {
+                char* slotStr = strtok(NULL, " ");
+                char* gemSlotStr = strtok(NULL, " ");
+                if (!slotStr || !gemSlotStr)
+                {
+                    SendPM(thisclient, "Usage: /party bot socket <equip_slot> <gem_bag_slot>");
+                    return true;
+                }
+                int slot = atoi(slotStr);
+                int gemSlot = atoi(gemSlotStr);
+                bool socketed = false;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        socketed = m->bot_ai->DoFieldSocket(slot, gemSlot);
+                        break;
+                    }
+                }
+                if (!socketed)
+                {
+                    SendPM(thisclient, "[Party Bot] Failed to socket gem (check slots and ensure equipment has an open socket).");
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "story") == 0)
+            {
+                char* targetName = strtok(NULL, " ");
+                SendPM(thisclient, "=== Companion Loyalty Chronicles ===");
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        if (targetName && strcasecmp(m->CharInfo->charname, targetName) != 0) continue;
+                        SendPM(thisclient, "[%s] %s | Active: %s (Affinity %d/100)",
+                            m->CharInfo->charname, m->bot_ai->GetStoryDialogue(),
+                            m->bot_ai->GetLoyaltyAuraName(), m->bot_ai->GetAffinity());
+                    }
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "feast") == 0 || strcmp(botAction, "camp") == 0)
+            {
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        m->bot_ai->PrepareCampfireFeast();
+                        break;
+                    }
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "dance") == 0)
+            {
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        m->bot_ai->ExecuteSquadDance();
+                    }
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "siege") == 0)
+            {
+                char* modeStr = strtok(NULL, " ");
+                int mode = 0;
+                const char* modeName = "NORMAL";
+                if (modeStr && strcasecmp(modeStr, "attack") == 0)
+                {
+                    mode = 1;
+                    modeName = "SIEGE ATTACK (Target Gates & Relics)";
+                }
+                else if (modeStr && strcasecmp(modeStr, "defend") == 0)
+                {
+                    mode = 2;
+                    modeName = "SIEGE DEFENSE (Perimeter Fortress)";
+                }
+
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        m->bot_ai->SetSiegeMode(mode);
+                        botCount++;
+                    }
+                }
+                SendPM(thisclient, "[Castle Siege] Set siege warfare posture to %s for %d bots.", modeName, botCount);
+                return true;
+            }
             else if (strcmp(botAction, "info") == 0)
             {
                 SendPM(thisclient, "=== Party Bot Roster ===");
@@ -1068,9 +1220,10 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                     {
                         int hpPct = (m->Stats->MaxHP > 0) ? (m->Stats->HP * 100 / m->Stats->MaxHP) : 100;
                         int mpPct = (m->Stats->MaxMP > 0) ? (m->Stats->MP * 100 / m->Stats->MaxMP) : 100;
-                        SendPM(thisclient, "Bot: %s (Lvl %d, %s) | HP: %d%% MP: %d%% | Stance: %s | Tactic: %s | Affinity: %d/100 (%s)%s",
+                        SendPM(thisclient, "Bot: %s (Lvl %d, %s) | HP: %d%% MP: %d%% | Stance: %s | Tactic: %s | Synergy: %d%% | Aura: %s | Affinity: %d/100 (%s)%s",
                             m->CharInfo->charname, m->Stats->Level, m->bot_ai->GetPersonalityString(),
                             hpPct, mpPct, m->bot_ai->GetStanceString(), m->bot_ai->GetTacticString(),
+                            m->bot_ai->GetSynergy(), m->bot_ai->GetLoyaltyAuraName(),
                             m->bot_ai->GetAffinity(), m->bot_ai->GetAffinityTierString(),
                             (m->bot_ai->GetAffinity() >= 90) ? " [Soulbound Perk Active]" : "");
                         botCount++;

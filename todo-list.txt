@@ -478,5 +478,14 @@ MILESTONE 11 — Tactical Gambits, Field Services, Mercenary Hiring & Squad Aren
 [x] Tavern Mercenary Recruitment: Implemented `/party bot recruit <Brom|Lyra|Ignis|Sylvia|Barnaby>` allowing players to hire veteran specialists with unique combat roles and 80 initial Affinity.
 [x] Akram 4v4 Squad Arena Deployment: Implemented `/party bot arena` to queue and deploy the player and their full bot fireteam into Akram Arena match battles.
 
+MILESTONE 12 — Squad Unison Ultimates, Field Crafting, Siege Warfare & Loyalty Quests (COMPLETED & VERIFIED)
+[x] Squad Synergy & Limit Break Unison Engine: Dynamic squad synergy meter (0–100%) tracking combat combos, boss interrupts, and multi-target CC. When full, `/party bot ultimate` (or `/party bot unison`) triggers coordinated class Limit Breaks: Knight/Tank *Aegis Bastion* (party-wide damage reduction and AoE taunt), Mage *Grand Cataclysm* (heavy arcane meteor burst), Scout *Arrow Storm* (AoE bleed & 50% slow), and Cleric *Divine Radiance* (full party cleanse and 100% HP/MP restoration).
+[x] Mobile Field Refinement & Gem Socketing: Artisan and Bourgeois companion synergy (e.g. Barnaby); `/party bot refine <slot>` executes mobile forge hammering to refine weapons and armor (+1 to +9) in the field with affinity gains; `/party bot socket <slot> <gem_slot>` embeds gems into open gear sockets with stat endowment.
+[x] Mobile Monster Reagent Harvesting: Artisan companions automatically dismantle defeated beasts, golems, and monsters into rare hides and essences, depositing extra Zulies and crafting spoils directly into the squad treasury.
+[x] Union War Allegiance & Castle Siege Postures: Companion bots automatically mirror the leader's Union affiliation (Junon Order vs Righteous Vanguard). Implemented `/party bot siege <attack|defend|normal>` allowing clan leaders to direct bot fireteams to assault castle gates/relics or fortify core defenses.
+[x] Companion Loyalty Chronicles & Narrative Quests: Reaching Affinity milestones (30, 60, 90) unlocks personal story chapters and signature loyalty auras (Brom's *Bastion Aura* +5% DEF, Lyra's *Grace Aura* +5% HP Recovery, Ignis's *Pyre Aura* +5% Magic Power, Sylvia's *Gale Aura* +5% Crit/Speed, Barnaby's *Fortune Aura* +10% Zulies). Viewable via `/party bot story [bot]`.
+[x] Expedition Campfire Feasts & Squad Resting Buffs: Resting together at camp or commanding `/party bot feast` cooks an adventurer's meal granting the 30-minute "Well-Fed & Inspired" buff (+15% EXP co-op boost, +10% Attack Power & Defense, full HP/MP refresh).
+[x] Synchronized Squad Emotes & Boss Victory Fanfares: Executing `/party bot dance` triggers synchronized party dance routines; vanquishing dungeon bosses automatically triggers squad victory cheers (`DoEmote 3`), celebrations, and fanfares.
+
 ================================================================================
 

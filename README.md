@@ -31,6 +31,7 @@ Recommended Client to use with Server : https://162.35.161.103/downloads/Rose-cl
    - [Milestone 9 — Intelligent AI Companion & Party Bot System](#milestone-9--intelligent-ai-companion--party-bot-system-completed--verified)
    - [Milestone 10 — Advanced Companion Tactics, Convoy PAT Driving & Squad Affinity](#milestone-10--advanced-companion-tactics-convoy-pat-driving--squad-affinity-completed--verified)
    - [Milestone 11 — Tactical Gambits, Field Services, Mercenary Hiring & Squad Arena](#milestone-11--tactical-gambits-field-services-mercenary-hiring--squad-arena-completed--verified)
+   - [Milestone 12 — Squad Unison Ultimates, Field Crafting, Siege Warfare & Loyalty Quests](#milestone-12--squad-unison-ultimates-field-crafting-siege-warfare--loyalty-quests-completed--verified)
 3. [Roadmap & Upcoming Milestones](#roadmap--upcoming-milestones)
 4. [Intelligent AI Companion & PlayerBot Deep-Dive](#intelligent-ai-companion--playerbot-deep-dive)
    - [1. Real Player Auto-Grouping](#1-real-player-auto-grouping)
@@ -286,9 +287,40 @@ RosE Resurrected utilizes a distributed 3-tier server model communicating via TC
 
 ---
 
+### Milestone 12 — Squad Unison Ultimates, Field Crafting, Siege Warfare & Loyalty Quests (Completed & Verified)
+- **Squad Synergy & Limit Break Unison Engine (`/party bot ultimate` / `/party bot unison`)**:
+  - Dynamic squad synergy meter (0–100%) tracking combat combos, boss interrupts, and multi-target crowd control.
+  - When full, executing `/party bot ultimate` triggers synchronized class Limit Breaks:
+    - **Knight / Tank**: *Aegis Bastion* — Slams shield, taunting all foes within 25m and granting party-wide defense protection.
+    - **Mage**: *Grand Cataclysm* — Calls down celestial arcane fire dealing devastating AoE burst damage to all nearby enemies.
+    - **Scout / Hawker**: *Arrow Storm* — Rains piercing volleys applying 50% slow and heavy bleed damage.
+    - **Cleric**: *Divine Radiance* — Cleanses all squad debuffs and fully restores 100% HP and 100% MP.
+- **Mobile Field Equipment Refinement & Gem Socketing**:
+  - Artisan / Bourgeois bot synergy (e.g. Barnaby):
+  - `/party bot refine <slot>`: Strikes the forge hammer in the field, refining weapons and armor (+1 to +9) with affinity boosts.
+  - `/party bot socket <slot> <gem_slot>`: Embeds jewels and gems into socketed gear pieces with stat endowment.
+  - **Mobile Monster Reagent Harvesting**: Artisan companions dismantle defeated beasts, golems, and monsters into rare hides and essences, depositing bonus Zulies into the squad pouch.
+- **Union War Allegiance & Castle Siege Postures (`/party bot siege <attack|defend|normal>`)**:
+  - Companion bots automatically mirror the leader's Union affiliation (Junon Order vs Righteous Vanguard).
+  - Clan leaders can set siege postures: `attack` directs bots to assault castle gates/relics (using Castle Gear when appropriate), while `defend` sets an impenetrable defensive perimeter.
+- **Companion Loyalty Chronicles & Narrative Quests (`/party bot story [bot]`)**:
+  - Reaching Affinity milestones (30, 60, 90) unlocks personal story chapters and signature loyalty auras:
+    - **Brom**: *Bastion Aura* (+5% Physical DEF)
+    - **Lyra**: *Grace Aura* (+5% HP & MP Recovery)
+    - **Ignis**: *Pyre Aura* (+5% Magic Power)
+    - **Sylvia**: *Gale Aura* (+5% Move Speed & Critical Rate)
+    - **Barnaby**: *Fortune Aura* (+10% Zulies & Salvage Yield)
+- **Expedition Campfire Feasts & Squad Resting Buffs (`/party bot feast`)**:
+  - Resting together at camp or commanding `/party bot feast` cooks an adventurer's meal granting the 30-minute **"Well-Fed & Inspired"** buff (+15% EXP co-op boost, +10% Attack Power & Defense, full HP/MP refresh).
+- **Synchronized Squad Emotes & Boss Victory Fanfares**:
+  - Executing `/party bot dance` triggers synchronized party dance routines (`DoEmote 6`).
+  - Vanquishing dungeon bosses automatically triggers squad victory cheers (`DoEmote 3`), celebrations, and fanfares.
+
+---
+
 ## Roadmap & Upcoming Milestones
 
-### Milestone 12 — Advanced World Events, Raids & Planetary Expansion (In Design)
+### Milestone 13 — Advanced World Events, Raids & Planetary Expansion (In Design)
 - [ ] **Planet Luna & Orlo Expansion Polish**: Review and verify space flight transitions, low-gravity physics, and unique monster spawn definitions.
 - [ ] **World Boss Multi-Phase Mechanics**: Implement multi-phase enrage timers, area-of-effect telegraphs, and tiered reward chests for world bosses (*King Spider*, *Chapeau*, *Karkome*).
 - [ ] **Seasonal Event Automation**: Automated in-game holidays (Halloween pumpkin drops, Christmas gift boxes, Summer festival events).

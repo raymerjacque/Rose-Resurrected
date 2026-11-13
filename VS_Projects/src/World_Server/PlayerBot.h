@@ -272,6 +272,28 @@ public:
     bool HandleOffTargetCrowdControl( CMonster* primaryMob );
     bool CheckPuzzleInteraction( );
 
+    // Phase 6 / Milestone 12: Unison Ultimates, Field Crafting, Siege Warfare & Loyalty Quests
+    int GetSynergy( ) const { return m_synergy; }
+    void SetSynergy( int synergy ) { m_synergy = ( synergy > 100 ) ? 100 : ( ( synergy < 0 ) ? 0 : synergy ); }
+    void AddSynergy( int amount );
+    bool ExecuteUnisonUltimate( );
+
+    bool DoFieldRefine( int slot );
+    bool DoFieldSocket( int slot, int gemSlot );
+    void HarvestReagents( CMonster* mob );
+
+    void CheckUnionSync( );
+    int GetSiegeMode( ) const { return m_siegeMode; }
+    void SetSiegeMode( int mode ) { m_siegeMode = mode; }
+
+    int GetStoryChapter( ) const;
+    const char* GetStoryDialogue( ) const;
+    const char* GetLoyaltyAuraName( ) const;
+
+    bool PrepareCampfireFeast( );
+    void ExecuteSquadDance( );
+    void ExecuteVictoryCelebration( );
+
 private:
     CPlayer* m_player;
     BotState m_state;
@@ -395,6 +417,13 @@ private:
     clock_t m_lastClanSyncTime;
     clock_t m_lastCcTime;
     clock_t m_lastPuzzleCheck;
+
+    // Phase 6 / Milestone 12: Unison Ultimates, Field Crafting, Siege Warfare & Loyalty Quests
+    int m_synergy;
+    int m_siegeMode;
+    clock_t m_lastUnionSyncTime;
+    clock_t m_lastFeastTime;
+    clock_t m_feastRestStart;
 };
 
 class CBotManager {

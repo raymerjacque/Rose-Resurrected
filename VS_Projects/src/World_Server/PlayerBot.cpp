@@ -1302,7 +1302,12 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_lastResupplyTime( 0 ),
       m_lastClanSyncTime( 0 ),
       m_lastCcTime( 0 ),
-      m_lastPuzzleCheck( 0 )
+      m_lastPuzzleCheck( 0 ),
+      m_synergy( 0 ),
+      m_siegeMode( 0 ),
+      m_lastUnionSyncTime( 0 ),
+      m_lastFeastTime( 0 ),
+      m_feastRestStart( 0 )
 {
     m_pullAnchorPos.x = 0.0f;
     m_pullAnchorPos.y = 0.0f;
@@ -3911,6 +3916,16 @@ void CPlayerBot::HandleCombat( )
             {
                 bool isEpic = ( mob->Stats->MaxHP >= 4000 || mob->montype >= 400 || ( m_followTarget && IsMonsterQuestTarget( mob, m_followTarget ) ) );
                 AddAffinity( isEpic ? 5 : 1 );
+                AddSynergy( isEpic ? 20 : 5 );
+
+                // Milestone 12: Artisan Mobile Reagent Harvesting
+                HarvestReagents( mob );
+
+                // Milestone 12: Squad Victory Celebration Fanfare on Boss defeat
+                if ( isEpic )
+                {
+                    ExecuteVictoryCelebration( );
+                }
 
                 // Milestone 11: Clan Contribution Sharing on Epic / Boss Kill
                 if ( isEpic && m_followTarget && m_followTarget->Clan && m_followTarget->Clan->clanid != 0 )
@@ -4117,6 +4132,7 @@ void CPlayerBot::HandleRest( )
         // If leader is resting/sitting, companion bot loyally stays sitting with leader!
         if ( m_isCompanion && m_followTarget->Status && m_followTarget->Status->Stance == 2 )
         {
+            PrepareCampfireFeast( );
             return;
         }
     }
@@ -4288,9 +4304,10 @@ void CPlayerBot::HandleFollow( )
         }
     }
 
-    // Milestone 11: Ammunition resupply, clan synchronization & dungeon puzzle awareness
+    // Milestone 11 & 12: Logistics, clan synchronization & union awareness
     CheckAmmunitionResupply( );
     CheckClanSync( );
+    CheckUnionSync( );
     CheckPuzzleInteraction( );
 
     // 2. Party Member Support: Heals, Resurrections, Buffs (Always active)
@@ -6262,6 +6279,7 @@ bool CPlayerBot::CheckSpellInterrupt( CMonster* mob )
         const char* shout = ( m_role == BOT_ROLE_TANK ) ? "Shield Bash! Spell channel cancelled!" :
                             ( ( m_role == BOT_ROLE_DPS_PHYS_RANGED ) ? "Stun Arrow! Interrupted mob cast!" : "Counter-spell cast! Interrupted!" );
         Say( shout );
+        AddSynergy( 15 );
         return true;
     }
     return false;
@@ -6523,6 +6541,7 @@ bool CPlayerBot::HandleOffTargetCrowdControl( CMonster* primaryMob )
         m_lastSkillCastTime = now;
         m_player->StartAction( secondaryTarget, SKILL_ATTACK, ccSkill );
         if ( ccPhrase ) Say( ccPhrase );
+        AddSynergy( 10 );
         return true;
     }
     return false;
@@ -6556,6 +6575,361 @@ bool CPlayerBot::CheckPuzzleInteraction( )
         }
     }
     return false;
+}
+
+void CPlayerBot::AddSynergy( int amount )
+{
+    if ( !m_isCompanion || !m_followTarget ) return;
+    m_synergy += amount;
+    if ( m_synergy > 100 ) m_synergy = 100;
+    if ( m_synergy < 0 ) m_synergy = 0;
+
+    if ( m_player->Party && m_player->Party->party )
+    {
+        CParty* party = m_player->Party->party;
+        for ( size_t i = 0; i < party->Members.size( ); i++ )
+        {
+            CPlayer* mem = party->Members[i];
+            if ( mem && mem->is_bot && mem->bot_ai && mem != m_player )
+            {
+                reinterpret_cast<CPlayerBot*>( mem->bot_ai )->m_synergy = m_synergy;
+            }
+        }
+    }
+}
+
+bool CPlayerBot::ExecuteUnisonUltimate( )
+{
+    if ( !m_isCompanion || !m_player || !m_followTarget ) return false;
+    if ( m_synergy < 100 ) return false;
+
+    m_synergy = 0;
+    if ( m_player->Party && m_player->Party->party )
+    {
+        CParty* party = m_player->Party->party;
+        for ( size_t i = 0; i < party->Members.size( ); i++ )
+        {
+            CPlayer* mem = party->Members[i];
+            if ( mem && mem->is_bot && mem->bot_ai )
+            {
+                reinterpret_cast<CPlayerBot*>( mem->bot_ai )->m_synergy = 0;
+            }
+        }
+    }
+
+    CMap* map = GetMap( );
+    if ( !map ) return false;
+
+    char shoutMsg[128];
+    snprintf( shoutMsg, sizeof(shoutMsg), "[SQUAD UNISON ATTACK] The party unleashes their ultimate Limit Break synergy!" );
+    Say( shoutMsg );
+
+    CParty* party = m_player->Party->party;
+    if ( party )
+    {
+        for ( size_t i = 0; i < party->Members.size( ); i++ )
+        {
+            CPlayer* mem = party->Members[i];
+            if ( !mem || !mem->is_bot || !mem->bot_ai ) continue;
+            CPlayerBot* botAi = reinterpret_cast<CPlayerBot*>( mem->bot_ai );
+            BotRole role = botAi->GetRole( );
+
+            if ( role == BOT_ROLE_TANK )
+            {
+                botAi->Say( "Limit Break: AEGIS BASTION! Frontline bulwark activated! Taunting all foes!" );
+                botAi->DoEmote( 4 );
+                for ( UINT m = 0; m < map->MonsterList.size( ); m++ )
+                {
+                    CMonster* mob = map->MonsterList[m];
+                    if ( mob && !mob->IsDead( ) && mob->Stats->HP > 0 && !mob->IsBonfire( ) )
+                    {
+                        if ( GServer->distance( mem->Position->current, mob->Position->current ) <= 25.0f )
+                        {
+                            mob->Battle->target = mem->clientid;
+                        }
+                    }
+                }
+            }
+            else if ( role == BOT_ROLE_DPS_MAGIC )
+            {
+                botAi->Say( "Limit Break: GRAND CATACLYSM! Arcane heavens rain celestial fire!" );
+                botAi->DoEmote( 3 );
+                for ( UINT m = 0; m < map->MonsterList.size( ); m++ )
+                {
+                    CMonster* mob = map->MonsterList[m];
+                    if ( mob && !mob->IsDead( ) && mob->Stats->HP > 0 && !mob->IsBonfire( ) )
+                    {
+                        if ( GServer->distance( mem->Position->current, mob->Position->current ) <= 20.0f )
+                        {
+                            long long dmg = (long long)mem->Stats->Attack_Power * 4 + 800;
+                            if ( mob->Stats->HP > dmg ) mob->Stats->HP -= dmg;
+                            else mob->Stats->HP = 0;
+                        }
+                    }
+                }
+            }
+            else if ( role == BOT_ROLE_DPS_PHYS_RANGED || role == BOT_ROLE_DPS_PHYS_MELEE )
+            {
+                botAi->Say( "Limit Break: ARROW STORM! Piercing volleys shredding enemy defenses!" );
+                botAi->DoEmote( 6 );
+                for ( UINT m = 0; m < map->MonsterList.size( ); m++ )
+                {
+                    CMonster* mob = map->MonsterList[m];
+                    if ( mob && !mob->IsDead( ) && mob->Stats->HP > 0 && !mob->IsBonfire( ) )
+                    {
+                        if ( GServer->distance( mem->Position->current, mob->Position->current ) <= 20.0f )
+                        {
+                            long long dmg = (long long)mem->Stats->Attack_Power * 3 + 400;
+                            if ( mob->Stats->HP > dmg ) mob->Stats->HP -= dmg;
+                            else mob->Stats->HP = 0;
+                            mob->Stats->Move_Speed = ( mob->Stats->Move_Speed > 200 ) ? ( mob->Stats->Move_Speed / 2 ) : 150;
+                        }
+                    }
+                }
+            }
+            else if ( role == BOT_ROLE_HEALER )
+            {
+                botAi->Say( "Limit Break: DIVINE RADIANCE! Full squad celestial restoration!" );
+                botAi->DoEmote( 4 );
+                for ( size_t p = 0; p < party->Members.size( ); p++ )
+                {
+                    CPlayer* ally = party->Members[p];
+                    if ( ally && !ally->IsDead( ) )
+                    {
+                        ally->Stats->HP = ally->Stats->MaxHP;
+                        ally->Stats->MP = ally->Stats->MaxMP;
+                        ally->RefreshHPMP( );
+                        ally->Status->Poisoned = 0xff;
+                        ally->Status->Muted = 0xff;
+                        ally->Status->Stuned = 0xff;
+                        ally->Status->Curse = 0xff;
+                        ally->Status->Attack_down = 0xff;
+                        ally->Status->Defense_down = 0xff;
+                        ally->Status->Haste_down = 0xff;
+                        ally->Status->Dash_down = 0xff;
+                    }
+                }
+            }
+        }
+    }
+
+    if ( m_followTarget )
+    {
+        GServer->SendPM( m_followTarget, "[Squad Unison] All class Limit Breaks executed! Full squad restored, massive AoE damage inflicted!" );
+    }
+    return true;
+}
+
+bool CPlayerBot::DoFieldRefine( int slot )
+{
+    if ( !m_followTarget || m_followTarget->is_bot ) return false;
+    if ( slot < 1 || slot >= 140 ) return false;
+
+    CItem& itm = m_followTarget->items[slot];
+    if ( itm.itemnum == 0 ) return false;
+
+    if ( itm.refine >= 9 )
+    {
+        Say( "This equipment is already refined to the maximum of +9! Its power cannot be increased further!" );
+        return true;
+    }
+
+    itm.refine++;
+    m_followTarget->UpdateInventory( slot, 0xffff, true );
+    AddAffinity( 5 );
+
+    char msg[128];
+    snprintf( msg, sizeof(msg), "The forge hammer strikes true! Your equipment in slot %d has been refined to +%d!",
+        slot, itm.refine );
+    Say( msg );
+    return true;
+}
+
+bool CPlayerBot::DoFieldSocket( int slot, int gemSlot )
+{
+    if ( !m_followTarget || m_followTarget->is_bot ) return false;
+    if ( slot < 1 || slot >= 140 || gemSlot < 9 || gemSlot >= 140 ) return false;
+
+    CItem& equip = m_followTarget->items[slot];
+    CItem& gem = m_followTarget->items[gemSlot];
+
+    if ( equip.itemnum == 0 || gem.itemnum == 0 ) return false;
+
+    if ( !equip.socketed )
+    {
+        Say( "This piece of gear does not have a socket slot! Socketing cannot be performed." );
+        return true;
+    }
+
+    equip.gem = gem.itemnum;
+    equip.stats = 301 + ( gem.itemnum % 50 );
+
+    if ( gem.count > 1 ) gem.count--;
+    else ClearItem( gem );
+
+    m_followTarget->UpdateInventory( slot, gemSlot, true );
+    AddAffinity( 10 );
+
+    char msg[128];
+    snprintf( msg, sizeof(msg), "Masterwork jewelcrafting complete! Socketed gem into slot %d, awakening its latent power!", slot );
+    Say( msg );
+    return true;
+}
+
+void CPlayerBot::HarvestReagents( CMonster* mob )
+{
+    if ( !m_isCompanion || !m_followTarget || !mob ) return;
+
+    bool isArtisan = ( m_player->CharInfo->Job == 422 || m_player->CharInfo->Job == 411 || m_player->CharInfo->Job == 421 || strcasecmp( m_player->CharInfo->charname, "Barnaby" ) == 0 );
+    if ( !isArtisan ) return;
+
+    if ( ( rand( ) % 100 ) < 35 )
+    {
+        long long extraZulies = 300 + ( ( rand( ) % 8 ) * 150 );
+        m_followTarget->CharInfo->Zulies += extraZulies;
+
+        BEGINPACKET( pak, 0x71d );
+        ADDQWORD( pak, m_followTarget->CharInfo->Zulies );
+        m_followTarget->client->SendPacket( &pak );
+
+        char harvestMsg[128];
+        snprintf( harvestMsg, sizeof(harvestMsg), "Harvested rare monster essence & hides! Deposited %lld Zulies into squad pouch!", extraZulies );
+        Say( harvestMsg );
+    }
+}
+
+void CPlayerBot::CheckUnionSync( )
+{
+    if ( !m_isCompanion || !m_player || !m_followTarget || m_followTarget->is_bot ) return;
+    clock_t now = clock( );
+    if ( ( now - m_lastUnionSyncTime ) < (clock_t)( 20.0f * CLOCKS_PER_SEC ) ) return;
+    m_lastUnionSyncTime = now;
+
+    if ( m_followTarget->CharInfo && m_followTarget->CharInfo->unionid != 0 )
+    {
+        if ( m_player->CharInfo->unionid != m_followTarget->CharInfo->unionid )
+        {
+            m_player->CharInfo->unionid = m_followTarget->CharInfo->unionid;
+            m_player->CharInfo->unionfame = m_followTarget->CharInfo->unionfame;
+        }
+    }
+}
+
+int CPlayerBot::GetStoryChapter( ) const
+{
+    if ( m_affinity >= 90 ) return 3;
+    if ( m_affinity >= 60 ) return 2;
+    if ( m_affinity >= 30 ) return 1;
+    return 0;
+}
+
+const char* CPlayerBot::GetLoyaltyAuraName( ) const
+{
+    if ( m_affinity < 60 ) return "None";
+    const char* name = m_player->CharInfo->charname;
+    if ( strcasecmp( name, "Brom" ) == 0 || m_role == BOT_ROLE_TANK ) return "Bastion Aura (+5% DEF)";
+    if ( strcasecmp( name, "Lyra" ) == 0 || m_role == BOT_ROLE_HEALER ) return "Grace Aura (+5% HP Recovery)";
+    if ( strcasecmp( name, "Ignis" ) == 0 || m_role == BOT_ROLE_DPS_MAGIC ) return "Pyre Aura (+5% Magic Power)";
+    if ( strcasecmp( name, "Sylvia" ) == 0 || m_role == BOT_ROLE_DPS_PHYS_RANGED ) return "Gale Aura (+5% Crit & Speed)";
+    if ( strcasecmp( name, "Barnaby" ) == 0 ) return "Fortune Aura (+10% Zulies & Salvage)";
+    return "Valiant Aura (+5% Attack)";
+}
+
+const char* CPlayerBot::GetStoryDialogue( ) const
+{
+    const char* name = m_player->CharInfo->charname;
+    int ch = GetStoryChapter( );
+
+    if ( strcasecmp( name, "Brom" ) == 0 || m_role == BOT_ROLE_TANK )
+    {
+        if ( ch == 3 ) return "Chapter 3: Soulbound Aegis - 'You are more than a commander, leader; you are family. My shield will never waver!'";
+        if ( ch == 2 ) return "Chapter 2: The Shattered Shield - 'We vanquished our foes in the valley. Today, my vows are restored. Bastion Aura awakened!'";
+        if ( ch == 1 ) return "Chapter 1: The Iron Vow - 'In the high halls of Junon, I swore never to let an ally fall on my watch.'";
+        return "Prologue: 'I am Brom. My shield defends this party with iron will.'";
+    }
+    if ( strcasecmp( name, "Lyra" ) == 0 || m_role == BOT_ROLE_HEALER )
+    {
+        if ( ch == 3 ) return "Chapter 3: Soulbound Dawn - 'Where there is shadow, our unity shall bring the morning star!'";
+        if ( ch == 2 ) return "Chapter 2: Celestial Dew - 'The sacred herbs of Luna blossom in harmony with your courage. Grace Aura awakened!'";
+        if ( ch == 1 ) return "Chapter 1: The Sacred Well - 'The temple elders spoke of a leader with a pure spirit. They guided me to you.'";
+        return "Prologue: 'I am Lyra. May the light of the seven planets keep us safe.'";
+    }
+    if ( strcasecmp( name, "Ignis" ) == 0 || m_role == BOT_ROLE_DPS_MAGIC )
+    {
+        if ( ch == 3 ) return "Chapter 3: Soulbound Supernova - 'Together, we can pierce the celestial abyss itself!'";
+        if ( ch == 2 ) return "Chapter 2: The Inferno Core - 'I have harnessed starstone embers into this catalyst. Pyre Aura awakened!'";
+        if ( ch == 1 ) return "Chapter 1: Spark of Arcana - 'Magic is not mere power; it is an untamed hymn of the stars.'";
+        return "Prologue: 'I am Ignis. Point me to the enemy and watch them burn.'";
+    }
+    if ( strcasecmp( name, "Sylvia" ) == 0 || m_role == BOT_ROLE_DPS_PHYS_RANGED )
+    {
+        if ( ch == 3 ) return "Chapter 3: Soulbound Horizon - 'You never need to look over your shoulder, leader. My arrow flies for you.'";
+        if ( ch == 2 ) return "Chapter 2: The Hunter's Focus - 'The wind whispers the quarry's every breath. Gale Aura awakened!'";
+        if ( ch == 1 ) return "Chapter 1: Windrunner's Code - 'Keep your bow strung, your eyes sharp, and your footsteps silent.'";
+        return "Prologue: 'I am Sylvia. One shot, one clean strike.'";
+    }
+    if ( strcasecmp( name, "Barnaby" ) == 0 )
+    {
+        if ( ch == 3 ) return "Chapter 3: Soulbound Ingenuity - 'With you at the helm, there's no machine or dungeon we can't conquer!'";
+        if ( ch == 2 ) return "Chapter 2: Masterwork Blueprint - 'Reinforced metallurgy and precision tuning! Fortune Aura awakened!'";
+        if ( ch == 1 ) return "Chapter 1: Gears and Zulies - 'Everything in this world has great value if you know how to shape it!'";
+        return "Prologue: 'I am Barnaby. Need repairs, ammo, or firepower? I've got the tools!'";
+    }
+
+    if ( ch == 3 ) return "Chapter 3: Soulbound Companion - 'Our squad bond is unbreakable! Ready for anything!'";
+    if ( ch == 2 ) return "Chapter 2: Proven Ally - 'We have weathered many storms together. Combat Aura awakened!'";
+    if ( ch == 1 ) return "Chapter 1: Fresh Adventurer - 'I'm glad to travel by your side, leader!'";
+    return "Prologue: 'Ready for the road ahead!'";
+}
+
+bool CPlayerBot::PrepareCampfireFeast( )
+{
+    if ( !m_isCompanion || !m_player || !m_followTarget || m_followTarget->is_bot ) return false;
+    clock_t now = clock( );
+    if ( ( now - m_lastFeastTime ) < (clock_t)( 60.0f * CLOCKS_PER_SEC ) ) return false;
+
+    m_lastFeastTime = now;
+    DoEmote( 3 );
+
+    char msg[128];
+    snprintf( msg, sizeof(msg), "Campfire feast prepared! Roasted meat and savory stew served for %s (+15%% EXP & +10%% Combat Stats)!",
+        m_followTarget->CharInfo->charname );
+    Say( msg );
+
+    if ( m_player->Party && m_player->Party->party )
+    {
+        CParty* party = m_player->Party->party;
+        for ( size_t i = 0; i < party->Members.size( ); i++ )
+        {
+            CPlayer* mem = party->Members[i];
+            if ( mem && !mem->IsDead( ) && mem->Position->Map == m_player->Position->Map )
+            {
+                mem->Stats->Attack_Power += ( mem->Stats->Attack_Power * 10 / 100 );
+                mem->Stats->Defense += ( mem->Stats->Defense * 10 / 100 );
+                mem->Stats->HP = mem->Stats->MaxHP;
+                mem->Stats->MP = mem->Stats->MaxMP;
+                mem->RefreshHPMP( );
+            }
+        }
+    }
+    return true;
+}
+
+void CPlayerBot::ExecuteSquadDance( )
+{
+    if ( !m_isCompanion || !m_player ) return;
+    DoEmote( 6 );
+    Say( "Squad dance in sync! Look at these moves, leader!" );
+}
+
+void CPlayerBot::ExecuteVictoryCelebration( )
+{
+    if ( !m_isCompanion || !m_player || !m_followTarget ) return;
+    DoEmote( 3 );
+    char victoryShout[128];
+    snprintf( victoryShout, sizeof(victoryShout), "Victory is ours! Another glorious triumph with leader %s!",
+        m_followTarget->CharInfo->charname );
+    Say( victoryShout );
 }
 
 BotRole CBotManager::GetPlayerRole( CPlayer* player )
