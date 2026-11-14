@@ -90,6 +90,41 @@ enum SoundCueType {
     CUE_LIMIT_BREAK = 3
 };
 
+enum BotOutfitType {
+    OUTFIT_DEFAULT = 0,
+    OUTFIT_CASUAL = 1,
+    OUTFIT_ARMORED = 2,
+    OUTFIT_SWIMWEAR = 3,
+    OUTFIT_FESTIVE = 4
+};
+
+enum BotTalentSpec {
+    TALENT_NONE = 0,
+    TALENT_BASTION = 1,
+    TALENT_LUMINARY = 2,
+    TALENT_SPELLWEAVER = 3,
+    TALENT_SCAVENGER = 4
+};
+
+struct BotGambitRule {
+    std::string condition;
+    std::string action;
+    bool enabled;
+};
+
+struct BotDispatchMission {
+    std::string missionId;
+    std::string title;
+    std::string assignedMerc;
+    clock_t startTime;
+    int durationSec;
+    long long rewardZulies;
+    int rewardExp;
+    std::string rewardItem;
+    bool completed;
+    bool claimed;
+};
+
 class CPlayerBot {
 public:
     CPlayerBot( CPlayer* player );
@@ -328,6 +363,29 @@ public:
     void CheckTreasureHunt( );
     void PlaySoundCue( int cueType );
 
+    // Phase 8 / Milestone 14: Sparring Duels, Gambit Rules, Outfits, Talents, Inter-Bot Banter & Field Crafting
+    bool StartSparringDuel( CPlayer* challenger );
+    void EndSparringDuel( const char* resultMsg );
+    bool IsSparring( ) const { return m_isSparring; }
+    CPlayer* GetSparringChallenger( ) const { return m_sparringChallenger; }
+
+    bool AddGambitRule( const char* cond, const char* act );
+    void ClearGambitRules( );
+    std::string GetGambitRulesSummary( ) const;
+    bool EvaluateGambitRules( );
+
+    bool SetOutfit( BotOutfitType outfit );
+    BotOutfitType GetOutfit( ) const { return m_outfit; }
+    const char* GetOutfitName( ) const;
+
+    bool SetTalentSpec( BotTalentSpec spec );
+    BotTalentSpec GetTalentSpec( ) const { return m_talentSpec; }
+    const char* GetTalentSpecName( ) const;
+
+    void CheckInterBotBanter( );
+    bool FieldBrewPotions( const char* type, int count );
+    bool FieldForgeAmmunition( const char* type, int count );
+
 private:
     CPlayer* m_player;
     BotState m_state;
@@ -468,6 +526,15 @@ private:
     clock_t m_lastPetPulseTime;
     clock_t m_lastTreasureHuntTime;
     clock_t m_lastLowHpWarningTime;
+
+    // Phase 8 / Milestone 14: Sparring, Gambits, Outfits, Talents & Banter
+    bool m_isSparring;
+    CPlayer* m_sparringChallenger;
+    clock_t m_sparringStartTime;
+    std::vector<BotGambitRule> m_customGambits;
+    BotOutfitType m_outfit;
+    BotTalentSpec m_talentSpec;
+    clock_t m_lastInterBotBanterTime;
 };
 
 class CBotManager {
@@ -519,6 +586,11 @@ public:
     bool DismissRaidAlliance( CPlayer* leader );
     void CheckDungeonAutonomousParties( );
 
+    // Milestone 14: Mercenary Dispatch Missions
+    bool StartMercenaryDispatch( CPlayer* player, const char* missionId, const char* mercName );
+    bool ClaimMercenaryDispatch( CPlayer* player );
+    std::string GetDispatchStatus( CPlayer* player );
+
 private:
     CBotManager( );
     ~CBotManager( );
@@ -539,6 +611,7 @@ private:
     bool m_vendingBotsInitialized;
     int m_nameCounter;
     std::map<std::string, clock_t> m_recentNames;
+    std::map<UINT, BotDispatchMission> m_playerDispatches;
 };
 
 #endif // _PLAYER_BOT_H_

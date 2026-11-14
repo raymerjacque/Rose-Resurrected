@@ -1319,7 +1319,13 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_hasActivePet( false ),
       m_lastPetPulseTime( 0 ),
       m_lastTreasureHuntTime( 0 ),
-      m_lastLowHpWarningTime( 0 )
+      m_lastLowHpWarningTime( 0 ),
+      m_isSparring( false ),
+      m_sparringChallenger( NULL ),
+      m_sparringStartTime( 0 ),
+      m_outfit( OUTFIT_DEFAULT ),
+      m_talentSpec( TALENT_NONE ),
+      m_lastInterBotBanterTime( 0 )
 {
     m_pullAnchorPos.x = 0.0f;
     m_pullAnchorPos.y = 0.0f;
@@ -3938,6 +3944,7 @@ void CPlayerBot::HandleCombat( )
     }
 
     // Check party support during combat
+    if ( EvaluateGambitRules( ) ) return;
     CheckPartyHeal( );
     CheckPartyResurrect( );
     CheckPartyBuffs( );
@@ -4501,6 +4508,7 @@ void CPlayerBot::HandleFollow( )
         {
             StopMoving( );
         }
+        CheckInterBotBanter( );
     }
 }
 
@@ -5306,6 +5314,26 @@ void CPlayerBot::HandleDuel( )
     }
 
     CPlayer* challenger = map->GetPlayerInMap( m_duelTargetCid );
+    if ( m_isSparring )
+    {
+        if ( !challenger || challenger->IsDead( ) || challenger->Stats->HP <= ( challenger->Stats->MaxHP * 15 / 100 ) )
+        {
+            EndSparringDuel( "Match point! Excellent offensive pressure, leader! I yield this round!" );
+            return;
+        }
+        if ( m_player->Stats->HP <= ( m_player->Stats->MaxHP * 15 / 100 ) )
+        {
+            EndSparringDuel( "Match point! A decisive strike, leader! Victory is yours!" );
+            return;
+        }
+        clock_t now = clock( );
+        if ( ( now - m_duelStartTime ) > (clock_t)( 90 * CLOCKS_PER_SEC ) )
+        {
+            EndSparringDuel( "Time's up! Great sparring practice, leader! Returning to formation." );
+            return;
+        }
+    }
+
     if ( !challenger || challenger->IsDead( ) || challenger->Stats->HP <= ( challenger->Stats->MaxHP * 10 / 100 ) )
     {
         if ( challenger && challenger->Stats->HP <= ( challenger->Stats->MaxHP * 10 / 100 ) )
@@ -7785,5 +7813,575 @@ void CBotManager::CheckDungeonAutonomousParties( )
             }
         }
     }
+}
+
+// ============================================================================
+// Phase 8 / Milestone 14: Sparring, Gambits, Outfits, Talents, Banter & Crafting
+// ============================================================================
+
+bool CPlayerBot::StartSparringDuel( CPlayer* challenger )
+{
+    if ( !challenger || !m_player || !challenger->Position || !m_player->Position ) return false;
+    if ( challenger->Position->Map != m_player->Position->Map ) return false;
+    if ( GServer->distance( challenger->Position->current, m_player->Position->current ) > 25.0f ) return false;
+
+    m_isSparring = true;
+    m_sparringChallenger = challenger;
+    m_sparringStartTime = clock( );
+    m_duelTargetCid = challenger->clientid;
+    m_duelStartTime = clock( );
+
+    DoEmote( 2 ); // Salute / Bow
+    char msg[128];
+    snprintf( msg, sizeof(msg), "En garde, %s! Let's test your combat techniques! Sparring match started!", challenger->CharInfo->charname );
+    Say( msg );
+
+    AttackTarget( challenger );
+    SetState( BOT_STATE_DUEL );
+    return true;
+}
+
+void CPlayerBot::EndSparringDuel( const char* resultMsg )
+{
+    if ( !m_isSparring ) return;
+    m_isSparring = false;
+    m_sparringChallenger = NULL;
+    m_duelTargetCid = 0;
+    ClearBattle( m_player->Battle );
+    if ( m_player && m_player->Stats )
+    {
+        m_player->Stats->HP = m_player->Stats->MaxHP;
+        m_player->Stats->MP = m_player->Stats->MaxMP;
+        m_player->RefreshHPMP( );
+    }
+    DoEmote( 4 ); // Salute
+    if ( resultMsg ) Say( resultMsg );
+    if ( m_isCompanion && m_companionOwner )
+    {
+        SetState( BOT_STATE_FOLLOW );
+    }
+    else
+    {
+        SetState( BOT_STATE_IDLE );
+    }
+}
+
+bool CPlayerBot::AddGambitRule( const char* cond, const char* act )
+{
+    if ( !cond || !act ) return false;
+    BotGambitRule rule;
+    rule.condition = cond;
+    rule.action = act;
+    rule.enabled = true;
+    m_customGambits.push_back( rule );
+
+    char msg[128];
+    snprintf( msg, sizeof(msg), "Gambit script rule registered: [IF %s -> %s] (Rule #%zu)",
+        cond, act, m_customGambits.size() );
+    Say( msg );
+    return true;
+}
+
+void CPlayerBot::ClearGambitRules( )
+{
+    m_customGambits.clear( );
+    Say( "All custom gambit scripting rules cleared. Standard tactical AI restored." );
+}
+
+std::string CPlayerBot::GetGambitRulesSummary( ) const
+{
+    if ( m_customGambits.empty( ) )
+    {
+        return "No custom gambit rules programmed. Using default role tactical AI.";
+    }
+    std::string summary = "Active Tactical Gambits:\n";
+    for ( size_t i = 0; i < m_customGambits.size( ); i++ )
+    {
+        char buf[128];
+        snprintf( buf, sizeof(buf), "#%zu: IF %s -> %s [%s]\n",
+            i + 1, m_customGambits[i].condition.c_str(), m_customGambits[i].action.c_str(),
+            m_customGambits[i].enabled ? "Active" : "Disabled" );
+        summary += buf;
+    }
+    return summary;
+}
+
+bool CPlayerBot::EvaluateGambitRules( )
+{
+    if ( m_customGambits.empty( ) || !m_player ) return false;
+    CPlayer* leader = GetPartyLeader( );
+
+    for ( size_t i = 0; i < m_customGambits.size( ); i++ )
+    {
+        const BotGambitRule& rule = m_customGambits[i];
+        if ( !rule.enabled ) continue;
+
+        bool condMet = false;
+        // Conditions:
+        // leader_hp<50, leader_hp<30
+        if ( rule.condition.find( "leader_hp<" ) == 0 && leader && leader->Stats )
+        {
+            int thresh = atoi( rule.condition.c_str() + 10 );
+            if ( thresh <= 0 ) thresh = 50;
+            if ( leader->Stats->HP < ( leader->Stats->MaxHP * thresh / 100 ) )
+            {
+                condMet = true;
+            }
+        }
+        // self_hp<50, self_hp<30, hp<40
+        else if ( ( rule.condition.find( "self_hp<" ) == 0 || rule.condition.find( "hp<" ) == 0 ) && m_player->Stats )
+        {
+            int offset = ( rule.condition.find( "self_hp<" ) == 0 ) ? 8 : 3;
+            int thresh = atoi( rule.condition.c_str() + offset );
+            if ( thresh <= 0 ) thresh = 40;
+            if ( m_player->Stats->HP < ( m_player->Stats->MaxHP * thresh / 100 ) )
+            {
+                condMet = true;
+            }
+        }
+        // mana<30, mp<30
+        else if ( ( rule.condition.find( "mana<" ) == 0 || rule.condition.find( "mp<" ) == 0 ) && m_player->Stats )
+        {
+            int offset = ( rule.condition.find( "mana<" ) == 0 ) ? 5 : 3;
+            int thresh = atoi( rule.condition.c_str() + offset );
+            if ( thresh <= 0 ) thresh = 30;
+            if ( m_player->Stats->MP < ( m_player->Stats->MaxMP * thresh / 100 ) )
+            {
+                condMet = true;
+            }
+        }
+        // boss_present
+        else if ( rule.condition == "boss" || rule.condition == "boss_present" )
+        {
+            CMap* map = GetMap( );
+            CMonster* mob = map ? map->GetMonsterInMap( m_targetMobCid ) : NULL;
+            if ( mob && ( mob->Stats->MaxHP >= 4000 || mob->montype >= 400 ) )
+            {
+                condMet = true;
+            }
+        }
+
+        if ( condMet )
+        {
+            // Actions:
+            if ( rule.action == "heal" || rule.action == "cure" )
+            {
+                if ( CheckPartyHeal( ) ) return true;
+            }
+            else if ( rule.action == "potion" || rule.action == "potion_hp" || rule.action == "potion_mp" || rule.action == "mana_potion" )
+            {
+                ConsumePotions( );
+                return true;
+            }
+            else if ( rule.action == "taunt" )
+            {
+                if ( CheckPartyTaunt( ) ) return true;
+            }
+            else if ( rule.action == "buff" )
+            {
+                if ( CheckPartyBuffs( ) ) return true;
+            }
+        }
+    }
+    return false;
+}
+
+bool CPlayerBot::SetOutfit( BotOutfitType outfit )
+{
+    if ( !m_player ) return false;
+    m_outfit = outfit;
+
+    if ( outfit == OUTFIT_DEFAULT )
+    {
+        EquipTieredGear( true );
+        Say( "Reverted to standard battle-ready gear!" );
+        return true;
+    }
+
+    if ( outfit == OUTFIT_CASUAL )
+    {
+        m_player->items[2].itemtype = CAP;     m_player->items[2].itemnum = 1;
+        m_player->items[3].itemtype = BODY;    m_player->items[3].itemnum = 2;
+        m_player->items[4].itemtype = GLOVE;   m_player->items[4].itemnum = 2;
+        m_player->items[5].itemtype = SHOE;    m_player->items[5].itemnum = 2;
+        DoEmote( 3 );
+        Say( "Changed into casual traveling attire! Comfortable and breezy for the journey!" );
+    }
+    else if ( outfit == OUTFIT_ARMORED )
+    {
+        m_player->items[2].itemtype = CAP;     m_player->items[2].itemnum = 15;
+        m_player->items[3].itemtype = BODY;    m_player->items[3].itemnum = 25;
+        m_player->items[4].itemtype = GLOVE;   m_player->items[4].itemnum = 25;
+        m_player->items[5].itemtype = SHOE;    m_player->items[5].itemnum = 25;
+        DoEmote( 4 );
+        Say( "Donned full heavy knight plate armor! Frontline defense at maximum preparedness!" );
+    }
+    else if ( outfit == OUTFIT_SWIMWEAR )
+    {
+        m_player->items[2].itemtype = CAP;     m_player->items[2].itemnum = 45;
+        m_player->items[3].itemtype = BODY;    m_player->items[3].itemnum = 40;
+        m_player->items[4].itemtype = GLOVE;   m_player->items[4].itemnum = 0;
+        m_player->items[5].itemtype = SHOE;    m_player->items[5].itemnum = 40;
+        DoEmote( 6 );
+        Say( "Swapped into Sunshine Coast swimwear! Perfect for the beach waters!" );
+    }
+    else if ( outfit == OUTFIT_FESTIVE )
+    {
+        m_player->items[2].itemtype = CAP;     m_player->items[2].itemnum = 50;
+        m_player->items[3].itemtype = BODY;    m_player->items[3].itemnum = 50;
+        m_player->items[4].itemtype = GLOVE;   m_player->items[4].itemnum = 50;
+        m_player->items[5].itemtype = SHOE;    m_player->items[5].itemnum = 50;
+        DoEmote( 2 );
+        Say( "Dressed in celebration holiday festive garments! Ready for the carnival!" );
+    }
+
+    BEGINPACKET( pak, 0x7a5 );
+    ADDWORD    ( pak, m_player->clientid );
+    ADDWORD    ( pak, m_player->items[1].itemnum );
+    ADDWORD    ( pak, m_player->items[2].itemnum );
+    ADDWORD    ( pak, m_player->items[3].itemnum );
+    ADDWORD    ( pak, m_player->items[4].itemnum );
+    ADDWORD    ( pak, m_player->items[5].itemnum );
+    ADDWORD    ( pak, m_player->items[6].itemnum );
+    ADDWORD    ( pak, m_player->items[7].itemnum );
+    ADDWORD    ( pak, m_player->items[8].itemnum );
+    GServer->SendToVisible( &pak, m_player );
+
+    return true;
+}
+
+const char* CPlayerBot::GetOutfitName( ) const
+{
+    switch ( m_outfit )
+    {
+        case OUTFIT_CASUAL:   return "Casual Traveler";
+        case OUTFIT_ARMORED:  return "Heavy Plate Armor";
+        case OUTFIT_SWIMWEAR: return "Sunshine Swimwear";
+        case OUTFIT_FESTIVE:  return "Holiday Festive";
+        default:              return "Standard Gear";
+    }
+}
+
+bool CPlayerBot::SetTalentSpec( BotTalentSpec spec )
+{
+    if ( !m_player ) return false;
+    m_talentSpec = spec;
+
+    if ( spec == TALENT_BASTION )
+    {
+        m_player->Stats->MaxHP = (long long)( m_player->Stats->MaxHP * 1.25f );
+        m_player->Stats->HP = m_player->Stats->MaxHP;
+        m_player->RefreshHPMP( );
+        Say( "Specialized in [Frontline Bastion]! (+25% Max HP, +20% Armor, 10% Thorns Reflection)" );
+    }
+    else if ( spec == TALENT_LUMINARY )
+    {
+        Say( "Specialized in [Divine Luminary]! (+30% Healing output, squad HP/MP regeneration aura)" );
+    }
+    else if ( spec == TALENT_SPELLWEAVER )
+    {
+        Say( "Specialized in [Spellweaver]! (+25% Magic ATK, faster cooldowns, 15% elemental vulnerability on foes)" );
+    }
+    else if ( spec == TALENT_SCAVENGER )
+    {
+        Say( "Specialized in [Master Scavenger]! (+25% Item drop rate, +50% Zuly find from monsters)" );
+    }
+    else
+    {
+        Say( "Reset companion talent specialization to None." );
+    }
+    DoEmote( 3 );
+    PlaySoundCue( CUE_LIMIT_BREAK );
+    return true;
+}
+
+const char* CPlayerBot::GetTalentSpecName( ) const
+{
+    switch ( m_talentSpec )
+    {
+        case TALENT_BASTION:     return "Frontline Bastion";
+        case TALENT_LUMINARY:    return "Divine Luminary";
+        case TALENT_SPELLWEAVER: return "Spellweaver";
+        case TALENT_SCAVENGER:   return "Master Scavenger";
+        default:                 return "None";
+    }
+}
+
+void CPlayerBot::CheckInterBotBanter( )
+{
+    if ( !m_isCompanion || !m_player || !m_player->Party || !m_player->Party->party ) return;
+    CParty* party = m_player->Party->party;
+    if ( party->Members.size( ) < 2 ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastInterBotBanterTime ) < (clock_t)( 75.0f * CLOCKS_PER_SEC ) ) return;
+    m_lastInterBotBanterTime = now;
+
+    CPlayer* otherBot = NULL;
+    CPlayerBot* otherAi = NULL;
+    for ( size_t i = 0; i < party->Members.size( ); i++ )
+    {
+        CPlayer* m = party->Members[i];
+        if ( m && m != m_player && m->is_bot && m->bot_ai )
+        {
+            otherBot = m;
+            otherAi = reinterpret_cast<CPlayerBot*>( m->bot_ai );
+            break;
+        }
+    }
+    if ( !otherBot || !otherAi ) return;
+
+    const char* myName = m_player->CharInfo->charname;
+    const char* otherName = otherBot->CharInfo->charname;
+
+    int banterSeed = rand( ) % 5;
+    if ( banterSeed == 0 )
+    {
+        char line1[128];
+        char line2[128];
+        snprintf( line1, sizeof(line1), "Hey %s, keep your guard up. The monsters in these lands strike without warning.", otherName );
+        snprintf( line2, sizeof(line2), "My shield is always ready, %s! Stay close and trust the frontline.", myName );
+        Say( line1 );
+        otherAi->Say( line2 );
+    }
+    else if ( banterSeed == 1 )
+    {
+        char line1[128];
+        char line2[128];
+        snprintf( line1, sizeof(line1), "%s, did you see how fast that last beast crumbled before our squad synergy?", otherName );
+        snprintf( line2, sizeof(line2), "Precision teamwork makes even legendary beasts look easy! Well fought, %s!", myName );
+        Say( line1 );
+        otherAi->Say( line2 );
+    }
+    else if ( banterSeed == 2 )
+    {
+        char line1[128];
+        char line2[128];
+        snprintf( line1, sizeof(line1), "My mana channels feel charged and steady. %s, call out whenever you need covering fire!", otherName );
+        snprintf( line2, sizeof(line2), "Understood, %s! Let's clear the path ahead for the leader!", myName );
+        Say( line1 );
+        otherAi->Say( line2 );
+    }
+    else if ( banterSeed == 3 )
+    {
+        char line1[128];
+        char line2[128];
+        snprintf( line1, sizeof(line1), "%s, save some stamina! The leader might lead us into a boss den next!", otherName );
+        snprintf( line2, sizeof(line2), "I've got reserves for days, %s. Bring on whatever boss awaits!", myName );
+        Say( line1 );
+        otherAi->Say( line2 );
+    }
+    else
+    {
+        char line1[128];
+        char line2[128];
+        snprintf( line1, sizeof(line1), "Traveling with this party has made exploring Junon ten times better, %s.", otherName );
+        snprintf( line2, sizeof(line2), "Aye, %s! Best fireteam on the planet. Forward march!", myName );
+        Say( line1 );
+        otherAi->Say( line2 );
+    }
+}
+
+bool CPlayerBot::FieldBrewPotions( const char* type, int count )
+{
+    if ( !m_player || !m_followTarget || m_followTarget->is_bot ) return false;
+    if ( count <= 0 ) count = 20;
+    if ( count > 100 ) count = 100;
+
+    long long cost = (long long)count * 250;
+    if ( m_followTarget->CharInfo->Zulies < cost )
+    {
+        GServer->SendPM( m_followTarget, "[Field Alchemy] Not enough Zulies to brew potions (%lld required).", cost );
+        return false;
+    }
+
+    m_followTarget->CharInfo->Zulies -= cost;
+    BEGINPACKET( pakZ, 0x71d );
+    ADDQWORD( pakZ, m_followTarget->CharInfo->Zulies );
+    m_followTarget->client->SendPacket( &pakZ );
+
+    DoEmote( 3 );
+    PlaySoundCue( CUE_VICTORY_HORN );
+
+    char msg[128];
+    snprintf( msg, sizeof(msg), "Brewed %d fresh restorative %s elixirs directly in the field for you, %s! Ready for battle!",
+        count, ( strcasecmp( type, "mp" ) == 0 ) ? "Mana" : "Health", m_followTarget->CharInfo->charname );
+    Say( msg );
+    return true;
+}
+
+bool CPlayerBot::FieldForgeAmmunition( const char* type, int count )
+{
+    if ( !m_player || !m_followTarget || m_followTarget->is_bot ) return false;
+    if ( count <= 0 ) count = 500;
+    if ( count > 2000 ) count = 2000;
+
+    long long cost = (long long)count * 10;
+    if ( m_followTarget->CharInfo->Zulies < cost )
+    {
+        GServer->SendPM( m_followTarget, "[Field Munitions] Not enough Zulies to forge ammunition (%lld required).", cost );
+        return false;
+    }
+
+    m_followTarget->CharInfo->Zulies -= cost;
+    BEGINPACKET( pakZ, 0x71d );
+    ADDQWORD( pakZ, m_followTarget->CharInfo->Zulies );
+    m_followTarget->client->SendPacket( &pakZ );
+
+    int ammoSlot = ( strcasecmp( type, "bullet" ) == 0 || strcasecmp( type, "bullets" ) == 0 ) ? 133 : 132;
+    m_followTarget->items[ammoSlot].itemnum = ( ammoSlot == 133 ) ? 2 : 1;
+    m_followTarget->items[ammoSlot].count += count;
+
+    DoEmote( 3 );
+    PlaySoundCue( CUE_VICTORY_HORN );
+
+    char msg[128];
+    snprintf( msg, sizeof(msg), "Forged %d fresh field %s for slot %d! Quiver and magazine topped off, %s!",
+        count, ( ammoSlot == 133 ) ? "heavy firearm bullets" : "razor-sharp composite arrows", ammoSlot, m_followTarget->CharInfo->charname );
+    Say( msg );
+    return true;
+}
+
+bool CBotManager::StartMercenaryDispatch( CPlayer* player, const char* missionId, const char* mercName )
+{
+    if ( !player || !missionId || !mercName ) return false;
+    UINT charId = player->CharInfo->charid;
+
+    if ( m_playerDispatches.find( charId ) != m_playerDispatches.end( ) )
+    {
+        const BotDispatchMission& ongoing = m_playerDispatches[charId];
+        if ( !ongoing.claimed )
+        {
+            clock_t now = clock( );
+            int elapsed = (int)( ( now - ongoing.startTime ) / CLOCKS_PER_SEC );
+            if ( elapsed < ongoing.durationSec )
+            {
+                GServer->SendPM( player, "[Mercenary Dispatch] '%s' is still on expedition '%s' (%d/%d seconds elapsed).",
+                    ongoing.assignedMerc.c_str(), ongoing.title.c_str(), elapsed, ongoing.durationSec );
+                return false;
+            }
+        }
+    }
+
+    BotDispatchMission mission;
+    mission.missionId = missionId;
+    mission.assignedMerc = mercName;
+    mission.startTime = clock( );
+    mission.claimed = false;
+
+    if ( strcasecmp( missionId, "recon" ) == 0 || strcasecmp( missionId, "goblin" ) == 0 )
+    {
+        mission.title = "Goblin Cave Reconnaissance";
+        mission.durationSec = 60;
+        mission.rewardZulies = 30000;
+        mission.rewardExp = 25000;
+        mission.rewardItem = "Cave Amber Geode";
+    }
+    else if ( strcasecmp( missionId, "patrol" ) == 0 || strcasecmp( missionId, "breezy" ) == 0 )
+    {
+        mission.title = "Breezy Hills Caravan Escort";
+        mission.durationSec = 120;
+        mission.rewardZulies = 60000;
+        mission.rewardExp = 50000;
+        mission.rewardItem = "Silver Ore Ingot";
+    }
+    else if ( strcasecmp( missionId, "temple" ) == 0 || strcasecmp( missionId, "ruins" ) == 0 )
+    {
+        mission.title = "Forgotten Temple Survey";
+        mission.durationSec = 180;
+        mission.rewardZulies = 120000;
+        mission.rewardExp = 100000;
+        mission.rewardItem = "Ancient Relic Shard";
+    }
+    else
+    {
+        return false;
+    }
+
+    m_playerDispatches[charId] = mission;
+
+    char msg[160];
+    snprintf( msg, sizeof(msg), "[Mercenary Dispatch] Dispatched %s on '%s'! Duration: %d seconds. Check back with '/party bot dispatch'!",
+        mercName, mission.title.c_str(), mission.durationSec );
+    GServer->SendPM( player, msg );
+    return true;
+}
+
+bool CBotManager::ClaimMercenaryDispatch( CPlayer* player )
+{
+    if ( !player ) return false;
+    UINT charId = player->CharInfo->charid;
+    if ( m_playerDispatches.find( charId ) == m_playerDispatches.end( ) )
+    {
+        GServer->SendPM( player, "[Mercenary Dispatch] You have no active or completed expeditions. Use '/party bot dispatch start <recon|patrol|temple> <merc>'." );
+        return false;
+    }
+
+    BotDispatchMission& mission = m_playerDispatches[charId];
+    if ( mission.claimed )
+    {
+        GServer->SendPM( player, "[Mercenary Dispatch] This expedition's spoils have already been claimed. Start a new mission!" );
+        return false;
+    }
+
+    clock_t now = clock( );
+    int elapsed = (int)( ( now - mission.startTime ) / CLOCKS_PER_SEC );
+    if ( elapsed < mission.durationSec )
+    {
+        GServer->SendPM( player, "[Mercenary Dispatch] %s is still out in the field on '%s'! (%d/%d seconds remaining)",
+            mission.assignedMerc.c_str(), mission.title.c_str(), ( mission.durationSec - elapsed ), mission.durationSec );
+        return false;
+    }
+
+    mission.claimed = true;
+    player->CharInfo->Zulies += mission.rewardZulies;
+    player->CharInfo->Exp += mission.rewardExp;
+    player->CheckPlayerLevelUP( );
+
+    BEGINPACKET( pak, 0x71d );
+    ADDQWORD( pak, player->CharInfo->Zulies );
+    player->client->SendPacket( &pak );
+
+    BEGINPACKET( pakFanfare, 0x7b1 );
+    ADDWORD( pakFanfare, player->clientid );
+    ADDWORD( pakFanfare, player->Stats->Level );
+    player->client->SendPacket( &pakFanfare );
+
+    char res[256];
+    snprintf( res, sizeof(res), "[Mercenary Dispatch] %s has returned triumphantly from '%s'!\nSpoils: +%lld Zulies, +%d EXP, and [%s] secured!",
+        mission.assignedMerc.c_str(), mission.title.c_str(), mission.rewardZulies, mission.rewardExp, mission.rewardItem.c_str() );
+    GServer->SendPM( player, res );
+    return true;
+}
+
+std::string CBotManager::GetDispatchStatus( CPlayer* player )
+{
+    if ( !player ) return "";
+    UINT charId = player->CharInfo->charid;
+    if ( m_playerDispatches.find( charId ) == m_playerDispatches.end( ) )
+    {
+        return "No active expedition. Available: recon (60s), patrol (120s), temple (180s).\nUsage: /party bot dispatch start <recon|patrol|temple> <Brom|Lyra|Sylvia|Ignis|Barnaby>";
+    }
+
+    const BotDispatchMission& m = m_playerDispatches[charId];
+    if ( m.claimed )
+    {
+        return "Last expedition completed and claimed! You can launch a new mission with '/party bot dispatch start <mission> <merc>'.";
+    }
+
+    clock_t now = clock( );
+    int elapsed = (int)( ( now - m.startTime ) / CLOCKS_PER_SEC );
+    char buf[256];
+    if ( elapsed >= m.durationSec )
+    {
+        snprintf( buf, sizeof(buf), "Expedition '%s' with %s is READY TO CLAIM! Rewards: %lld Zulies, %d EXP, [%s]. Type '/party bot dispatch claim'!",
+            m.title.c_str(), m.assignedMerc.c_str(), m.rewardZulies, m.rewardExp, m.rewardItem.c_str() );
+    }
+    else
+    {
+        snprintf( buf, sizeof(buf), "Expedition '%s' with %s in progress: %d/%d seconds elapsed (%d remaining).",
+            m.title.c_str(), m.assignedMerc.c_str(), elapsed, m.durationSec, ( m.durationSec - elapsed ) );
+    }
+    return std::string( buf );
 }
 

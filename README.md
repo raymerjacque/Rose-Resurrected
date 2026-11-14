@@ -33,6 +33,7 @@ Recommended Client to use with Server : https://162.35.161.103/downloads/Rose-cl
    - [Milestone 11 — Tactical Gambits, Field Services, Mercenary Hiring & Squad Arena](#milestone-11--tactical-gambits-field-services-mercenary-hiring--squad-arena-completed--verified)
    - [Milestone 12 — Squad Unison Ultimates, Field Crafting, Siege Warfare & Loyalty Quests](#milestone-12--squad-unison-ultimates-field-crafting-siege-warfare--loyalty-quests-completed--verified)
    - [Milestone 13 — Combat DPS & Healing Parser, Dynamic Loadouts, 8-Man Raid Alliances & Dungeon Expeditions](#milestone-13--combat-dps--healing-parser-dynamic-loadouts-8-man-raid-alliances--dungeon-expeditions-completed--verified)
+   - [Milestone 14 — Sparring Duels, Gambit Scripts, Mercenary Expeditions, Transmog & Squad Masteries](#milestone-14--sparring-duels-gambit-scripts-mercenary-expeditions-transmog--squad-masteries-completed--verified)
 3. [Roadmap & Upcoming Milestones](#roadmap--upcoming-milestones)
 4. [Intelligent AI Companion & PlayerBot Deep-Dive](#intelligent-ai-companion--playerbot-deep-dive)
    - [1. Real Player Auto-Grouping](#1-real-player-auto-grouping)
@@ -346,11 +347,42 @@ RosE Resurrected utilizes a distributed 3-tier server model communicating via TC
 - **Autonomous Living Dungeon Bot Parties**:
   - Dynamic dungeon population engine: when caves such as Goblin Cave B1 (Map 51) and George Cave B1 (Map 24) have no bots, an autonomous 4-bot delving squad (`DungeonDelver_511..514`) is spawned to clear rooms and fight monsters independently.
 
+### Milestone 14 — Sparring Duels, Gambit Scripts, Mercenary Expeditions, Transmog & Squad Masteries (Completed & Verified)
+- **1v1 Practice Sparring Duels (`/party bot duel [bot|stop]`)**:
+  - Challenge companions to friendly, zero-penalty 1v1 practice sparring duels anywhere in the world.
+  - Features real-time dueling AI with kiting, skill combos, auto-concede at 15% HP, and instant full HP/MP restoration.
+- **Mini-Gambit Tactical Script Engine (`/party bot rule <condition> <action> [bot]`)**:
+  - Full conditional scripting system (`/party bot rules`):
+    - Triggers: `leader_hp<50`, `leader_hp<30`, `hp<40`, `mana<30`, `boss`.
+    - Actions: `heal`, `potion`, `potion_mp`, `taunt`, `buff`.
+- **Offline Mercenary Dispatch & Field Expeditions (`/party bot dispatch <start|claim|list>`)**:
+  - Dispatch off-duty tavern mercenaries on timed exploration missions:
+    - *Goblin Cave Reconnaissance* (60s): 30k Zulies, 25k EXP, Cave Amber Geode.
+    - *Breezy Hills Caravan Escort* (120s): 60k Zulies, 50k EXP, Silver Ore Ingot.
+    - *Forgotten Temple Survey* (180s): 120k Zulies, 100k EXP, Ancient Relic Shard.
+- **Transmog Wardrobe & Dynamic Outfits (`/party bot outfit <casual|armored|swimwear|festive|default> [bot]`)**:
+  - Instant cosmetic transformations for companions with live network broadcasts (`0x7a5`):
+    - `casual`: Lightweight traveler linen attire and cap.
+    - `armored`: Heavy steel knight plate armor.
+    - `swimwear`: Sunshine Coast resort beachwear and sandals.
+    - `festive`: Carnival holiday celebration garments.
+    - `default`: Reverts to tier-synced battle gear.
+- **Squad Mastery & Companion Talent Trees (`/party bot talent <bastion|luminary|spellweaver|scavenger|none> [bot]`)**:
+  - Specialize companions with powerful passive squad masteries:
+    - **Frontline Bastion**: +25% Max HP, +20% Armor, 10% Thorns damage reflection.
+    - **Divine Luminary**: +30% Healing power, passive squad HP/MP regen aura.
+    - **Spellweaver**: +25% Magic ATK, faster cooldowns, 15% elemental vulnerability debuff.
+    - **Master Scavenger**: +25% Item drop rate, +50% Zuly find.
+- **Autonomous Companion-to-Companion Inter-Party Banter**:
+  - Companion bots converse organically with each other during downtime, arguing over battle tactics, celebrating squad synergy, and commentating on the world.
+- **Field Alchemy & Munitions Forging (`/party bot brew` & `/party bot forge`)**:
+  - Direct field crafting: Clerics/Muses brew 20-100 HP/MP potions on demand; Artisans/Bourgeois forge 500-2000 arrows or bullets directly into the player's quiver slots.
+
 ---
 
 ## Roadmap & Upcoming Milestones
 
-### Milestone 14 — Advanced World Events, Raids & Planetary Expansion (In Design)
+### Milestone 15 — Advanced World Events, Raids & Planetary Expansion (In Design)
 - [ ] **Planet Luna & Orlo Expansion Polish**: Review and verify space flight transitions, low-gravity physics, and unique monster spawn definitions.
 - [ ] **World Boss Multi-Phase Mechanics**: Implement multi-phase enrage timers, area-of-effect telegraphs, and tiered reward chests for world bosses (*King Spider*, *Chapeau*, *Karkome*).
 - [ ] **Seasonal Event Automation**: Automated in-game holidays (Halloween pumpkin drops, Christmas gift boxes, Summer festival events).

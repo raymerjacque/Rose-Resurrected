@@ -591,6 +591,14 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                 SendPM(thisclient, "/party bot spec <tank|2h|healer|smite|bow|gun> [bot] - Companion spec loadout swap");
                 SendPM(thisclient, "/party bot raid [dismiss] - Mobilize 8-man AI raid co-op alliance");
                 SendPM(thisclient, "/party bot pet [summon|dismiss] - Summon/dismiss companion battle pet & fairies");
+                SendPM(thisclient, "/party bot duel [bot|stop] - 1v1 practice sparring duel (zero death penalty)");
+                SendPM(thisclient, "/party bot rule <condition> <action> [bot] - Program tactical script gambit");
+                SendPM(thisclient, "/party bot rules [clear] [bot] - View or reset programmed tactical gambits");
+                SendPM(thisclient, "/party bot dispatch [start|claim|list] - Dispatch mercenaries on timed expeditions");
+                SendPM(thisclient, "/party bot outfit <casual|armored|swimwear|festive|default> [bot] - Transmog wardrobe");
+                SendPM(thisclient, "/party bot talent <bastion|luminary|spellweaver|scavenger|none> [bot] - Squad mastery");
+                SendPM(thisclient, "/party bot brew [hp|mp] [amount] - Cleric brews fresh field potion elixirs");
+                SendPM(thisclient, "/party bot forge [arrows|bullets] [amount] - Artisan smiths fresh ammunition");
                 SendPM(thisclient, "/party bot aggressive  - Set Hunter stance (proactively pulls mobs)");
                 SendPM(thisclient, "/party bot defensive   - Set Bodyguard stance (protects party)");
                 SendPM(thisclient, "/party bot passive     - Set Pacifist stance (holds fire, follows)");
@@ -1357,6 +1365,246 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                 SendPM(thisclient, "[Companion Pets] Toggled companion battle pet/fairy for %d companion bot(s).", affected);
                 return true;
             }
+            else if (strcmp(botAction, "duel") == 0 || strcmp(botAction, "spar") == 0)
+            {
+                char* targetBot = strtok(NULL, " ");
+                if (targetBot && (strcmp(targetBot, "stop") == 0 || strcmp(targetBot, "end") == 0))
+                {
+                    int ended = 0;
+                    for (UINT i = 0; i < party->Members.size(); i++)
+                    {
+                        CPlayer* m = party->Members[i];
+                        if (m && m->is_bot && m->bot_ai && m->bot_ai->IsSparring())
+                        {
+                            m->bot_ai->EndSparringDuel("Sparring match halted by leader command. Returning to formation.");
+                            ended++;
+                        }
+                    }
+                    SendPM(thisclient, "[Sparring] Halted active sparring duel for %d bot(s).", ended);
+                    return true;
+                }
+
+                CPlayer* sparPartner = NULL;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        if (targetBot && strcasecmp(m->CharInfo->charname, targetBot) == 0)
+                        {
+                            sparPartner = m;
+                            break;
+                        }
+                        if (!sparPartner) sparPartner = m;
+                    }
+                }
+
+                if (!sparPartner || !sparPartner->bot_ai)
+                {
+                    SendPM(thisclient, "[Sparring] No valid companion bot found to duel. Usage: /party bot duel [bot_name|stop]");
+                    return true;
+                }
+
+                if (sparPartner->bot_ai->StartSparringDuel(thisclient))
+                {
+                    SendPM(thisclient, "[Sparring] 1v1 Practice Sparring Duel commenced with %s! (Zero death penalty / auto-concede at 15%% HP). Type '/party bot duel stop' to end.",
+                        sparPartner->CharInfo->charname);
+                }
+                else
+                {
+                    SendPM(thisclient, "[Sparring] Could not start duel. Make sure you are near %s.", sparPartner->CharInfo->charname);
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "rule") == 0)
+            {
+                char* cond = strtok(NULL, " ");
+                char* act = strtok(NULL, " ");
+                char* targetBot = strtok(NULL, " ");
+                if (!cond || !act)
+                {
+                    SendPM(thisclient, "[Gambits] Usage: /party bot rule <condition> <action> [bot]");
+                    SendPM(thisclient, "Conditions: leader_hp<50, leader_hp<30, hp<40, mana<30, boss");
+                    SendPM(thisclient, "Actions: heal, potion, potion_mp, taunt, buff");
+                    return true;
+                }
+                int count = 0;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        if (targetBot && strcasecmp(m->CharInfo->charname, targetBot) != 0) continue;
+                        if (m->bot_ai->AddGambitRule(cond, act)) count++;
+                    }
+                }
+                SendPM(thisclient, "[Gambits] Programmed script [IF %s -> %s] for %d companion bot(s).", cond, act, count);
+                return true;
+            }
+            else if (strcmp(botAction, "rules") == 0)
+            {
+                char* sub = strtok(NULL, " ");
+                if (sub && (strcmp(sub, "clear") == 0 || strcmp(sub, "reset") == 0))
+                {
+                    for (UINT i = 0; i < party->Members.size(); i++)
+                    {
+                        CPlayer* m = party->Members[i];
+                        if (m && m->is_bot && m->bot_ai) m->bot_ai->ClearGambitRules();
+                    }
+                    SendPM(thisclient, "[Gambits] Cleared all custom tactical rules for party bots.");
+                    return true;
+                }
+                SendPM(thisclient, "=== Squad Tactical Gambit Scripts ===");
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        SendPM(thisclient, "[%s] %s", m->CharInfo->charname, m->bot_ai->GetGambitRulesSummary().c_str());
+                    }
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "dispatch") == 0 || strcmp(botAction, "expedition") == 0)
+            {
+                char* dispCmd = strtok(NULL, " ");
+                if (!dispCmd || strcmp(dispCmd, "list") == 0 || strcmp(dispCmd, "status") == 0)
+                {
+                    std::string st = CBotManager::GetInstance()->GetDispatchStatus(thisclient);
+                    SendPM(thisclient, "%s", st.c_str());
+                    return true;
+                }
+                if (strcmp(dispCmd, "claim") == 0)
+                {
+                    CBotManager::GetInstance()->ClaimMercenaryDispatch(thisclient);
+                    return true;
+                }
+                if (strcmp(dispCmd, "start") == 0)
+                {
+                    char* mission = strtok(NULL, " ");
+                    char* merc = strtok(NULL, " ");
+                    if (!mission || !merc)
+                    {
+                        SendPM(thisclient, "[Mercenary Dispatch] Usage: /party bot dispatch start <recon|patrol|temple> <Brom|Lyra|Sylvia|Ignis|Barnaby>");
+                        return true;
+                    }
+                    CBotManager::GetInstance()->StartMercenaryDispatch(thisclient, mission, merc);
+                    return true;
+                }
+                SendPM(thisclient, "[Mercenary Dispatch] Usage: /party bot dispatch <start|claim|list>");
+                return true;
+            }
+            else if (strcmp(botAction, "outfit") == 0 || strcmp(botAction, "glamour") == 0)
+            {
+                char* outfitName = strtok(NULL, " ");
+                if (!outfitName)
+                {
+                    SendPM(thisclient, "[Wardrobe] Usage: /party bot outfit <casual|armored|swimwear|festive|default> [bot]");
+                    return true;
+                }
+                char* targetBot = strtok(NULL, " ");
+                BotOutfitType ot = OUTFIT_DEFAULT;
+                if (strcasecmp(outfitName, "casual") == 0) ot = OUTFIT_CASUAL;
+                else if (strcasecmp(outfitName, "armored") == 0 || strcasecmp(outfitName, "armor") == 0) ot = OUTFIT_ARMORED;
+                else if (strcasecmp(outfitName, "swimwear") == 0 || strcasecmp(outfitName, "beach") == 0) ot = OUTFIT_SWIMWEAR;
+                else if (strcasecmp(outfitName, "festive") == 0 || strcasecmp(outfitName, "holiday") == 0) ot = OUTFIT_FESTIVE;
+                else if (strcasecmp(outfitName, "default") == 0 || strcasecmp(outfitName, "standard") == 0) ot = OUTFIT_DEFAULT;
+
+                int count = 0;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        if (targetBot && strcasecmp(m->CharInfo->charname, targetBot) != 0) continue;
+                        if (m->bot_ai->SetOutfit(ot)) count++;
+                    }
+                }
+                SendPM(thisclient, "[Wardrobe] Updated outfit to '%s' for %d companion bot(s).", outfitName, count);
+                return true;
+            }
+            else if (strcmp(botAction, "talent") == 0 || strcmp(botAction, "mastery") == 0)
+            {
+                char* talentName = strtok(NULL, " ");
+                if (!talentName)
+                {
+                    SendPM(thisclient, "[Squad Mastery] Usage: /party bot talent <bastion|luminary|spellweaver|scavenger|none> [bot]");
+                    SendPM(thisclient, "Bastion: +25%% HP, +20%% DEF, 10%% reflect | Luminary: +30%% Heal, HP/MP regen aura | Spellweaver: +25%% M.ATK, CDR, vulnerability | Scavenger: +25%% drops, +50%% Zulies");
+                    return true;
+                }
+                char* targetBot = strtok(NULL, " ");
+                BotTalentSpec ts = TALENT_NONE;
+                if (strcasecmp(talentName, "bastion") == 0 || strcasecmp(talentName, "tank") == 0) ts = TALENT_BASTION;
+                else if (strcasecmp(talentName, "luminary") == 0 || strcasecmp(talentName, "healer") == 0) ts = TALENT_LUMINARY;
+                else if (strcasecmp(talentName, "spellweaver") == 0 || strcasecmp(talentName, "mage") == 0) ts = TALENT_SPELLWEAVER;
+                else if (strcasecmp(talentName, "scavenger") == 0 || strcasecmp(talentName, "loot") == 0) ts = TALENT_SCAVENGER;
+                else if (strcasecmp(talentName, "none") == 0) ts = TALENT_NONE;
+
+                int count = 0;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        if (targetBot && strcasecmp(m->CharInfo->charname, targetBot) != 0) continue;
+                        if (m->bot_ai->SetTalentSpec(ts)) count++;
+                    }
+                }
+                SendPM(thisclient, "[Squad Mastery] Set talent tree to '%s' for %d companion bot(s).", talentName, count);
+                return true;
+            }
+            else if (strcmp(botAction, "brew") == 0 || strcmp(botAction, "potion") == 0)
+            {
+                char* pType = strtok(NULL, " ");
+                char* countStr = strtok(NULL, " ");
+                int count = countStr ? atoi(countStr) : 20;
+                if (!pType) pType = "hp";
+
+                bool brewed = false;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        if (m->bot_ai->FieldBrewPotions(pType, count))
+                        {
+                            brewed = true;
+                            break;
+                        }
+                    }
+                }
+                if (!brewed)
+                {
+                    SendPM(thisclient, "[Field Alchemy] Could not brew potions. Ensure you have sufficient Zulies (250 Zulies per potion).");
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "forge") == 0 || strcmp(botAction, "ammo") == 0)
+            {
+                char* aType = strtok(NULL, " ");
+                char* countStr = strtok(NULL, " ");
+                int count = countStr ? atoi(countStr) : 500;
+                if (!aType) aType = "arrows";
+
+                bool forged = false;
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        if (m->bot_ai->FieldForgeAmmunition(aType, count))
+                        {
+                            forged = true;
+                            break;
+                        }
+                    }
+                }
+                if (!forged)
+                {
+                    SendPM(thisclient, "[Field Munitions] Could not forge ammunition. Ensure you have sufficient Zulies (10 Zulies per round).");
+                }
+                return true;
+            }
             else if (strcmp(botAction, "info") == 0)
             {
                 SendPM(thisclient, "=== Party Bot Roster ===");
@@ -1367,9 +1615,10 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                     {
                         int hpPct = (m->Stats->MaxHP > 0) ? (m->Stats->HP * 100 / m->Stats->MaxHP) : 100;
                         int mpPct = (m->Stats->MaxMP > 0) ? (m->Stats->MP * 100 / m->Stats->MaxMP) : 100;
-                        SendPM(thisclient, "Bot: %s (Lvl %d, %s) | HP: %d%% MP: %d%% | Stance: %s | Spec: %s | Pet: %s | Tactic: %s | Synergy: %d%% | Aura: %s | Affinity: %d/100 (%s)%s",
+                        SendPM(thisclient, "Bot: %s (Lvl %d, %s) | HP: %d%% MP: %d%% | Stance: %s | Spec: %s | Outfit: %s | Talent: %s | Pet: %s | Tactic: %s | Synergy: %d%% | Aura: %s | Affinity: %d/100 (%s)%s",
                             m->CharInfo->charname, m->Stats->Level, m->bot_ai->GetPersonalityString(),
                             hpPct, mpPct, m->bot_ai->GetStanceString(), m->bot_ai->GetSubSpecString(),
+                            m->bot_ai->GetOutfitName(), m->bot_ai->GetTalentSpecName(),
                             m->bot_ai->HasActivePet() ? m->bot_ai->GetPetName() : "None",
                             m->bot_ai->GetTacticString(),
                             m->bot_ai->GetSynergy(), m->bot_ai->GetLoyaltyAuraName(),
