@@ -36,6 +36,7 @@ Recommended Client to use with Server : https://162.35.161.103/downloads/Rose-cl
    - [Milestone 14 — Sparring Duels, Gambit Scripts, Mercenary Expeditions, Transmog & Squad Masteries](#milestone-14--sparring-duels-gambit-scripts-mercenary-expeditions-transmog--squad-masteries-completed--verified)
    - [Milestone 15 — Autonomous Living World Dynamics, Stranger Rescues, Camp Vignettes & Natural AI](#milestone-15--autonomous-living-world-dynamics-stranger-rescues-camp-vignettes--natural-ai-completed--verified)
    - [Milestone 16 — Guard Perimeters, Panic Kiting, Social Circles & Drop Hype](#milestone-16--guard-perimeters-panic-kiting-social-circles--drop-hype-completed--verified)
+   - [Milestone 17 — Environmental Awareness, Hazards, Grudges & Hospitality](#milestone-17--environmental-awareness-hazards-grudges--hospitality-completed--verified)
 3. [Roadmap & Upcoming Milestones](#roadmap--upcoming-milestones)
 4. [Intelligent AI Companion & PlayerBot Deep-Dive](#intelligent-ai-companion--playerbot-deep-dive)
    - [1. Real Player Auto-Grouping](#1-real-player-auto-grouping)
@@ -410,11 +411,25 @@ RosE Resurrected utilizes a distributed 3-tier server model communicating via TC
 - **Autonomous Revive Gratitude & Medical Praise**:
   - Companions revived in combat express gratitude and morale boosts ("Back on my feet! Arua bless your healing hands!"), cheering (`DoEmote 3`) before charging straight back into the fray.
 
+### Milestone 17 — Environmental Awareness, Hazards, Grudges & Hospitality (Completed & Verified)
+- **Dynamic Day/Night & Weather Sensory Cycles**:
+  - Companions dynamically sense in-game local time and atmospheric climates. At night (20:00–06:00) or in dark subterranean caverns (Goblin Caves), companions tighten formation leashes and whisper warnings of nocturnal beasts. Ambient roaming bots naturally gather around lit bonfires for warmth, while bots vocalize regional weather reactions (sandstorms in El Vergel, mountain crosswinds on Breezy Hills, valley rain mist on Adventurer Plains).
+- **Autonomous Ground Hazard & Dungeon Trap Dodging**:
+  - Companions detect environmental hazards, poison spore vents, and boss ground AoE shockwave channels, calling out warnings and calculating evasion vectors (7.5m evade) to avoid standing in floor hazard zones.
+- **Ambient Field Hobbies (Riverbank Fishing & Herb Foraging)**:
+  - When idling near water bodies (Adventurer riverbank, Anima Lake, Kenji Beach), bots naturally pull out a fishing rod, cast a line, and reel in trout, bass, or soggy boots (`DoEmote 3/4`). In wilderness fields, bots periodically forage wild Moonwort herbs or chip copper veins, contributing +150 Zulies to the squad treasury.
+- **Squad Nemesis & Combat Grudge Memory Engine**:
+  - When a companion falls in battle, the squad memorizes the killer monster's species and type. Upon re-engaging that nemesis within 10 minutes, companions call out for vengeance with morale shouts and unleash a 2-minute "Vengeance" buff dealing increased combat damage.
+- **Living Clan Agit Life & Autonomous Guild Enlistment**:
+  - High-affinity companions (Affinity >= 85) warmly petition the leader to join their Clan ("Would you grant me the honor of officially joining Clan X?"), automatically joining the guild roster and flying clan crest banners. In Clan Agit and Clan Fields, bots inspect vaults, sit at war tables, and train on target dummies.
+- **Field Hospitality & Generosity to Weary Travelers**:
+  - Resting or idle bots warmly welcome passing real players who are resting or low on HP/MP, offering hot traveler's broth, polite bows, and healing/haste charms to weary wanderers on the road.
+
 ---
 
 ## Roadmap & Upcoming Milestones
 
-### Milestone 17 — Advanced World Events, Raids & Planetary Expansion (In Design)
+### Milestone 18 — Advanced World Events, Raids & Planetary Expansion (In Design)
 - [ ] **Planet Luna & Orlo Expansion Polish**: Review and verify space flight transitions, low-gravity physics, and unique monster spawn definitions.
 - [ ] **World Boss Multi-Phase Mechanics**: Implement multi-phase enrage timers, area-of-effect telegraphs, and tiered reward chests for world bosses (*King Spider*, *Chapeau*, *Karkome*).
 - [ ] **Seasonal Event Automation**: Automated in-game holidays (Halloween pumpkin drops, Christmas gift boxes, Summer festival events).
@@ -691,6 +706,12 @@ Stationed at prime leveling areas across Planet Junon:
 | **🏙️ Living Town Street Life** | Walking through cities (Zant, Junon) | Bots browse merchant stalls, inspect anvil temperatures, and wave (`DoEmote 1`) to greet passing players. |
 | **💥 Clutch Combat Finishers** | Decisive takedowns in battle | Companions call out critical kills and offer respectful apologies if their blow clipped a monster the player was battling. |
 | **🚜 PAT Convoy Mount Driving** | Leader mounts Cart or Castle Gear | Companions Level 30+ instantly mount matching vehicles and drive alongside leader in mechanized formation. |
+| **🌙 Day/Night & Weather Cycles** | Night (20:00–06:00) or dark caverns | Companions tighten formation leash and whisper caution; ambient bots sit by bonfires for warmth; regional weather reactions. |
+| **☠️ Hazard & Dungeon Trap Dodging** | Poison spore vents / boss AoE shockwaves | Bots call out floor hazard alerts and calculate 7.5m evasion vector away from danger zones instead of blindly taking damage. |
+| **🎣 Riverbank Fishing & Foraging** | Idle near water or wilderness roads | Bots pull out fishing lines near lakes/rivers (`DoEmote 3/4`); in fields, forage Moonwort herbs and copper veins (+150 Zulies). |
+| **🗡️ Squad Nemesis & Grudge Revenge** | Re-engaging monster that defeated ally | Squad remembers killer for 10m; re-engaging triggers vengeance war cries and a 2-minute "Vengeance" combat power buff. |
+| **🏰 Clan Agit Life & Enlistment** | High Affinity ($\ge 85$) / Clan Hall visit | Bots petition leader to join clan and fly guild banners; inside Clan Agit, inspect vaults, sit at war tables, and spar dummies. |
+| **🍖 Field Hospitality & Traveler Aiding**| Weary real player resting near bot | Bots bow (`DoEmote 1/2`), offer hot broth, and cast healing/haste charms on low-HP/MP real players passing by. |
 
 - **GM Fast Teleport Suite (`/tele <name>` & `/go <name>`)**:
   - *Cities & Fields*: `/tele zant`, `/tele adventure`, `/tele junonpolis` (`/go junon`), `/tele eucar`, `/tele xitasanctuary` (`/tele xita`), `/tele luxem`, `/tele breezy`, `/tele elvergel`, `/tele animalake`, `/tele kenji`, `/tele forestofwisdom`, `/tele desertofthedead`.

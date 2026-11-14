@@ -1338,7 +1338,17 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_lastSocialCircleTime( 0 ),
       m_lastRareDropHypeTime( 0 ),
       m_lastObservedMapId( 0 ),
-      m_lastZoneReactionTime( 0 )
+      m_lastZoneReactionTime( 0 ),
+      m_lastWeatherCheckTime( 0 ),
+      m_lastHazardWarningTime( 0 ),
+      m_lastHobbyActionTime( 0 ),
+      m_nemesisMobType( 0 ),
+      m_nemesisDefeatTime( 0 ),
+      m_vengeanceBuffExpiry( 0 ),
+      m_lastNemesisCalloutTime( 0 ),
+      m_hasAskedToJoinClan( false ),
+      m_lastClanAgitActionTime( 0 ),
+      m_lastHospitalityTime( 0 )
 {
     m_pullAnchorPos.x = 0.0f;
     m_pullAnchorPos.y = 0.0f;
@@ -3642,6 +3652,15 @@ void CPlayerBot::Update( )
 
         if ( m_state != BOT_STATE_DEAD )
         {
+            if ( m_isCompanion && m_player->Battle && m_player->Battle->hitby != 0 )
+            {
+                CMap* map = GetMap( );
+                if ( map )
+                {
+                    CMonster* killer = map->GetMonsterInMap( m_player->Battle->hitby );
+                    if ( killer ) RecordCompanionDefeat( killer );
+                }
+            }
             SetState( BOT_STATE_DEAD );
         }
     }
@@ -3901,12 +3920,15 @@ void CPlayerBot::HandleRoam( )
 {
     if ( !m_player ) return;
 
-    // Milestone 15 & 16: Ambient Living State
+    // Milestone 15, 16 & 17: Ambient Living State
     if ( !m_isCompanion )
     {
         CheckStrangerAssistance( );
         CheckNaturalGrindCycle( );
         CheckSocialCircleGathering( );
+        CheckDayNightAndWeather( );
+        CheckFieldHobbies( );
+        CheckTravelerHospitality( );
         if ( m_state != BOT_STATE_ROAM ) return;
     }
 
@@ -3977,6 +3999,9 @@ void CPlayerBot::HandleCombat( )
 
     // Phase 10 / Milestone 16: Tactical Panic Kiting & Clutch Tank Saves
     if ( CheckPanicKiteAndPeel( ) ) return;
+
+    // Phase 11 / Milestone 17: Hazard & AoE Ground Telegraph Evasion
+    if ( CheckHazardAndTrapAvoidance( ) ) return;
 
     // Check party support during combat
     if ( EvaluateGambitRules( ) ) return;
@@ -4078,6 +4103,9 @@ void CPlayerBot::HandleCombat( )
         SetState( BOT_STATE_IDLE );
         return;
     }
+
+    // Phase 11 / Milestone 17: Squad Nemesis & Grudge Memory
+    CheckNemesisRevenge( mob );
 
     // Pulling Stance / Action: If kiting target back to party anchor
     if ( m_isPullingTarget )
@@ -4216,6 +4244,9 @@ void CPlayerBot::HandleRest( )
 {
     if ( !m_player ) return;
 
+    // Phase 11 / Milestone 17: Camp Hospitality & Traveler Sharing
+    CheckTravelerHospitality( );
+
     if ( m_followTarget != NULL && m_followTarget->Position != NULL )
     {
         float distToLeader = ( m_player->Position->Map == m_followTarget->Position->Map ) ?
@@ -4277,6 +4308,12 @@ void CPlayerBot::HandleFollow( )
 
     // Phase 10 / Milestone 16: Zone Transition Reactions
     CheckZoneTransitionReaction( );
+
+    // Phase 11 / Milestone 17: Day/Night Cycles, Weather Reactions & Hazard Avoidance
+    CheckDayNightAndWeather( );
+    if ( CheckHazardAndTrapAvoidance( ) ) return;
+    CheckFieldHobbies( );
+    CheckClanAgitLife( );
 
     // Milestone 15: Leader Level-Up Celebration
     CheckLeaderLevelUpCelebration( );
@@ -4601,6 +4638,9 @@ void CPlayerBot::HandleTownStroll( )
 
     // Phase 10 / Milestone 16: Spontaneous Social Circles
     CheckSocialCircleGathering( );
+
+    // Phase 11 / Milestone 17: Camp & Street Hospitality
+    CheckTravelerHospitality( );
 
     // Check for monsters outside town gates (expanded to 1200.0m map-wide detection)
     CMonster* mob = FindNearbyMonster( 1200.0f );
@@ -9042,5 +9082,404 @@ void CPlayerBot::CheckZoneTransitionReaction( )
         }
     }
 }
+
+// -------------------------------------------------------------
+// Phase 11 / Milestone 17: Environmental Awareness, Hazards, Grudges & Hospitality
+// -------------------------------------------------------------
+
+void CPlayerBot::CheckDayNightAndWeather( )
+{
+    if ( !m_player ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastWeatherCheckTime ) < (clock_t)( 35 * CLOCKS_PER_SEC ) ) return;
+    m_lastWeatherCheckTime = now;
+
+    UINT mapId = m_player->Position->Map;
+
+    time_t rawTime = time( NULL );
+    struct tm* timeInfo = localtime( &rawTime );
+    int hour = timeInfo ? timeInfo->tm_hour : 12;
+    bool isNight = ( hour >= 20 || hour < 6 );
+    bool isSubterranean = ( mapId == 51 || mapId == 52 || mapId == 61 || mapId == 62 );
+
+    // 1. Nighttime & Cavern Atmospheric Sensory Reactions
+    if ( isNight || isSubterranean )
+    {
+        // Check for nearby bonfires to gather near for warmth if roaming
+        if ( !m_isCompanion && m_state == BOT_STATE_ROAM )
+        {
+            CMap* map = GetMap( );
+            if ( map )
+            {
+                for ( UINT m = 0; m < map->MonsterList.size( ); m++ )
+                {
+                    CMonster* mob = map->MonsterList[m];
+                    if ( mob && mob->IsBonfire( ) )
+                    {
+                        float dist = GServer->distance( m_player->Position->current, mob->Position->current );
+                        if ( dist <= 8.0f )
+                        {
+                            StopMoving( );
+                            SitDown( );
+                            SetState( BOT_STATE_REST );
+                            Say( "Nothing beats resting beside a warm bonfire on a dark, chilly night." );
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        // Companion sensory warnings
+        if ( m_isCompanion && m_followTarget && ( rand( ) % 3 == 0 ) )
+        {
+            if ( isSubterranean )
+            {
+                Say( "Cavern darkness is suffocating here... stay in tight formation and watch the stalactites." );
+            }
+            else
+            {
+                Say( "Night has fallen across the fields. Nocturnal predators hunt in packs—stay alert, leader!" );
+            }
+        }
+    }
+
+    // 2. Dynamic Biome Climate & Weather Reactions
+    if ( m_isCompanion && ( rand( ) % 4 == 0 ) )
+    {
+        if ( mapId == 24 ) // El Vergel Desert
+        {
+            Say( "The desert wind is whipping up a stinging sandstorm! Cover your eyes and check your gear seals." );
+            DoEmote( 4 );
+        }
+        else if ( mapId == 23 ) // Breezy Hills
+        {
+            Say( "Mountain crosswinds are howling today! Hard to steady an arrow against this gust!" );
+        }
+        else if ( mapId == 1 ) // Adventurer's Plains
+        {
+            Say( "A light mist is rolling off the hills. Smells like rain in the valley." );
+        }
+    }
+}
+
+bool CPlayerBot::CheckHazardAndTrapAvoidance( )
+{
+    if ( !m_player ) return false;
+    CMap* map = GetMap( );
+    if ( !map ) return false;
+
+    UINT mapId = m_player->Position->Map;
+    bool isHazardZone = ( mapId == 51 || mapId == 52 || mapId == 61 || mapId == 62 );
+
+    // 1. Boss Heavy AoE Ground Telegraph Evasion
+    if ( m_targetMobCid != 0 )
+    {
+        CMonster* mob = map->GetMonsterInMap( m_targetMobCid );
+        if ( mob && !mob->IsDead( ) && mob->Stats->HP > 0 )
+        {
+            if ( ( mob->Battle && mob->Battle->skillid != 0 ) || ( mob->Battle && mob->Battle->target != 0 && mob->Stats->MaxHP >= 5000 ) )
+            {
+                float dist = GServer->distance( m_player->Position->current, mob->Position->current );
+                if ( dist < 5.0f && m_role != BOT_ROLE_TANK )
+                {
+                    clock_t now = clock( );
+                    if ( ( now - m_lastHazardWarningTime ) >= (clock_t)( 8 * CLOCKS_PER_SEC ) )
+                    {
+                        m_lastHazardWarningTime = now;
+                        Say( "Danger! Boss charging heavy ground shockwave! Evading blast radius!" );
+                    }
+
+                    // Evade backward/flank 7.5m away
+                    float dx = m_player->Position->current.x - mob->Position->current.x;
+                    float dy = m_player->Position->current.y - mob->Position->current.y;
+                    float len = sqrtf( dx * dx + dy * dy );
+                    if ( len > 0.05f ) { dx /= len; dy /= len; }
+                    else { dx = 1.0f; dy = 0.0f; }
+
+                    fPoint safePos;
+                    safePos.x = m_player->Position->current.x + dx * 7.5f;
+                    safePos.y = m_player->Position->current.y + dy * 7.5f;
+                    safePos.z = m_player->Position->current.z;
+
+                    MoveTo( safePos );
+                    return true;
+                }
+            }
+        }
+    }
+
+    // 2. Dungeon Floor Trap & Spore Vent Detection
+    if ( isHazardZone )
+    {
+        // Fixed environmental hazard hotspots (e.g. Goblin Cave gas corridors)
+        fPoint hazardPoints[] = {
+            { 5350.0f, 5180.0f, 0.0f },
+            { 5210.0f, 5420.0f, 0.0f },
+            { 5580.0f, 5290.0f, 0.0f }
+        };
+
+        for ( int h = 0; h < 3; h++ )
+        {
+            float d = GServer->distance( m_player->Position->current, hazardPoints[h] );
+            if ( d < 4.0f )
+            {
+                clock_t now = clock( );
+                if ( ( now - m_lastHazardWarningTime ) >= (clock_t)( 10 * CLOCKS_PER_SEC ) )
+                {
+                    m_lastHazardWarningTime = now;
+                    Say( "Floor hazard spotted! Poison spore vent ahead—stepping around!" );
+                }
+
+                fPoint detour;
+                detour.x = m_player->Position->current.x + 4.5f;
+                detour.y = m_player->Position->current.y - 4.5f;
+                detour.z = m_player->Position->current.z;
+                MoveTo( detour );
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+void CPlayerBot::CheckFieldHobbies( )
+{
+    if ( !m_player ) return;
+    if ( m_player->IsOnBattle( ) || ( m_followTarget && m_followTarget->IsOnBattle( ) ) ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastHobbyActionTime ) < (clock_t)( 45 * CLOCKS_PER_SEC ) ) return;
+
+    UINT mapId = m_player->Position->Map;
+
+    // 1. Water Body Fishing Hobby
+    fPoint waterSpots[] = {
+        { 5220.0f, 5110.0f, 0.0f }, // Zant / Adventurer riverbank (Map 1)
+        { 5350.0f, 5200.0f, 0.0f }, // Anima Lake (Map 25)
+        { 5500.0f, 5400.0f, 0.0f }  // Kenji Beach (Map 27)
+    };
+
+    for ( int w = 0; w < 3; w++ )
+    {
+        float d = GServer->distance( m_player->Position->current, waterSpots[w] );
+        if ( d <= 25.0f )
+        {
+            m_lastHobbyActionTime = now;
+            StopMoving( );
+            DoEmote( 2 );
+
+            int r = rand( ) % 3;
+            if ( r == 0 )
+            {
+                Say( "Casting a line into the river... *tugs* ...Aha! Reeled in a fine Silver Trout!" );
+                DoEmote( 3 );
+            }
+            else if ( r == 1 )
+            {
+                Say( "Patience is key while fishing... *splashes* ...Caught a plump River Bass!" );
+                DoEmote( 3 );
+            }
+            else
+            {
+                Say( "Felt a heavy pull! ...Aw, an old waterlogged boot? Someone littered in the lake!" );
+                DoEmote( 4 );
+            }
+            return;
+        }
+    }
+
+    // 2. Wilderness Herb & Mineral Outcropping Foraging
+    if ( mapId == 1 || mapId == 22 || mapId == 23 || mapId == 24 || mapId == 25 )
+    {
+        m_lastHobbyActionTime = now;
+        int forageRoll = rand( ) % 2;
+        if ( forageRoll == 0 )
+        {
+            Say( "Spotted wild Moonwort herbs by the wayside! Foraged a batch for our apothecary kit." );
+            DoEmote( 1 );
+        }
+        else
+        {
+            Say( "Found a raw copper mineral vein in the rock shelf! Chipped off a few usable ore nuggets." );
+            DoEmote( 2 );
+        }
+
+        if ( m_player->CharInfo )
+        {
+            m_player->CharInfo->Zulies += 150;
+        }
+    }
+}
+
+void CPlayerBot::RecordCompanionDefeat( CMonster* killerMob )
+{
+    if ( !killerMob || !m_player ) return;
+
+    m_nemesisMobType = killerMob->montype;
+    m_nemesisDefeatTime = clock( );
+
+    // If part of a squad, synchronize the grudge across all companion party members
+    if ( m_player->Party && m_player->Party->party )
+    {
+        CParty* party = m_player->Party->party;
+        for ( size_t i = 0; i < party->Members.size( ); i++ )
+        {
+            CPlayer* ally = party->Members[i];
+            if ( ally && ally->is_bot && ally->bot_ai )
+            {
+                ally->bot_ai->m_nemesisMobType = killerMob->montype;
+                ally->bot_ai->m_nemesisDefeatTime = m_nemesisDefeatTime;
+            }
+        }
+    }
+}
+
+void CPlayerBot::CheckNemesisRevenge( CMonster* mob )
+{
+    if ( !mob || !m_player ) return;
+    if ( m_nemesisMobType == 0 ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_nemesisDefeatTime ) > (clock_t)( 600 * CLOCKS_PER_SEC ) ) // 10 minute memory
+    {
+        m_nemesisMobType = 0;
+        return;
+    }
+
+    if ( mob->montype == m_nemesisMobType )
+    {
+        if ( ( now - m_lastNemesisCalloutTime ) >= (clock_t)( 25 * CLOCKS_PER_SEC ) )
+        {
+            m_lastNemesisCalloutTime = now;
+            m_vengeanceBuffExpiry = now + (clock_t)( 120 * CLOCKS_PER_SEC ); // 2-min vengeance buff
+
+            int r = rand( ) % 3;
+            if ( r == 0 )
+                Say( "That's the beast that struck our companion down! Vengeance is ours! Focus fire and tear it apart!" );
+            else if ( r == 1 )
+                Say( "Nemesis spotted! You won't defeat us a second time, monster! Unleash full power!" );
+            else
+                Say( "Payback time! For the squad! Fight with fury!" );
+
+            DoEmote( 3 ); // Cheer
+        }
+    }
+}
+
+void CPlayerBot::CheckClanAgitLife( )
+{
+    if ( !m_isCompanion || !m_followTarget || !m_player ) return;
+
+    // 1. High-Affinity Clan Enlistment Request
+    if ( m_affinity >= 85 && !m_hasAskedToJoinClan )
+    {
+        if ( m_followTarget->Clan && m_followTarget->Clan->clanid != 0 )
+        {
+            m_hasAskedToJoinClan = true;
+            char joinReq[192];
+            snprintf( joinReq, sizeof(joinReq),
+                "Leader %s, we have triumphed through countless perils together. Would you honor me with membership in Clan '%s'? I will proudly fly our banner!",
+                m_followTarget->CharInfo->charname, m_followTarget->Clan->clanname );
+            Say( joinReq );
+            DoEmote( 2 ); // Bow
+
+            // Auto-enlist into leader's clan
+            m_player->Clan = m_followTarget->Clan;
+            Say( "Honored to fight under our guild's crest! For glory and brotherhood!" );
+            DoEmote( 3 );
+            return;
+        }
+    }
+
+    // 2. Clan Field & Agit Activities
+    UINT mapId = m_player->Position->Map;
+    bool isClanArea = ( mapId == 50 || mapId == 7 || mapId == 8 );
+    if ( isClanArea )
+    {
+        clock_t now = clock( );
+        if ( ( now - m_lastClanAgitActionTime ) >= (clock_t)( 35 * CLOCKS_PER_SEC ) )
+        {
+            m_lastClanAgitActionTime = now;
+            int act = rand( ) % 3;
+            if ( act == 0 )
+            {
+                Say( "Inspecting our clan storage vault... inventory is well-prepared for the next war!" );
+                DoEmote( 1 );
+            }
+            else if ( act == 1 )
+            {
+                Say( "Taking a seat at the clan war table. Awaiting orders for our next operation!" );
+                SitDown( );
+            }
+            else
+            {
+                Say( "Sharpening weapon blade against the guild training dummy. Combat readiness at 100%!" );
+                DoEmote( 3 );
+            }
+        }
+    }
+}
+
+void CPlayerBot::CheckTravelerHospitality( )
+{
+    if ( !m_player ) return;
+    if ( m_player->IsOnBattle( ) || m_state == BOT_STATE_COMBAT || m_state == BOT_STATE_DEAD ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastHospitalityTime ) < (clock_t)( 35 * CLOCKS_PER_SEC ) ) return;
+
+    CMap* map = GetMap( );
+    if ( !map ) return;
+
+    for ( UINT i = 0; i < map->PlayerList.size( ); i++ )
+    {
+        CPlayer* traveler = map->PlayerList[i];
+        if ( !traveler || traveler == m_player || traveler->is_bot || traveler->IsDead( ) )
+            continue;
+
+        float dist = GServer->distance( m_player->Position->current, traveler->Position->current );
+        if ( dist <= 4.5f )
+        {
+            bool isWeary = ( ( traveler->Status && traveler->Status->Stance == 2 ) ||
+                             ( traveler->Stats && ( traveler->Stats->HP < ( traveler->Stats->MaxHP * 55 / 100 ) ||
+                                                    traveler->Stats->MP < ( traveler->Stats->MaxMP * 40 / 100 ) ) ) );
+            if ( isWeary )
+            {
+                m_lastHospitalityTime = now;
+
+                if ( m_role == BOT_ROLE_HEALER )
+                {
+                    UINT healSkill = 0; int healLvl = 0;
+                    if ( GetLearnedSkill( 921, healSkill, healLvl ) || GetLearnedSkill( 981, healSkill, healLvl ) )
+                    {
+                        m_player->StartAction( traveler, SKILL_BUFF, healSkill );
+                    }
+                    char msg[140];
+                    snprintf( msg, sizeof(msg), "You look weary from your travels, %s! Let me mend your fatigue with Arua's blessings.", traveler->CharInfo->charname );
+                    Say( msg );
+                    DoEmote( 2 );
+                    return;
+                }
+
+                char msg[140];
+                int r = rand( ) % 3;
+                if ( r == 0 )
+                    snprintf( msg, sizeof(msg), "Welcome to our camp, traveler %s! Take a seat by the fire and enjoy some hot broth.", traveler->CharInfo->charname );
+                else if ( r == 1 )
+                    snprintf( msg, sizeof(msg), "Rest your boots a while, %s! The roads between cities can be grueling.", traveler->CharInfo->charname );
+                else
+                    snprintf( msg, sizeof(msg), "Safe journey, %s! Stay refreshed and keep your weapon ready.", traveler->CharInfo->charname );
+
+                Say( msg );
+                DoEmote( 1 );
+                return;
+            }
+        }
+    }
+}
+
 
 

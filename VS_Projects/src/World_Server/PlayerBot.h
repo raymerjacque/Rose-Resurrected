@@ -401,6 +401,15 @@ public:
     void CheckRareDropCelebration( CDrop* drop );
     void CheckZoneTransitionReaction( );
 
+    // Phase 11 / Milestone 17: Environmental Awareness, Hazards, Grudges & Hospitality
+    void CheckDayNightAndWeather( );
+    bool CheckHazardAndTrapAvoidance( );
+    void CheckFieldHobbies( );
+    void RecordCompanionDefeat( CMonster* killerMob );
+    void CheckNemesisRevenge( CMonster* mob );
+    void CheckClanAgitLife( );
+    void CheckTravelerHospitality( );
+
 private:
     CPlayer* m_player;
     BotState m_state;
@@ -568,6 +577,18 @@ private:
     clock_t m_lastRareDropHypeTime;
     UINT m_lastObservedMapId;
     clock_t m_lastZoneReactionTime;
+
+    // Phase 11 / Milestone 17: Environmental Awareness, Hazards, Grudges & Hospitality
+    clock_t m_lastWeatherCheckTime;
+    clock_t m_lastHazardWarningTime;
+    clock_t m_lastHobbyActionTime;
+    UINT m_nemesisMobType;
+    clock_t m_nemesisDefeatTime;
+    clock_t m_vengeanceBuffExpiry;
+    clock_t m_lastNemesisCalloutTime;
+    bool m_hasAskedToJoinClan;
+    clock_t m_lastClanAgitActionTime;
+    clock_t m_lastHospitalityTime;
 };
 
 class CBotManager {
