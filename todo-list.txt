@@ -514,5 +514,13 @@ MILESTONE 15 — Autonomous Living World Dynamics, Stranger Rescues, Camp Vignet
 [x] Living Town Street Life & Citizen Greeting Encounters: Bots strolling through cities (Zant, Junon Polis) naturally browse stalls, inspect forge temperatures, and pause to wave (`DoEmote 1`) and exchange friendly town greetings with passing players and fellow adventurers.
 [x] Clutch Combat Finisher Callouts: Companions dynamically celebrate decisive takedowns, calling out critical kills and offering respectful apologies if their final blow clipped a monster the player was battling.
 
+MILESTONE 16 — Guard Perimeters, Panic Kiting, Social Circles & Drop Hype (COMPLETED & VERIFIED)
+[x] Autonomous AFK Guard Perimeter Duty: When the party leader remains stationary for >35 seconds (AFK or chatting), companion bots establish a 360-degree radial defensive perimeter (3.5m radius). Any hostile monster approaching within 15m is instantly engaged and neutralized before threatening the leader. The perimeter smoothly dissolves and reforms standard formation as soon as the leader resumes marching (>2.5m).
+[x] Tactical Panic Kiting & Clutch Tank Saves: Squishy backline companions (Mages, Scouts, Clerics) under severe pressure (<25% HP with a beast within 4.5m) tactically panic-kite 12m backwards, chugging emergency potions and shouting for triage. The party Tank bot automatically detects kiting allies, charging into melee to intercept the beast with taunts and defensive crowd control.
+[x] Spontaneous Tavern & Campfire Social Circles: Ambient roaming bots in towns and outposts naturally form social circles when crossing paths (within 5.5m), sitting down together or exchanging animated emotes (`DoEmote 1`, `DoEmote 3`), discussing ore veins, Goblin King raids, market commodity prices, and adventures.
+[x] Autonomous Rare Drop Celebrations & Item Hype: When high-value treasure drops (>=1,000 Zulies or rare equipment items) drop in the field or are picked up, companions immediately celebrate with cheers (`DoEmote 3`) and contextual hype dialogue (with specialized appraisal remarks from Artisan/Dealer companions like Barnaby).
+[x] Atmospheric Biome Transitions & Zone Reactions: When the party crosses zone borders or enters new regions (Adventurer's Plains, Junon Polis, Breezy Hills, El Vergel, subterranean Goblin Caves), companions react with immersive environmental dialogue and greeting gestures.
+[x] Autonomous Revive Gratitude & Medical Praise: Companions revived in combat express gratitude and morale boosts ("Back on my feet! Arua bless your healing hands!"), cheering (`DoEmote 3`) before charging straight back into the fray.
+
 ================================================================================
 

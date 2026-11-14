@@ -35,6 +35,7 @@ Recommended Client to use with Server : https://162.35.161.103/downloads/Rose-cl
    - [Milestone 13 — Combat DPS & Healing Parser, Dynamic Loadouts, 8-Man Raid Alliances & Dungeon Expeditions](#milestone-13--combat-dps--healing-parser-dynamic-loadouts-8-man-raid-alliances--dungeon-expeditions-completed--verified)
    - [Milestone 14 — Sparring Duels, Gambit Scripts, Mercenary Expeditions, Transmog & Squad Masteries](#milestone-14--sparring-duels-gambit-scripts-mercenary-expeditions-transmog--squad-masteries-completed--verified)
    - [Milestone 15 — Autonomous Living World Dynamics, Stranger Rescues, Camp Vignettes & Natural AI](#milestone-15--autonomous-living-world-dynamics-stranger-rescues-camp-vignettes--natural-ai-completed--verified)
+   - [Milestone 16 — Guard Perimeters, Panic Kiting, Social Circles & Drop Hype](#milestone-16--guard-perimeters-panic-kiting-social-circles--drop-hype-completed--verified)
 3. [Roadmap & Upcoming Milestones](#roadmap--upcoming-milestones)
 4. [Intelligent AI Companion & PlayerBot Deep-Dive](#intelligent-ai-companion--playerbot-deep-dive)
    - [1. Real Player Auto-Grouping](#1-real-player-auto-grouping)
@@ -395,11 +396,25 @@ RosE Resurrected utilizes a distributed 3-tier server model communicating via TC
 - **Clutch Combat Finisher Callouts**:
   - Companions dynamically celebrate decisive takedowns, calling out critical kills and offering respectful apologies if their final blow clipped a monster the player was battling.
 
+### Milestone 16 — Guard Perimeters, Panic Kiting, Social Circles & Drop Hype (Completed & Verified)
+- **Autonomous AFK Guard Perimeter Duty**:
+  - When the leader stays stationary for >35s (AFK, browsing bags, or typing in chat), companions immediately break trail formation and establish a 360-degree radial defensive perimeter (3.5m radius). Any monster wandering within 15m is intercepted and defeated before reaching the leader. As soon as the leader moves >2.5m, the perimeter seamlessly dissolves and normal trail formation resumes.
+- **Tactical Panic Kiting & Clutch Tank Saves**:
+  - Squishy backline companions (Mages, Scouts, Clerics) under heavy pressure (<25% HP and enemy within 4.5m) tactically panic-kite 12m backwards away from the attacker, drinking emergency potions and crying for cover (`DoEmote 4`). Party Tank bots automatically detect kiting allies, charging into melee to intercept the beast with taunts and defensive crowd control.
+- **Spontaneous Tavern & Campfire Social Circles**:
+  - Ambient roaming bots in towns and outposts naturally form social circles when crossing paths (within 5.5m), sitting down together or exchanging animated emotes (`DoEmote 1`, `DoEmote 3`), discussing ore veins, Goblin King raids, market commodity prices, and adventures.
+- **Autonomous Rare Drop Celebrations & Item Hype**:
+  - When high-value treasure drops (>=1,000 Zulies or rare equipment items) drop in the field or are picked up, companions immediately celebrate with cheers (`DoEmote 3`) and contextual hype dialogue (with specialized appraisal remarks from Artisan/Dealer companions like Barnaby).
+- **Atmospheric Biome Transitions & Zone Reactions**:
+  - When the party crosses zone borders or enters new regions (Adventurer's Plains, Junon Polis, Breezy Hills, El Vergel, subterranean Goblin Caves), companions react with immersive environmental dialogue and greeting gestures.
+- **Autonomous Revive Gratitude & Medical Praise**:
+  - Companions revived in combat express gratitude and morale boosts ("Back on my feet! Arua bless your healing hands!"), cheering (`DoEmote 3`) before charging straight back into the fray.
+
 ---
 
 ## Roadmap & Upcoming Milestones
 
-### Milestone 16 — Advanced World Events, Raids & Planetary Expansion (In Design)
+### Milestone 17 — Advanced World Events, Raids & Planetary Expansion (In Design)
 - [ ] **Planet Luna & Orlo Expansion Polish**: Review and verify space flight transitions, low-gravity physics, and unique monster spawn definitions.
 - [ ] **World Boss Multi-Phase Mechanics**: Implement multi-phase enrage timers, area-of-effect telegraphs, and tiered reward chests for world bosses (*King Spider*, *Chapeau*, *Karkome*).
 - [ ] **Seasonal Event Automation**: Automated in-game holidays (Halloween pumpkin drops, Christmas gift boxes, Summer festival events).

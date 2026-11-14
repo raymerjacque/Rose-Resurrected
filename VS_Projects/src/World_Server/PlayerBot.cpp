@@ -1331,7 +1331,14 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_lastDowntimeVignette( 0 ),
       m_grindKillCount( 0 ),
       m_lastStrangerAssistTime( 0 ),
-      m_lastTownGreetingTime( 0 )
+      m_lastTownGreetingTime( 0 ),
+      m_isGuardPerimeterActive( false ),
+      m_isPanicKiting( false ),
+      m_lastPanicKiteTime( 0 ),
+      m_lastSocialCircleTime( 0 ),
+      m_lastRareDropHypeTime( 0 ),
+      m_lastObservedMapId( 0 ),
+      m_lastZoneReactionTime( 0 )
 {
     m_pullAnchorPos.x = 0.0f;
     m_pullAnchorPos.y = 0.0f;
@@ -3014,7 +3021,14 @@ bool CPlayerBot::CheckPartyResurrect( )
             {
                 member->bot_ai->SetFollowTarget( m_followTarget ? m_followTarget : m_player );
                 member->bot_ai->SetState( BOT_STATE_FOLLOW );
-                member->bot_ai->Say( "Thank you for the revive!" );
+                const char* rezThanks[] = {
+                    "Thank you for the revive! Back on my feet!",
+                    "Phew, that was close! Arua bless your healing hands!",
+                    "I owe you one! Rejoining the battle line!",
+                    "Thank you, healer! Let's show these beasts what we're made of!"
+                };
+                member->bot_ai->Say( rezThanks[rand( ) % 4] );
+                member->bot_ai->DoEmote( 3 ); // Cheer
             }
 
             char rezMsg[64];
@@ -3887,11 +3901,12 @@ void CPlayerBot::HandleRoam( )
 {
     if ( !m_player ) return;
 
-    // Milestone 15: Good Samaritan - Rescue struggling real players in the wild
+    // Milestone 15 & 16: Ambient Living State
     if ( !m_isCompanion )
     {
         CheckStrangerAssistance( );
         CheckNaturalGrindCycle( );
+        CheckSocialCircleGathering( );
         if ( m_state != BOT_STATE_ROAM ) return;
     }
 
@@ -3960,6 +3975,9 @@ void CPlayerBot::HandleCombat( )
         }
     }
 
+    // Phase 10 / Milestone 16: Tactical Panic Kiting & Clutch Tank Saves
+    if ( CheckPanicKiteAndPeel( ) ) return;
+
     // Check party support during combat
     if ( EvaluateGambitRules( ) ) return;
     CheckPartyHeal( );
@@ -4022,10 +4040,17 @@ void CPlayerBot::HandleCombat( )
             CDrop* drop = FindNearbyDrop( 3.0f );
             if ( drop )
             {
+                CheckRareDropCelebration( drop );
                 m_targetDropCid = drop->clientid;
                 MoveTo( drop->pos );
                 SetState( BOT_STATE_LOOT );
                 return;
+            }
+            // Check for rare drop nearby to celebrate even if leader collects it
+            CDrop* nearbyDrop = FindNearbyDrop( 12.0f );
+            if ( nearbyDrop )
+            {
+                CheckRareDropCelebration( nearbyDrop );
             }
             SetState( BOT_STATE_FOLLOW );
             return;
@@ -4148,6 +4173,10 @@ void CPlayerBot::HandleLoot( )
     else
     {
         StopMoving( );
+
+        // Phase 10 / Milestone 16: Rare Drop Celebrations & Item Hype
+        CheckRareDropCelebration( drop );
+
         if ( drop->type == 1 )
         {
             m_player->CharInfo->Zulies += drop->amount;
@@ -4246,6 +4275,9 @@ void CPlayerBot::HandleFollow( )
         SyncLevelToLeader( m_followTarget->Stats->Level );
     }
 
+    // Phase 10 / Milestone 16: Zone Transition Reactions
+    CheckZoneTransitionReaction( );
+
     // Milestone 15: Leader Level-Up Celebration
     CheckLeaderLevelUpCelebration( );
 
@@ -4255,6 +4287,10 @@ void CPlayerBot::HandleFollow( )
 
     // Milestone 15: Idle Downtime Vignettes & Camp Relaxation
     CheckIdleDowntimeVignette( );
+
+    // Phase 10 / Milestone 16: Autonomous AFK Guard Perimeter Duty
+    CheckAfkGuardPerimeter( );
+    if ( m_isGuardPerimeterActive ) return;
 
     // 1. Teleport follow: If party leader changed maps or moved far away (> 25m), follow leader instantly
     if ( m_player->Position->Map != m_followTarget->Position->Map ||
@@ -4562,6 +4598,9 @@ void CPlayerBot::HandleTownStroll( )
 
     // Milestone 15: Town Street Life & Citizen Greeting Encounters
     CheckTownLifeRoutine( );
+
+    // Phase 10 / Milestone 16: Spontaneous Social Circles
+    CheckSocialCircleGathering( );
 
     // Check for monsters outside town gates (expanded to 1200.0m map-wide detection)
     CMonster* mob = FindNearbyMonster( 1200.0f );
@@ -8488,7 +8527,7 @@ void CPlayerBot::CheckLeaderLevelUpCelebration( )
         else if ( r == 1 )
             snprintf( cheer, sizeof(cheer), "Level %d! Another monumental milestone achieved, leader! Honored to fight alongside you!", currLvl );
         else
-            snprintf( cheer, sizeof(cheer), "Incredible progress, %s! Level %d! The seven planets tremble before our squad!", currLvl, m_followTarget->CharInfo->charname );
+            snprintf( cheer, sizeof(cheer), "Incredible progress, %s! Level %d! The seven planets tremble before our squad!", m_followTarget->CharInfo->charname, currLvl );
         Say( cheer );
     }
 }
@@ -8669,4 +8708,339 @@ void CPlayerBot::CheckTownLifeRoutine( )
         }
     }
 }
+
+// -------------------------------------------------------------
+// Phase 10 / Milestone 16: Autonomous Living Behaviors
+// -------------------------------------------------------------
+
+void CPlayerBot::CheckAfkGuardPerimeter( )
+{
+    if ( !m_isCompanion || !m_followTarget || !m_player ) return;
+    if ( m_player->IsOnBattle( ) || m_followTarget->IsOnBattle( ) ) return;
+
+    clock_t now = clock( );
+    float distMoved = GServer->distance( m_followTarget->Position->current, m_lastLeaderStationaryPos );
+    if ( distMoved > 2.5f )
+    {
+        if ( m_isGuardPerimeterActive )
+        {
+            m_isGuardPerimeterActive = false;
+            Say( "Leader is on the move! Breaking guard perimeter and reforming." );
+        }
+        return;
+    }
+
+    // Leader has been stationary for >= 35 seconds
+    if ( ( now - m_leaderStationaryTime ) >= (clock_t)( 35 * CLOCKS_PER_SEC ) )
+    {
+        if ( !m_isGuardPerimeterActive )
+        {
+            m_isGuardPerimeterActive = true;
+            int r = rand( ) % 3;
+            if ( r == 0 ) Say( "Leader seems resting or AFK. Setting up 360-degree defensive perimeter!" );
+            else if ( r == 1 ) Say( "Securing the perimeter around leader. Nothing gets past us." );
+            else Say( "Defensive perimeter active! Eyes sharp, squad." );
+        }
+
+        // Calculate 360 degree radial slot
+        int slot = GetPartySlotIndex( );
+        float angle = ( (float)slot * 90.0f ) * ( 3.14159265f / 180.0f );
+        fPoint guardPos;
+        guardPos.x = m_followTarget->Position->current.x + cosf( angle ) * 3.5f;
+        guardPos.y = m_followTarget->Position->current.y + sinf( angle ) * 3.5f;
+        guardPos.z = m_followTarget->Position->current.z;
+
+        float distToGuard = GServer->distance( m_player->Position->current, guardPos );
+        if ( distToGuard > 1.2f )
+        {
+            MoveTo( guardPos );
+        }
+
+        // Check for any nearby hostiles threatening the perimeter
+        CMonster* mob = FindNearbyMonster( 15.0f );
+        if ( mob && !mob->IsDead( ) && mob->Stats->HP > 0 && !mob->IsBonfire( ) )
+        {
+            AttackTarget( mob );
+            SetState( BOT_STATE_COMBAT );
+            Say( "Perimeter breach! Intercepting monster before it reaches the leader!" );
+        }
+    }
+}
+
+bool CPlayerBot::CheckPanicKiteAndPeel( )
+{
+    if ( !m_player ) return false;
+    CMap* map = GetMap( );
+    if ( !map ) return false;
+
+    // 1. Squishy bot panic kite logic (Mage, Scout, Cleric)
+    bool isSquishy = ( m_role == BOT_ROLE_DPS_MAGIC || m_role == BOT_ROLE_DPS_PHYS_RANGED || m_role == BOT_ROLE_HEALER );
+    if ( isSquishy && m_player->Stats && m_player->Stats->HP < ( m_player->Stats->MaxHP * 25 / 100 ) )
+    {
+        if ( m_targetMobCid != 0 )
+        {
+            CMonster* mob = map->GetMonsterInMap( m_targetMobCid );
+            if ( mob && !mob->IsDead( ) && mob->Stats->HP > 0 && !mob->IsBonfire( ) )
+            {
+                float dist = GServer->distance( m_player->Position->current, mob->Position->current );
+                if ( dist < 5.0f )
+                {
+                    m_isPanicKiting = true;
+                    clock_t now = clock( );
+                    if ( ( now - m_lastPanicKiteTime ) >= (clock_t)( 8 * CLOCKS_PER_SEC ) )
+                    {
+                        m_lastPanicKiteTime = now;
+                        int r = rand( ) % 3;
+                        if ( r == 0 ) Say( "Too close! I'm falling back, peel for me!" );
+                        else if ( r == 1 ) Say( "Heavy damage taken! Kiting backwards, need cover!" );
+                        else Say( "Backing away! Tank, pull this beast off me!" );
+                        DoEmote( 4 );
+                    }
+
+                    // Vector directly away from monster
+                    float dx = m_player->Position->current.x - mob->Position->current.x;
+                    float dy = m_player->Position->current.y - mob->Position->current.y;
+                    float len = sqrt( dx * dx + dy * dy );
+                    if ( len > 0.05f ) { dx /= len; dy /= len; }
+                    else { dx = 1.0f; dy = 0.0f; }
+
+                    fPoint fleePos;
+                    fleePos.x = m_player->Position->current.x + dx * 12.0f;
+                    fleePos.y = m_player->Position->current.y + dy * 12.0f;
+                    fleePos.z = m_player->Position->current.z;
+
+                    MoveTo( fleePos );
+                    ConsumePotions( );
+                    return true;
+                }
+            }
+        }
+    }
+    else if ( m_isPanicKiting && m_player->Stats && m_player->Stats->HP > ( m_player->Stats->MaxHP * 50 / 100 ) )
+    {
+        m_isPanicKiting = false;
+        Say( "Health recovered! Re-engaging target!" );
+    }
+
+    // 2. Tank bot peel logic: intercept monsters beating on kiting or low-HP allies
+    if ( m_role == BOT_ROLE_TANK && m_player->Party && m_player->Party->party )
+    {
+        CParty* party = m_player->Party->party;
+        for ( size_t i = 0; i < party->Members.size( ); i++ )
+        {
+            CPlayer* ally = party->Members[i];
+            if ( !ally || ally == m_player || ally->IsDead( ) || ally->Position->Map != m_player->Position->Map )
+                continue;
+
+            bool allyInTrouble = false;
+            if ( ally->is_bot && ally->bot_ai && ally->bot_ai->m_isPanicKiting )
+                allyInTrouble = true;
+            else if ( ally->Stats && ally->Stats->HP < ( ally->Stats->MaxHP * 35 / 100 ) && ally->Battle && ally->Battle->hitby != 0 )
+                allyInTrouble = true;
+
+            if ( allyInTrouble )
+            {
+                UINT threatCid = ( ally->Battle && ally->Battle->hitby != 0 ) ? ally->Battle->hitby : 0;
+                if ( threatCid == 0 && ally->is_bot && ally->bot_ai )
+                    threatCid = ally->bot_ai->m_targetMobCid;
+
+                if ( threatCid != 0 && threatCid != m_targetMobCid )
+                {
+                    CMonster* threatMob = map->GetMonsterInMap( threatCid );
+                    if ( threatMob && !threatMob->IsDead( ) && threatMob->Stats->HP > 0 && !threatMob->IsBonfire( ) )
+                    {
+                        AttackTarget( threatMob );
+                        SetState( BOT_STATE_COMBAT );
+
+                        UINT tauntSkill = 0; int tauntLvl = 0;
+                        if ( GetLearnedSkill( 201, tauntSkill, tauntLvl ) || GetLearnedSkill( 202, tauntSkill, tauntLvl ) )
+                        {
+                            m_player->StartAction( threatMob, SKILL_ATTACK, tauntSkill );
+                        }
+
+                        char peelMsg[128];
+                        snprintf( peelMsg, sizeof(peelMsg), "I've got your back, %s! Focus on me, beast!", ally->CharInfo->charname );
+                        Say( peelMsg );
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    return false;
+}
+
+void CPlayerBot::CheckSocialCircleGathering( )
+{
+    if ( m_isCompanion || !m_player ) return;
+    if ( m_state == BOT_STATE_COMBAT || m_state == BOT_STATE_DEAD ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastSocialCircleTime ) < (clock_t)( 45 * CLOCKS_PER_SEC ) ) return;
+
+    CMap* map = GetMap( );
+    if ( !map ) return;
+
+    // Scan for nearby ambient non-companion bots
+    CPlayer* companionBot = NULL;
+    for ( UINT i = 0; i < map->PlayerList.size( ); i++ )
+    {
+        CPlayer* other = map->PlayerList[i];
+        if ( !other || other == m_player || !other->is_bot || !other->bot_ai ) continue;
+        if ( other->bot_ai->m_isCompanion || other->IsDead( ) ) continue;
+        if ( other->bot_ai->GetState( ) == BOT_STATE_COMBAT || other->bot_ai->GetState( ) == BOT_STATE_DEAD ) continue;
+
+        float dist = GServer->distance( m_player->Position->current, other->Position->current );
+        if ( dist <= 5.5f )
+        {
+            companionBot = other;
+            break;
+        }
+    }
+
+    if ( companionBot && companionBot->bot_ai )
+    {
+        m_lastSocialCircleTime = now;
+        companionBot->bot_ai->m_lastSocialCircleTime = now;
+
+        // Both stop and emote / sit
+        StopMoving( );
+        companionBot->bot_ai->StopMoving( );
+
+        int socialAction = rand( ) % 3;
+        if ( socialAction == 0 )
+        {
+            SitDown( );
+            companionBot->bot_ai->SitDown( );
+            const char* convA[] = {
+                "Good campfire spot to rest our boots. Found any rare ore veins out in the valley?",
+                "The road from Zant was full of aggressive Jellybeans today. Good to sit a while.",
+                "Phew, that was quite a grinding session. How are market prices looking?"
+            };
+            const char* convB[] = {
+                "Aye, bagged some silver nuggets earlier! Safe travels to you, fellow wanderer.",
+                "I know the feeling. My sword edge is chipped, but pockets are lined with Zulies!",
+                "Prices are booming at the central market! Stock up on elixirs while you can."
+            };
+            int idx = rand( ) % 3;
+            Say( convA[idx] );
+            companionBot->bot_ai->Say( convB[idx] );
+        }
+        else if ( socialAction == 1 )
+        {
+            DoEmote( 1 ); // Wave
+            companionBot->bot_ai->DoEmote( 1 );
+            Say( "Hail, fellow traveler! Good hunting out there!" );
+            companionBot->bot_ai->Say( "Hail! May the Seven Hearts guide your path!" );
+        }
+        else
+        {
+            DoEmote( 3 ); // Cheer
+            companionBot->bot_ai->DoEmote( 2 ); // Laugh
+            Say( "Hear any news about the King Goblin raid party near the gates?" );
+            companionBot->bot_ai->Say( "Aye, heard they got routed! The realm is safe for another day." );
+        }
+    }
+}
+
+void CPlayerBot::CheckRareDropCelebration( CDrop* drop )
+{
+    if ( !m_isCompanion || !m_player || !drop ) return;
+
+    // Check if drop is valuable gold or equipment item
+    bool isRare = false;
+    if ( drop->type == 1 && drop->amount >= 1000 )
+    {
+        isRare = true;
+    }
+    else if ( drop->type == 2 && drop->item && drop->item->itemtype < 10 )
+    {
+        isRare = true;
+    }
+
+    if ( !isRare ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastRareDropHypeTime ) < (clock_t)( 15 * CLOCKS_PER_SEC ) ) return;
+    m_lastRareDropHypeTime = now;
+
+    DoEmote( 3 ); // Cheer
+
+    if ( drop->type == 1 )
+    {
+        int r = rand( ) % 3;
+        if ( r == 0 ) Say( "Whoa! Look at that heavy bag of Zulies! Jackpot, leader!" );
+        else if ( r == 1 ) Say( "That beast was hoarding serious coin! Drinks on the leader tonight!" );
+        else Say( "Cha-ching! Our party treasury is getting stacked!" );
+    }
+    else
+    {
+        // Equipment drop hype
+        if ( m_player->CharInfo && ( m_player->CharInfo->Job == 411 || m_player->CharInfo->Job == 421 || m_player->CharInfo->Job == 422 || m_player->CharInfo->Job == 431 || m_player->CharInfo->Job == 432 ) )
+        {
+            Say( "Fascinating craftsmanship on that gear drop! We should inspect the gem sockets and refine it!" );
+        }
+        else
+        {
+            int r = rand( ) % 3;
+            if ( r == 0 ) Say( "Rare equipment drop spotted! The RNG gods are smiling on our squad!" );
+            else if ( r == 1 ) Say( "Sweet loot! Check out the stats on that piece, leader!" );
+            else Say( "Clean kill, epic reward! That's what I'm talking about!" );
+        }
+    }
+}
+
+void CPlayerBot::CheckZoneTransitionReaction( )
+{
+    if ( !m_isCompanion || !m_player || !m_followTarget ) return;
+
+    UINT currentMap = m_player->Position->Map;
+    if ( m_lastObservedMapId == 0 )
+    {
+        m_lastObservedMapId = currentMap;
+        return;
+    }
+
+    if ( currentMap != m_lastObservedMapId )
+    {
+        m_lastObservedMapId = currentMap;
+        clock_t now = clock( );
+        if ( ( now - m_lastZoneReactionTime ) >= (clock_t)( 10 * CLOCKS_PER_SEC ) )
+        {
+            m_lastZoneReactionTime = now;
+            DoEmote( 1 ); // Wave / inspect
+
+            char arrivalMsg[160];
+            const char* leaderName = m_followTarget->CharInfo->charname;
+
+            if ( currentMap == 1 )
+            {
+                snprintf( arrivalMsg, sizeof(arrivalMsg), "Adventurer's Plains! Back to where every legend begins, %s. Smell that crisp country air!", leaderName );
+            }
+            else if ( currentMap == 2 )
+            {
+                snprintf( arrivalMsg, sizeof(arrivalMsg), "The towering spires of Junon Polis! The grand heart of civilization. What's on the agenda, %s?", leaderName );
+            }
+            else if ( currentMap == 23 )
+            {
+                snprintf( arrivalMsg, sizeof(arrivalMsg), "Breezy Hills! Feel that brisk mountain wind, %s. Keep weapons unsheathed, beasts roam thick here!", leaderName );
+            }
+            else if ( currentMap == 24 )
+            {
+                snprintf( arrivalMsg, sizeof(arrivalMsg), "El Vergel oasis! Scorching sands underfoot, %s. Watch out for desert scorpions and raiders!", leaderName );
+            }
+            else if ( currentMap == 51 || currentMap == 52 )
+            {
+                snprintf( arrivalMsg, sizeof(arrivalMsg), "Entering subterranean Goblin Caves, %s! Damp stone and echoing growls... stay close together, squad!", leaderName );
+            }
+            else
+            {
+                snprintf( arrivalMsg, sizeof(arrivalMsg), "New sector reached! Ready for whatever challenges this land throws at us, %s!", leaderName );
+            }
+            Say( arrivalMsg );
+        }
+    }
+}
+
 

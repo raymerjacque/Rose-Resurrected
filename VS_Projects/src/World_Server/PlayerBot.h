@@ -394,6 +394,13 @@ public:
     void CheckNaturalGrindCycle( );
     void CheckTownLifeRoutine( );
 
+    // Phase 10 / Milestone 16: Guard Perimeters, Panic Kiting, Social Circles & Hype
+    void CheckAfkGuardPerimeter( );
+    bool CheckPanicKiteAndPeel( );
+    void CheckSocialCircleGathering( );
+    void CheckRareDropCelebration( CDrop* drop );
+    void CheckZoneTransitionReaction( );
+
 private:
     CPlayer* m_player;
     BotState m_state;
@@ -552,6 +559,15 @@ private:
     int m_grindKillCount;
     clock_t m_lastStrangerAssistTime;
     clock_t m_lastTownGreetingTime;
+
+    // Phase 10 / Milestone 16: Additional Natural Living State
+    bool m_isGuardPerimeterActive;
+    bool m_isPanicKiting;
+    clock_t m_lastPanicKiteTime;
+    clock_t m_lastSocialCircleTime;
+    clock_t m_lastRareDropHypeTime;
+    UINT m_lastObservedMapId;
+    clock_t m_lastZoneReactionTime;
 };
 
 class CBotManager {
