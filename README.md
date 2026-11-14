@@ -34,6 +34,7 @@ Recommended Client to use with Server : https://162.35.161.103/downloads/Rose-cl
    - [Milestone 12 — Squad Unison Ultimates, Field Crafting, Siege Warfare & Loyalty Quests](#milestone-12--squad-unison-ultimates-field-crafting-siege-warfare--loyalty-quests-completed--verified)
    - [Milestone 13 — Combat DPS & Healing Parser, Dynamic Loadouts, 8-Man Raid Alliances & Dungeon Expeditions](#milestone-13--combat-dps--healing-parser-dynamic-loadouts-8-man-raid-alliances--dungeon-expeditions-completed--verified)
    - [Milestone 14 — Sparring Duels, Gambit Scripts, Mercenary Expeditions, Transmog & Squad Masteries](#milestone-14--sparring-duels-gambit-scripts-mercenary-expeditions-transmog--squad-masteries-completed--verified)
+   - [Milestone 15 — Autonomous Living World Dynamics, Stranger Rescues, Camp Vignettes & Natural AI](#milestone-15--autonomous-living-world-dynamics-stranger-rescues-camp-vignettes--natural-ai-completed--verified)
 3. [Roadmap & Upcoming Milestones](#roadmap--upcoming-milestones)
 4. [Intelligent AI Companion & PlayerBot Deep-Dive](#intelligent-ai-companion--playerbot-deep-dive)
    - [1. Real Player Auto-Grouping](#1-real-player-auto-grouping)
@@ -378,11 +379,27 @@ RosE Resurrected utilizes a distributed 3-tier server model communicating via TC
 - **Field Alchemy & Munitions Forging (`/party bot brew` & `/party bot forge`)**:
   - Direct field crafting: Clerics/Muses brew 20-100 HP/MP potions on demand; Artisans/Bourgeois forge 500-2000 arrows or bullets directly into the player's quiver slots.
 
+### Milestone 15 — Autonomous Living World Dynamics, Stranger Rescues, Camp Vignettes & Natural AI (Completed & Verified)
+- **Autonomous Bodyguard Ambusher Interception**:
+  - Companions automatically sense monsters flanking or attacking the player from behind, rushing in to intercept, taunt, and shield the leader without any manual player command.
+- **Autonomous Leader Level-Up Celebrations**:
+  - Companions spontaneously detect when the leader levels up, turning to face them, playing victory fanfare horns, saluting/cheering (`DoEmote 3`), and shouting congratulatory party messages.
+- **Natural Camp Rest & Biome Downtime Vignettes**:
+  - When the player stands idle for >15s in safe areas or outposts, companions naturally relax, sit down by the campfire, stretch (`DoEmote 1`), and engage in atmospheric biome chatter reflecting local lore (Zant forge smoke, cave ambushes, Breezy Hills winds).
+- **Open-World "Good Samaritan" Stranger Rescues**:
+  - Ambient roaming bots detect nearby real players struggling in combat (<50% HP or multiple mob aggro), immediately rushing over to cast emergency heals/cleanses or taunt away secondary beasts, bowing with friendly farewells upon victory.
+- **Natural Grinding Life Cycles & Rest Bandaging**:
+  - Ambient bots track monster kills (8-12 mobs), periodically pausing their grinding run to sit by the roadside, bandage up, drink potions, and inspect their gear before heading out to hunt again.
+- **Living Town Street Life & Citizen Greeting Encounters**:
+  - Bots strolling through cities (Zant, Junon Polis) browse stalls, inspect forge temperatures, and pause to wave (`DoEmote 1`) and exchange friendly town greetings with passing players and fellow adventurers.
+- **Clutch Combat Finisher Callouts**:
+  - Companions dynamically celebrate decisive takedowns, calling out critical kills and offering respectful apologies if their final blow clipped a monster the player was battling.
+
 ---
 
 ## Roadmap & Upcoming Milestones
 
-### Milestone 15 — Advanced World Events, Raids & Planetary Expansion (In Design)
+### Milestone 16 — Advanced World Events, Raids & Planetary Expansion (In Design)
 - [ ] **Planet Luna & Orlo Expansion Polish**: Review and verify space flight transitions, low-gravity physics, and unique monster spawn definitions.
 - [ ] **World Boss Multi-Phase Mechanics**: Implement multi-phase enrage timers, area-of-effect telegraphs, and tiered reward chests for world bosses (*King Spider*, *Chapeau*, *Karkome*).
 - [ ] **Seasonal Event Automation**: Automated in-game holidays (Halloween pumpkin drops, Christmas gift boxes, Summer festival events).

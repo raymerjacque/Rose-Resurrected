@@ -1325,11 +1325,20 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_sparringStartTime( 0 ),
       m_outfit( OUTFIT_DEFAULT ),
       m_talentSpec( TALENT_NONE ),
-      m_lastInterBotBanterTime( 0 )
+      m_lastInterBotBanterTime( 0 ),
+      m_lastLeaderLevel( 0 ),
+      m_leaderStationaryTime( 0 ),
+      m_lastDowntimeVignette( 0 ),
+      m_grindKillCount( 0 ),
+      m_lastStrangerAssistTime( 0 ),
+      m_lastTownGreetingTime( 0 )
 {
     m_pullAnchorPos.x = 0.0f;
     m_pullAnchorPos.y = 0.0f;
     m_pullAnchorPos.z = 0.0f;
+    m_lastLeaderStationaryPos.x = 0.0f;
+    m_lastLeaderStationaryPos.y = 0.0f;
+    m_lastLeaderStationaryPos.z = 0.0f;
     if ( player && player->CharInfo )
     {
         m_role = DetermineRoleFromJob( player->CharInfo->Job );
@@ -3878,6 +3887,14 @@ void CPlayerBot::HandleRoam( )
 {
     if ( !m_player ) return;
 
+    // Milestone 15: Good Samaritan - Rescue struggling real players in the wild
+    if ( !m_isCompanion )
+    {
+        CheckStrangerAssistance( );
+        CheckNaturalGrindCycle( );
+        if ( m_state != BOT_STATE_ROAM ) return;
+    }
+
     // Check for drops while roaming
     CDrop* drop = FindNearbyDrop( 100.0f );
     if ( drop )
@@ -3986,6 +4003,14 @@ void CPlayerBot::HandleCombat( )
                     m_followTarget->CharInfo->charname );
                 Say( progMsg );
             }
+            else if ( m_isCompanion && m_followTarget && ( rand( ) % 8 == 0 ) )
+            {
+                int s = rand( ) % 3;
+                if ( s == 0 ) Say( "Target eliminated! Clean takedown, squad!" );
+                else if ( s == 1 ) Say( "One less beast roaming Junon! Onward!" );
+                else Say( "Smooth execution, leader!" );
+            }
+            m_grindKillCount++;
         }
         ClearBattle( m_player->Battle );
         m_targetMobCid = 0;
@@ -4220,6 +4245,16 @@ void CPlayerBot::HandleFollow( )
     {
         SyncLevelToLeader( m_followTarget->Stats->Level );
     }
+
+    // Milestone 15: Leader Level-Up Celebration
+    CheckLeaderLevelUpCelebration( );
+
+    // Milestone 15: Autonomous Bodyguard Intercept
+    CheckAutonomousBodyguard( );
+    if ( m_state == BOT_STATE_COMBAT ) return;
+
+    // Milestone 15: Idle Downtime Vignettes & Camp Relaxation
+    CheckIdleDowntimeVignette( );
 
     // 1. Teleport follow: If party leader changed maps or moved far away (> 25m), follow leader instantly
     if ( m_player->Position->Map != m_followTarget->Position->Map ||
@@ -4524,6 +4559,9 @@ void CPlayerBot::HandleDead( )
 void CPlayerBot::HandleTownStroll( )
 {
     if ( !m_player ) return;
+
+    // Milestone 15: Town Street Life & Citizen Greeting Encounters
+    CheckTownLifeRoutine( );
 
     // Check for monsters outside town gates (expanded to 1200.0m map-wide detection)
     CMonster* mob = FindNearbyMonster( 1200.0f );
@@ -8383,5 +8421,252 @@ std::string CBotManager::GetDispatchStatus( CPlayer* player )
             m.title.c_str(), m.assignedMerc.c_str(), elapsed, m.durationSec, ( m.durationSec - elapsed ) );
     }
     return std::string( buf );
+}
+
+// ============================================================================
+// Phase 9 / Milestone 15: Natural Autonomous Life & Companion Living Dynamics
+// ============================================================================
+
+void CPlayerBot::CheckAutonomousBodyguard( )
+{
+    if ( !m_isCompanion || !m_followTarget || !m_player ) return;
+    if ( m_state == BOT_STATE_COMBAT || m_state == BOT_STATE_DEAD ) return;
+
+    CMap* map = GetMap( );
+    if ( !map ) return;
+
+    if ( m_followTarget->IsOnBattle( ) && m_followTarget->Battle->hitby != 0 )
+    {
+        CMonster* attacker = map->GetMonsterInMap( m_followTarget->Battle->hitby );
+        if ( attacker && !attacker->IsDead( ) && attacker->Stats->HP > 0 && !attacker->IsBonfire( ) )
+        {
+            float distToAttacker = GServer->distance( m_player->Position->current, attacker->Position->current );
+            if ( distToAttacker <= 25.0f )
+            {
+                AttackTarget( attacker );
+                SetState( BOT_STATE_COMBAT );
+
+                if ( m_role == BOT_ROLE_TANK )
+                {
+                    char alert[128];
+                    snprintf( alert, sizeof(alert), "Ambush on the leader! Behind you, %s! Focus on me, beast!", m_followTarget->CharInfo->charname );
+                    Say( alert );
+                    DoEmote( 4 );
+                }
+                else
+                {
+                    char alert[128];
+                    snprintf( alert, sizeof(alert), "Leader under attack! Covering fire engaged, %s!", m_followTarget->CharInfo->charname );
+                    Say( alert );
+                }
+                return;
+            }
+        }
+    }
+}
+
+void CPlayerBot::CheckLeaderLevelUpCelebration( )
+{
+    if ( !m_isCompanion || !m_followTarget || !m_player ) return;
+    int currLvl = m_followTarget->Stats->Level;
+    if ( m_lastLeaderLevel == 0 )
+    {
+        m_lastLeaderLevel = currLvl;
+        return;
+    }
+
+    if ( currLvl > m_lastLeaderLevel )
+    {
+        m_lastLeaderLevel = currLvl;
+        DoEmote( 3 ); // Cheer
+        PlaySoundCue( CUE_VICTORY_HORN );
+
+        char cheer[128];
+        int r = rand( ) % 3;
+        if ( r == 0 )
+            snprintf( cheer, sizeof(cheer), "Congratulations on Level %d, %s! Your power is growing rapidly!", currLvl, m_followTarget->CharInfo->charname );
+        else if ( r == 1 )
+            snprintf( cheer, sizeof(cheer), "Level %d! Another monumental milestone achieved, leader! Honored to fight alongside you!", currLvl );
+        else
+            snprintf( cheer, sizeof(cheer), "Incredible progress, %s! Level %d! The seven planets tremble before our squad!", currLvl, m_followTarget->CharInfo->charname );
+        Say( cheer );
+    }
+}
+
+void CPlayerBot::CheckIdleDowntimeVignette( )
+{
+    if ( !m_isCompanion || !m_followTarget || !m_player ) return;
+    if ( m_player->IsOnBattle( ) || m_followTarget->IsOnBattle( ) ) return;
+
+    clock_t now = clock( );
+    float distMoved = GServer->distance( m_followTarget->Position->current, m_lastLeaderStationaryPos );
+    if ( distMoved > 2.0f )
+    {
+        m_lastLeaderStationaryPos = m_followTarget->Position->current;
+        m_leaderStationaryTime = now;
+        if ( m_player->Status && m_player->Status->Stance == 2 ) // Sitting
+        {
+            StandUp( );
+        }
+        return;
+    }
+
+    if ( ( now - m_leaderStationaryTime ) >= ( 15 * CLOCKS_PER_SEC ) )
+    {
+        if ( ( now - m_lastDowntimeVignette ) >= ( 60 * CLOCKS_PER_SEC ) )
+        {
+            m_lastDowntimeVignette = now;
+
+            if ( m_player->Status && m_player->Status->Stance != 2 && ( rand( ) % 2 == 0 ) )
+            {
+                SitDown( );
+            }
+            else
+            {
+                DoEmote( 1 );
+            }
+
+            UINT mapId = m_player->Position->Map;
+            const char* leaderName = m_followTarget->CharInfo->charname;
+            char vignette[160];
+
+            if ( mapId == 1 || mapId == 2 )
+            {
+                int c = rand( ) % 3;
+                if ( c == 0 ) snprintf( vignette, sizeof(vignette), "The smell of forge embers and fresh bread in town... always good to catch our breath, %s.", leaderName );
+                else if ( c == 1 ) snprintf( vignette, sizeof(vignette), "Should we check the local merchant stalls or restock elixirs while we're in city gates, %s?", leaderName );
+                else snprintf( vignette, sizeof(vignette), "I love the lively atmosphere here. So many travelers passing through." );
+            }
+            else if ( mapId == 51 || mapId == 24 )
+            {
+                int c = rand( ) % 2;
+                if ( c == 0 ) snprintf( vignette, sizeof(vignette), "Keep your weapon grip dry, %s. Cave dampness and echoing monster cries make for sneaky ambushes.", leaderName );
+                else snprintf( vignette, sizeof(vignette), "Torchlight flickers off the cavern crystals... beautiful, but deadly." );
+            }
+            else if ( mapId == 23 )
+            {
+                snprintf( vignette, sizeof(vignette), "The mountain breeze on Breezy Hills feels invigorating after hours of battle, %s.", leaderName );
+            }
+            else
+            {
+                int c = rand( ) % 3;
+                if ( c == 0 ) snprintf( vignette, sizeof(vignette), "Taking a moment to check my weapon balance. We make a fearsome team, %s.", leaderName );
+                else if ( c == 1 ) snprintf( vignette, sizeof(vignette), "Whenever you're ready to march, leader, we're with you!" );
+                else snprintf( vignette, sizeof(vignette), "Enjoying the open skies while we can. What's our next destination, %s?", leaderName );
+            }
+            Say( vignette );
+        }
+    }
+}
+
+void CPlayerBot::CheckStrangerAssistance( )
+{
+    if ( m_isCompanion || !m_player ) return;
+    if ( m_player->Party && m_player->Party->party ) return;
+    if ( m_state == BOT_STATE_COMBAT || m_state == BOT_STATE_DEAD ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastStrangerAssistTime ) < ( 20 * CLOCKS_PER_SEC ) ) return;
+
+    CMap* map = GetMap( );
+    if ( !map ) return;
+
+    for ( UINT i = 0; i < map->PlayerList.size( ); i++ )
+    {
+        CPlayer* stranger = map->PlayerList[i];
+        if ( !stranger || stranger->is_bot || stranger->IsDead( ) || !stranger->Session || !stranger->Session->inGame )
+            continue;
+
+        float dist = GServer->distance( m_player->Position->current, stranger->Position->current );
+        if ( dist > 22.0f ) continue;
+
+        if ( stranger->IsOnBattle( ) && ( stranger->Stats->HP < ( stranger->Stats->MaxHP * 50 / 100 ) || stranger->Battle->hitby != 0 ) )
+        {
+            m_lastStrangerAssistTime = now;
+
+            if ( m_role == BOT_ROLE_HEALER )
+            {
+                UINT healSkill = 0; int healLvl = 0;
+                if ( GetLearnedSkill( 921, healSkill, healLvl ) || GetLearnedSkill( 976, healSkill, healLvl ) )
+                {
+                    m_player->StartAction( stranger, SKILL_BUFF, healSkill );
+                    char msg[128];
+                    snprintf( msg, sizeof(msg), "Hold on, traveler %s! Cleansing and healing your wounds! Stay strong!", stranger->CharInfo->charname );
+                    Say( msg );
+                    DoEmote( 2 );
+                    return;
+                }
+            }
+
+            UINT targetMobId = ( stranger->Battle->hitby != 0 ) ? stranger->Battle->hitby : stranger->Battle->target;
+            CMonster* mob = map->GetMonsterInMap( targetMobId );
+            if ( mob && !mob->IsDead( ) && mob->Stats->HP > 0 && !mob->IsBonfire( ) )
+            {
+                AttackTarget( mob );
+                SetState( BOT_STATE_COMBAT );
+                char msg[128];
+                if ( m_role == BOT_ROLE_TANK )
+                    snprintf( msg, sizeof(msg), "Hold the line, %s! I'll take this beast's attention off you!", stranger->CharInfo->charname );
+                else
+                    snprintf( msg, sizeof(msg), "Covering fire incoming! Assisting you, %s!", stranger->CharInfo->charname );
+                Say( msg );
+                return;
+            }
+        }
+    }
+}
+
+void CPlayerBot::CheckNaturalGrindCycle( )
+{
+    if ( m_isCompanion || !m_player ) return;
+    if ( m_player->Party && m_player->Party->party ) return;
+
+    if ( m_grindKillCount >= 10 )
+    {
+        m_grindKillCount = 0;
+        int actionRoll = rand( ) % 2;
+        if ( actionRoll == 0 )
+        {
+            Say( "Pockets full of monster drops. Time to sit by the roadside, bandage up, and rest a bit." );
+            SetState( BOT_STATE_REST );
+            SitDown( );
+        }
+        else
+        {
+            Say( "Weapon edge dulled from the hunt. Going to take a quick breather before next grinding run." );
+            DoEmote( 1 );
+            SetState( BOT_STATE_IDLE );
+        }
+    }
+}
+
+void CPlayerBot::CheckTownLifeRoutine( )
+{
+    if ( m_isCompanion || !m_player ) return;
+    CMap* map = GetMap( );
+    if ( !map ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastTownGreetingTime ) < ( 15 * CLOCKS_PER_SEC ) ) return;
+
+    for ( UINT i = 0; i < map->PlayerList.size( ); i++ )
+    {
+        CPlayer* passer = map->PlayerList[i];
+        if ( !passer || passer == m_player || passer->IsDead( ) ) continue;
+        float d = GServer->distance( m_player->Position->current, passer->Position->current );
+        if ( d <= 3.5f )
+        {
+            m_lastTownGreetingTime = now;
+            DoEmote( 1 ); // Wave
+            char greet[128];
+            int r = rand( ) % 4;
+            if ( r == 0 ) snprintf( greet, sizeof(greet), "Good day, %s! Safe travels!", passer->CharInfo->charname );
+            else if ( r == 1 ) snprintf( greet, sizeof(greet), "Greetings, adventurer! Fine weather in town today." );
+            else if ( r == 2 ) snprintf( greet, sizeof(greet), "May Arua bless your journey, %s!", passer->CharInfo->charname );
+            else snprintf( greet, sizeof(greet), "Heading out to the fields soon? Stock up on potions!" );
+            Say( greet );
+            break;
+        }
+    }
 }
 

@@ -386,6 +386,14 @@ public:
     bool FieldBrewPotions( const char* type, int count );
     bool FieldForgeAmmunition( const char* type, int count );
 
+    // Phase 9 / Milestone 15: Natural Autonomous Life & Companion Living Dynamics
+    void CheckAutonomousBodyguard( );
+    void CheckLeaderLevelUpCelebration( );
+    void CheckIdleDowntimeVignette( );
+    void CheckStrangerAssistance( );
+    void CheckNaturalGrindCycle( );
+    void CheckTownLifeRoutine( );
+
 private:
     CPlayer* m_player;
     BotState m_state;
@@ -535,6 +543,15 @@ private:
     BotOutfitType m_outfit;
     BotTalentSpec m_talentSpec;
     clock_t m_lastInterBotBanterTime;
+
+    // Phase 9 / Milestone 15: Natural Living State
+    int m_lastLeaderLevel;
+    clock_t m_leaderStationaryTime;
+    fPoint m_lastLeaderStationaryPos;
+    clock_t m_lastDowntimeVignette;
+    int m_grindKillCount;
+    clock_t m_lastStrangerAssistTime;
+    clock_t m_lastTownGreetingTime;
 };
 
 class CBotManager {

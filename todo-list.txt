@@ -505,5 +505,14 @@ MILESTONE 14 — Sparring Duels, Gambit Scripts, Mercenary Expeditions, Transmog
 [x] Autonomous Companion-to-Companion Inter-Party Banter: Dynamic conversational banter engine between companion bots during follow and resting downtime; bots interact, argue over tactics, celebrate synergy, and discuss planetary lore in real-time.
 [x] Field Alchemy & Ammunition Munitions Crafting: Implemented on-demand field crafting via `/party bot brew [hp|mp] [amount]` (Cleric/Muse bot brews fresh health/mana potions) and `/party bot forge [arrows|bullets] [amount]` (Artisan/Bourgeois bot smiths arrow quivers and bullet crates directly into the player's quiver slots).
 
+MILESTONE 15 — Autonomous Living World Dynamics, Stranger Rescues, Camp Vignettes & Natural AI (COMPLETED & VERIFIED)
+[x] Autonomous Bodyguard Ambusher Interception: Party companion bots automatically monitor monsters flanking or attacking the player from behind, rushing in to intercept, taunt, and shield the leader without any manual player input.
+[x] Autonomous Leader Level-Up Celebrations: Companions spontaneously detect when the leader levels up, turning to face them, playing victory fanfare horns, saluting/cheering (`DoEmote 3`), and shouting celebratory congratulations.
+[x] Natural Camp Rest & Biome Downtime Vignettes: When the player stands idle for >15s in safe areas or outposts, companions naturally relax, sit down by the campfire, stretch (`DoEmote 1`), and engage in atmospheric biome chatter (discussing forge smoke in Zant, cave dampness and ambushes, mountain breezes on Breezy Hills).
+[x] Open-World "Good Samaritan" Stranger Rescues: Ambient roaming bots in the wild detect nearby real players struggling in combat (<50% HP or multiple mob aggro), immediately rushing over to cast emergency heals/cleanses or taunt away secondary beasts, bowing with friendly farewells upon victory.
+[x] Natural Grinding Life Cycles & Rest Bandaging: Ambient bots track monster kills (8-12 mobs), periodically pausing their grinding run to sit by the roadside, bandage up, drink potions, and inspect their gear before heading out to hunt again.
+[x] Living Town Street Life & Citizen Greeting Encounters: Bots strolling through cities (Zant, Junon Polis) naturally browse stalls, inspect forge temperatures, and pause to wave (`DoEmote 1`) and exchange friendly town greetings with passing players and fellow adventurers.
+[x] Clutch Combat Finisher Callouts: Companions dynamically celebrate decisive takedowns, calling out critical kills and offering respectful apologies if their final blow clipped a monster the player was battling.
+
 ================================================================================
 
