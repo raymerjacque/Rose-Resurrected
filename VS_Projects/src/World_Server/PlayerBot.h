@@ -77,6 +77,19 @@ enum BotTactic {
     BOT_TACTIC_ECO = 3       // Resource saver: minimal mana expenditure, basic attacks, heals < 30% HP
 };
 
+enum BotSubSpec {
+    BOT_SUBSPEC_DEFAULT = 0, // Default spec weapon & rotation (e.g. 1H Sword & Shield, Wand, Bow)
+    BOT_SUBSPEC_2H = 1,      // Berserker 2H Greatsword (cleave DPS)
+    BOT_SUBSPEC_SMITE = 2,   // Battle Priest Mace & Shield (holy melee DPS)
+    BOT_SUBSPEC_GUN = 3      // Guns / Dual Launchers rapid-fire burst
+};
+
+enum SoundCueType {
+    CUE_LOW_HP = 1,
+    CUE_VICTORY_HORN = 2,
+    CUE_LIMIT_BREAK = 3
+};
+
 class CPlayerBot {
 public:
     CPlayerBot( CPlayer* player );
@@ -294,6 +307,27 @@ public:
     void ExecuteSquadDance( );
     void ExecuteVictoryCelebration( );
 
+    // Phase 7 / Milestone 13: DPS Meter, Spec Loadouts, Raid Alliances, Pets & Treasures
+    BotSubSpec GetSubSpec( ) const { return m_subSpec; }
+    bool SetSubSpec( const char* specName );
+    const char* GetSubSpecString( ) const;
+
+    void RecordMeterDamage( long long dmg ) { m_meterDamage += dmg; }
+    void RecordMeterHealing( long long heal );
+    void RecordMeterDamageTaken( long long dmg ) { m_meterDamageTaken += dmg; }
+    long long GetMeterDamage( ) const { return m_meterDamage; }
+    long long GetMeterHealing( ) const { return m_meterHealing; }
+    long long GetMeterDamageTaken( ) const { return m_meterDamageTaken; }
+    void ResetMeter( );
+
+    bool ToggleCompanionPet( );
+    bool HasActivePet( ) const { return m_hasActivePet; }
+    const char* GetPetName( ) const;
+    void UpdateCompanionPet( );
+
+    void CheckTreasureHunt( );
+    void PlaySoundCue( int cueType );
+
 private:
     CPlayer* m_player;
     BotState m_state;
@@ -424,6 +458,16 @@ private:
     clock_t m_lastUnionSyncTime;
     clock_t m_lastFeastTime;
     clock_t m_feastRestStart;
+
+    // Phase 7 / Milestone 13: Spec Loadouts, DPS Meter, Pets & Treasures
+    BotSubSpec m_subSpec;
+    long long m_meterDamage;
+    long long m_meterHealing;
+    long long m_meterDamageTaken;
+    bool m_hasActivePet;
+    clock_t m_lastPetPulseTime;
+    clock_t m_lastTreasureHuntTime;
+    clock_t m_lastLowHpWarningTime;
 };
 
 class CBotManager {
@@ -470,6 +514,11 @@ public:
     void CheckPlayerCompanions( );
     void SendPartyFullUpdate( CParty* party );
 
+    // Milestone 13: Raid Alliances & Dungeon Living World
+    bool SpawnRaidAlliance( CPlayer* leader );
+    bool DismissRaidAlliance( CPlayer* leader );
+    void CheckDungeonAutonomousParties( );
+
 private:
     CBotManager( );
     ~CBotManager( );
@@ -484,6 +533,7 @@ private:
     clock_t m_lastBuffBotCheck;
     clock_t m_lastVendingBotCheck;
     clock_t m_lastCompanionCheck;
+    clock_t m_lastDungeonPartyCheck;
     bool m_ambientInitialized;
     bool m_buffBotsInitialized;
     bool m_vendingBotsInitialized;

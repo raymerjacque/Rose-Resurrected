@@ -495,6 +495,21 @@ void CCharacter::NormalAttack( CCharacter* Enemy )
         }
     }
     Enemy->Stats->HP -= hitpower;
+    if ( hitpower > 0 )
+    {
+        if ( IsPlayer( ) )
+        {
+            CPlayer* plAtk = reinterpret_cast<CPlayer*>( this );
+            plAtk->meter_damage += hitpower;
+            if ( plAtk->bot_ai ) plAtk->bot_ai->RecordMeterDamage( hitpower );
+        }
+        if ( Enemy->IsPlayer( ) )
+        {
+            CPlayer* plDef = reinterpret_cast<CPlayer*>( Enemy );
+            plDef->meter_taken += hitpower;
+            if ( plDef->bot_ai ) plDef->bot_ai->RecordMeterDamageTaken( hitpower );
+        }
+    }
     //if(IsPlayer())
     //    Log(MSG_DEBUG,"Player attack did damage %i",hitpower);
     //if(IsMonster())
@@ -711,6 +726,21 @@ void CCharacter::NormalAttack( CCharacter* Enemy )
     }
 
     Enemy->Stats->HP -=  (long long) hitpower;
+    if ( hitpower > 0 )
+    {
+        if ( IsPlayer( ) )
+        {
+            CPlayer* plAtk = reinterpret_cast<CPlayer*>( this );
+            plAtk->meter_damage += hitpower;
+            if ( plAtk->bot_ai ) plAtk->bot_ai->RecordMeterDamage( hitpower );
+        }
+        if ( Enemy->IsPlayer( ) )
+        {
+            CPlayer* plDef = reinterpret_cast<CPlayer*>( Enemy );
+            plDef->meter_taken += hitpower;
+            if ( plDef->bot_ai ) plDef->bot_ai->RecordMeterDamageTaken( hitpower );
+        }
+    }
 	if (hitpower > 0) {
 		Enemy->Battle->hitby = clientid; //Enemy was just hit so make sure that we set up the hitby record
 	}
@@ -1897,6 +1927,21 @@ void CCharacter::UseAtkSkill( CCharacter* Enemy, CSkills* skill, bool deBuff )
     }
 
     Enemy->Stats->HP -=  (long long) skillpower;
+    if ( skillpower > 0 )
+    {
+        if ( IsPlayer( ) )
+        {
+            CPlayer* plAtk = reinterpret_cast<CPlayer*>( this );
+            plAtk->meter_damage += skillpower;
+            if ( plAtk->bot_ai ) plAtk->bot_ai->RecordMeterDamage( skillpower );
+        }
+        if ( Enemy->IsPlayer( ) )
+        {
+            CPlayer* plDef = reinterpret_cast<CPlayer*>( Enemy );
+            plDef->meter_taken += skillpower;
+            if ( plDef->bot_ai ) plDef->bot_ai->RecordMeterDamageTaken( skillpower );
+        }
+    }
 	if (hitpower > 0) {
 		Enemy->Battle->hitby = clientid; //Enemy was just hit so make sure that we set up the hitby record
 	}

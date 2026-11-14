@@ -31,6 +31,9 @@ CPlayer::CPlayer( CClientSocket* CLIENT )
     bot_ai = NULL;
     lastTargetPlayerId = 0;
     lastTargetPlayerTime = 0;
+    meter_damage = 0;
+    meter_healing = 0;
+    meter_taken = 0;
 
     pvp_id=-1;  //LMA: Pvp ID (set by qsd most of the time).
 

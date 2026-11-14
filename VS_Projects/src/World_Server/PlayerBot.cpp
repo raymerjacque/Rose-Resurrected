@@ -84,6 +84,7 @@ CBotManager::CBotManager( )
     m_lastBuffBotCheck = clock( );
     m_lastVendingBotCheck = clock( );
     m_lastCompanionCheck = clock( );
+    m_lastDungeonPartyCheck = clock( );
 }
 
 CBotManager::~CBotManager( )
@@ -225,6 +226,9 @@ void CBotManager::Update( )
 
     // 7. Companion Party Check & Maintenance for Real Players
     CheckPlayerCompanions( );
+
+    // 8. Autonomous Dungeon Parties Check
+    CheckDungeonAutonomousParties( );
 }
 
 void CBotManager::CheckAmbientPopulation( )
@@ -1307,7 +1311,15 @@ CPlayerBot::CPlayerBot( CPlayer* player )
       m_siegeMode( 0 ),
       m_lastUnionSyncTime( 0 ),
       m_lastFeastTime( 0 ),
-      m_feastRestStart( 0 )
+      m_feastRestStart( 0 ),
+      m_subSpec( BOT_SUBSPEC_DEFAULT ),
+      m_meterDamage( 0 ),
+      m_meterHealing( 0 ),
+      m_meterDamageTaken( 0 ),
+      m_hasActivePet( false ),
+      m_lastPetPulseTime( 0 ),
+      m_lastTreasureHuntTime( 0 ),
+      m_lastLowHpWarningTime( 0 )
 {
     m_pullAnchorPos.x = 0.0f;
     m_pullAnchorPos.y = 0.0f;
@@ -1998,6 +2010,13 @@ void CPlayerBot::EquipTieredGear( bool broadcast )
             wepNum = ( lvl >= 84 ) ? 8 : 7; // Elven Sword / Saber
             shieldNum = ( job == 122 ) ? 0 : 10; // Plate Shield
         }
+
+        // SubSpec: 2H Greatsword Berserker loadout override
+        if ( m_subSpec == BOT_SUBSPEC_2H || job == 122 )
+        {
+            shieldNum = 0;
+            wepNum = ( lvl >= 70 ) ? 22 : ( ( lvl >= 40 ) ? 21 : 20 );
+        }
     }
     else if ( job == 211 || job == 221 || job == 222 ) // Muse / Mage / Cleric
     {
@@ -2021,6 +2040,13 @@ void CPlayerBot::EquipTieredGear( bool broadcast )
         {
             bodyNum = 71; armNum = 71; footNum = 71;
             wepNum = 305; // White Staff
+        }
+
+        // SubSpec: Smite (Battle Priest Mace & Shield) override
+        if ( m_subSpec == BOT_SUBSPEC_SMITE )
+        {
+            wepNum = ( lvl >= 70 ) ? 144 : ( ( lvl >= 40 ) ? 142 : 141 );
+            shieldNum = ( lvl >= 70 ) ? 10 : 3;
         }
     }
     else if ( job == 311 || job == 321 || job == 322 ) // Hawker / Raider / Scout
@@ -2046,6 +2072,13 @@ void CPlayerBot::EquipTieredGear( bool broadcast )
         {
             bodyNum = 99; armNum = 99; footNum = 99;
             wepNum = 205; // White Wing Bow
+        }
+
+        // SubSpec: Gun / Launcher firearms override
+        if ( m_subSpec == BOT_SUBSPEC_GUN )
+        {
+            ammoType = 2;
+            wepNum = ( lvl >= 70 ) ? 234 : ( ( lvl >= 40 ) ? 232 : 231 );
         }
     }
     else if ( job == 411 || job == 421 || job == 422 ) // Dealer / Bourgeois / Artisan
@@ -2574,6 +2607,7 @@ bool CPlayerBot::CheckPartyHeal( )
         {
             m_player->StartAction( leader, SKILL_BUFF, healSkill );
             m_lastSkillCastTime = now;
+            RecordMeterHealing( 350 );
             char healMsg[64];
             snprintf( healMsg, sizeof(healMsg), "Healing leader %s!", leader->CharInfo->charname );
             Say( healMsg );
@@ -2596,6 +2630,7 @@ bool CPlayerBot::CheckPartyHeal( )
                 {
                     m_player->StartAction( member, SKILL_BUFF, healSkill );
                     m_lastSkillCastTime = now;
+                    RecordMeterHealing( 350 );
                     char healMsg[64];
                     snprintf( healMsg, sizeof(healMsg), "Healing tank %s!", member->CharInfo->charname );
                     Say( healMsg );
@@ -2610,6 +2645,7 @@ bool CPlayerBot::CheckPartyHeal( )
     {
         m_player->StartAction( m_player, SKILL_BUFF, healSkill );
         m_lastSkillCastTime = now;
+        RecordMeterHealing( 350 );
         Say( "Healing myself!" );
         return true;
     }
@@ -2628,6 +2664,7 @@ bool CPlayerBot::CheckPartyHeal( )
                 {
                     m_player->StartAction( member, SKILL_BUFF, healSkill );
                     m_lastSkillCastTime = now;
+                    RecordMeterHealing( 350 );
                     char healMsg[64];
                     snprintf( healMsg, sizeof(healMsg), "Healing %s!", member->CharInfo->charname );
                     Say( healMsg );
@@ -4309,6 +4346,24 @@ void CPlayerBot::HandleFollow( )
     CheckClanSync( );
     CheckUnionSync( );
     CheckPuzzleInteraction( );
+
+    // Milestone 13: Treasure hunt, companion pets & low HP warning cue
+    CheckTreasureHunt( );
+    UpdateCompanionPet( );
+
+    if ( m_followTarget && m_followTarget->Stats && m_followTarget->Stats->MaxHP > 0 )
+    {
+        if ( m_followTarget->Stats->HP < ( m_followTarget->Stats->MaxHP * 25 / 100 ) )
+        {
+            clock_t nowTime = clock( );
+            if ( ( nowTime - m_lastLowHpWarningTime ) > (clock_t)( 12.0f * CLOCKS_PER_SEC ) )
+            {
+                m_lastLowHpWarningTime = nowTime;
+                PlaySoundCue( CUE_LOW_HP );
+                Say( "Leader's health is critically low! Emergency triage protocols engaged!" );
+            }
+        }
+    }
 
     // 2. Party Member Support: Heals, Resurrections, Buffs (Always active)
     if ( CheckPartyHeal( ) ) return;
@@ -6926,10 +6981,239 @@ void CPlayerBot::ExecuteVictoryCelebration( )
 {
     if ( !m_isCompanion || !m_player || !m_followTarget ) return;
     DoEmote( 3 );
+    PlaySoundCue( CUE_VICTORY_HORN );
     char victoryShout[128];
     snprintf( victoryShout, sizeof(victoryShout), "Victory is ours! Another glorious triumph with leader %s!",
         m_followTarget->CharInfo->charname );
     Say( victoryShout );
+}
+
+bool CPlayerBot::SetSubSpec( const char* specName )
+{
+    if ( !specName ) return false;
+    BotSubSpec newSpec = BOT_SUBSPEC_DEFAULT;
+    const char* roleName = "Standard Loadout";
+
+    if ( strcasecmp( specName, "2h" ) == 0 || strcasecmp( specName, "berserker" ) == 0 || strcasecmp( specName, "greatsword" ) == 0 )
+    {
+        newSpec = BOT_SUBSPEC_2H;
+        roleName = "Berserker 2H Greatsword Cleave";
+    }
+    else if ( strcasecmp( specName, "smite" ) == 0 || strcasecmp( specName, "battlepriest" ) == 0 || strcasecmp( specName, "mace" ) == 0 )
+    {
+        newSpec = BOT_SUBSPEC_SMITE;
+        roleName = "Frontline Battle Priest (Mace & Holy Smite)";
+    }
+    else if ( strcasecmp( specName, "gun" ) == 0 || strcasecmp( specName, "launcher" ) == 0 )
+    {
+        newSpec = BOT_SUBSPEC_GUN;
+        roleName = "Rapid-Fire Firearms & Launchers";
+    }
+    else if ( strcasecmp( specName, "tank" ) == 0 || strcasecmp( specName, "shield" ) == 0 || strcasecmp( specName, "healer" ) == 0 || strcasecmp( specName, "bow" ) == 0 || strcasecmp( specName, "default" ) == 0 )
+    {
+        newSpec = BOT_SUBSPEC_DEFAULT;
+        roleName = "Classic Spec & Stance";
+    }
+    else
+    {
+        return false;
+    }
+
+    m_subSpec = newSpec;
+    EquipTieredGear( true );
+    char msg[128];
+    snprintf( msg, sizeof(msg), "Spec swapped to %s! Weapon drawn and tactical rotation adjusted, leader!", roleName );
+    Say( msg );
+    return true;
+}
+
+const char* CPlayerBot::GetSubSpecString( ) const
+{
+    switch ( m_subSpec )
+    {
+        case BOT_SUBSPEC_2H:    return "2H Greatsword (Berserker)";
+        case BOT_SUBSPEC_SMITE: return "Smite (Battle Priest)";
+        case BOT_SUBSPEC_GUN:   return "Gun (Firearms Burst)";
+        default:                return "Default";
+    }
+}
+
+const char* CPlayerBot::GetPetName( ) const
+{
+    const char* name = m_player->CharInfo->charname;
+    if ( strcasecmp( name, "Brom" ) == 0 || m_role == BOT_ROLE_TANK ) return "War Mastiff (Armor Shred)";
+    if ( strcasecmp( name, "Lyra" ) == 0 || m_role == BOT_ROLE_HEALER ) return "Celestial Healing Sprite (MP Aura)";
+    if ( strcasecmp( name, "Ignis" ) == 0 || m_role == BOT_ROLE_DPS_MAGIC ) return "Arcane Wisp (Magic Amp)";
+    if ( strcasecmp( name, "Sylvia" ) == 0 || m_role == BOT_ROLE_DPS_PHYS_RANGED ) return "Hunting Falcon (Crit & Stealth Sense)";
+    if ( strcasecmp( name, "Barnaby" ) == 0 ) return "Clockwork Scrapper (Auto-Vacuum Loot)";
+    return "Lucky Sprite (+5% Speed)";
+}
+
+bool CPlayerBot::ToggleCompanionPet( )
+{
+    if ( !m_isCompanion || !m_player ) return false;
+    m_hasActivePet = !m_hasActivePet;
+
+    if ( m_hasActivePet )
+    {
+        DoEmote( 3 );
+        PlaySoundCue( CUE_LIMIT_BREAK );
+        char msg[128];
+        snprintf( msg, sizeof(msg), "Summoned auxiliary battle pet: %s! Squad buff active!", GetPetName( ) );
+        Say( msg );
+    }
+    else
+    {
+        char msg[128];
+        snprintf( msg, sizeof(msg), "Dismissed companion pet %s back to familiar realm.", GetPetName( ) );
+        Say( msg );
+    }
+    return true;
+}
+
+void CPlayerBot::UpdateCompanionPet( )
+{
+    if ( !m_isCompanion || !m_hasActivePet || !m_player || !m_player->Party || !m_player->Party->party ) return;
+    clock_t now = clock( );
+    if ( ( now - m_lastPetPulseTime ) < (clock_t)( 10.0f * CLOCKS_PER_SEC ) ) return;
+    m_lastPetPulseTime = now;
+
+    CParty* party = m_player->Party->party;
+    const char* name = m_player->CharInfo->charname;
+
+    if ( strcasecmp( name, "Lyra" ) == 0 || m_role == BOT_ROLE_HEALER )
+    {
+        for ( size_t i = 0; i < party->Members.size( ); i++ )
+        {
+            CPlayer* mem = party->Members[i];
+            if ( mem && !mem->IsDead( ) && mem->Position->Map == m_player->Position->Map )
+            {
+                if ( GServer->distance( m_player->Position->current, mem->Position->current ) <= 15.0f )
+                {
+                    if ( mem->Stats->MP < mem->Stats->MaxMP )
+                    {
+                        mem->Stats->MP += 40;
+                        if ( mem->Stats->MP > mem->Stats->MaxMP ) mem->Stats->MP = mem->Stats->MaxMP;
+                        mem->RefreshHPMP( );
+                    }
+                }
+            }
+        }
+    }
+    else if ( strcasecmp( name, "Barnaby" ) == 0 )
+    {
+        CDrop* drop = FindNearbyDrop( 25.0f );
+        if ( drop && m_followTarget )
+        {
+            m_followTarget->CharInfo->Zulies += 350;
+            BEGINPACKET( pak, 0x71d );
+            ADDQWORD( pak, m_followTarget->CharInfo->Zulies );
+            m_followTarget->client->SendPacket( &pak );
+        }
+    }
+}
+
+void CPlayerBot::CheckTreasureHunt( )
+{
+    if ( !m_isCompanion || !m_followTarget || m_followTarget->is_bot ) return;
+    if ( m_affinity < 40 ) return;
+
+    clock_t now = clock( );
+    if ( ( now - m_lastTreasureHuntTime ) < (clock_t)( 180.0f * CLOCKS_PER_SEC ) ) return;
+    m_lastTreasureHuntTime = now;
+
+    if ( ( rand( ) % 100 ) < 35 )
+    {
+        DoEmote( 4 );
+        PlaySoundCue( CUE_VICTORY_HORN );
+
+        int giftType = rand( ) % 3;
+        if ( giftType == 0 )
+        {
+            long long zulyGift = 10000 + ( ( rand( ) % 15 ) * 1000 );
+            m_followTarget->CharInfo->Zulies += zulyGift;
+            BEGINPACKET( pak, 0x71d );
+            ADDQWORD( pak, m_followTarget->CharInfo->Zulies );
+            m_followTarget->client->SendPacket( &pak );
+
+            char msg[128];
+            snprintf( msg, sizeof(msg), "Leader, look! I discovered a hidden mineral geode in the earth! Uncovered %lld Zulies for you, %s!",
+                zulyGift, m_followTarget->CharInfo->charname );
+            Say( msg );
+        }
+        else if ( giftType == 1 )
+        {
+            long long zulyGift = 15000 + ( ( rand( ) % 20 ) * 1000 );
+            m_followTarget->CharInfo->Zulies += zulyGift;
+            BEGINPACKET( pak, 0x71d );
+            ADDQWORD( pak, m_followTarget->CharInfo->Zulies );
+            m_followTarget->client->SendPacket( &pak );
+
+            char msg[128];
+            snprintf( msg, sizeof(msg), "Unearthed an ancient adventurer's cache containing %lld Zulies and rare ores! Here you go, %s!",
+                zulyGift, m_followTarget->CharInfo->charname );
+            Say( msg );
+        }
+        else
+        {
+            AddAffinity( 3 );
+            char msg[128];
+            snprintf( msg, sizeof(msg), "Spotted a lucky starstone crystal nearby! The squad's fortune shines bright, %s!",
+                m_followTarget->CharInfo->charname );
+            Say( msg );
+        }
+    }
+}
+
+void CPlayerBot::PlaySoundCue( int cueType )
+{
+    if ( !m_player ) return;
+
+    if ( cueType == CUE_LOW_HP )
+    {
+        BEGINPACKET( pak, 0x79f );
+        ADDWORD    ( pak, m_player->clientid );
+        ADDDWORD   ( pak, m_player->Stats->HP );
+        GServer->SendToVisible( &pak, m_player );
+    }
+    else if ( cueType == CUE_VICTORY_HORN )
+    {
+        BEGINPACKET( pak, 0x7b1 );
+        ADDWORD    ( pak, m_player->clientid );
+        ADDWORD    ( pak, m_player->Stats->Level );
+        GServer->SendToVisible( &pak, m_player );
+
+        BEGINPACKET( pakAnim, 0x7b2 );
+        ADDWORD    ( pakAnim, m_player->clientid );
+        ADDWORD    ( pakAnim, 1 );
+        GServer->SendToVisible( &pakAnim, m_player );
+    }
+    else if ( cueType == CUE_LIMIT_BREAK )
+    {
+        BEGINPACKET( pak, 0x7b2 );
+        ADDWORD    ( pak, m_player->clientid );
+        ADDWORD    ( pak, 2 );
+        GServer->SendToVisible( &pak, m_player );
+    }
+}
+
+void CPlayerBot::RecordMeterHealing( long long heal )
+{
+    m_meterHealing += heal;
+    if ( m_player ) m_player->meter_healing += heal;
+}
+
+void CPlayerBot::ResetMeter( )
+{
+    m_meterDamage = 0;
+    m_meterHealing = 0;
+    m_meterDamageTaken = 0;
+    if ( m_player )
+    {
+        m_player->meter_damage = 0;
+        m_player->meter_healing = 0;
+        m_player->meter_taken = 0;
+    }
 }
 
 BotRole CBotManager::GetPlayerRole( CPlayer* player )
@@ -7378,5 +7662,128 @@ bool CBotManager::RecruitMercenary( CPlayer* leader, const char* mercName )
         return true;
     }
     return false;
+}
+
+bool CBotManager::SpawnRaidAlliance( CPlayer* leader )
+{
+    if ( !leader || leader->is_bot || !leader->Position ) return false;
+
+    CPlayerBot* existing = GetBot( "Vanguard_Roland" );
+    if ( existing ) return false;
+
+    struct RaidBotDef {
+        const char* name;
+        int job;
+        BotRole role;
+    };
+
+    RaidBotDef raidRoster[4] = {
+        { "Vanguard_Roland",    121, BOT_ROLE_TANK },
+        { "Vanguard_Seraphina", 222, BOT_ROLE_HEALER },
+        { "Vanguard_Kael",      221, BOT_ROLE_DPS_MAGIC },
+        { "Vanguard_Theron",    322, BOT_ROLE_DPS_PHYS_RANGED }
+    };
+
+    fPoint basePos = leader->Position->current;
+    int lvl = leader->Stats->Level;
+    UINT mapId = leader->Position->Map;
+
+    for ( int i = 0; i < 4; i++ )
+    {
+        fPoint spawnPos = basePos;
+        float angle = ( (float)i * 1.57f );
+        spawnPos.x += cos( angle ) * 6.0f;
+        spawnPos.y += sin( angle ) * 6.0f;
+
+        CPlayer* rBot = SpawnBot( raidRoster[i].name, raidRoster[i].job, lvl, mapId, spawnPos, false );
+        if ( rBot && rBot->bot_ai )
+        {
+            CPlayerBot* botAi = reinterpret_cast<CPlayerBot*>( rBot->bot_ai );
+            botAi->SetCompanion( true, leader );
+            botAi->SetRole( raidRoster[i].role );
+            botAi->SetFollowTarget( leader );
+            botAi->SetState( BOT_STATE_FOLLOW );
+            botAi->SyncLevelToLeader( lvl );
+            botAi->SetAffinity( 85 );
+        }
+    }
+
+    char raidAnnounce[128];
+    snprintf( raidAnnounce, sizeof(raidAnnounce), "The Silver Vanguard Raid Alliance has joined forces with %s! 8-Man Raid active!", leader->CharInfo->charname );
+    GServer->SendPM( leader, raidAnnounce );
+    return true;
+}
+
+bool CBotManager::DismissRaidAlliance( CPlayer* leader )
+{
+    const char* names[4] = { "Vanguard_Roland", "Vanguard_Seraphina", "Vanguard_Kael", "Vanguard_Theron" };
+    int count = 0;
+    for ( int i = 0; i < 4; i++ )
+    {
+        if ( RemoveBot( names[i] ) ) count++;
+    }
+    if ( leader )
+    {
+        GServer->SendPM( leader, "[Raid Alliance] Dismissed auxiliary raid bots. Returned to 4-man fireteam." );
+    }
+    return ( count > 0 );
+}
+
+void CBotManager::CheckDungeonAutonomousParties( )
+{
+    clock_t now = clock( );
+    if ( ( now - m_lastDungeonPartyCheck ) < ( 30 * CLOCKS_PER_SEC ) ) return;
+    m_lastDungeonPartyCheck = now;
+
+    UINT dMaps[2] = { 51, 24 };
+    for ( int d = 0; d < 2; d++ )
+    {
+        UINT mapId = dMaps[d];
+        CMap* map = GServer->MapList.Index[mapId];
+        if ( !map || map == GServer->MapList.nullzone ) continue;
+
+        int botsInDungeon = 0;
+        for ( UINT p = 0; p < map->PlayerList.size( ); p++ )
+        {
+            if ( map->PlayerList[p] && map->PlayerList[p]->is_bot ) botsInDungeon++;
+        }
+
+        if ( botsInDungeon == 0 )
+        {
+            fPoint spawnPos;
+            spawnPos.x = ( mapId == 51 ) ? 5200.0f : 5000.0f;
+            spawnPos.y = ( mapId == 51 ) ? 5200.0f : 5000.0f;
+            spawnPos.z = 0.0f;
+
+            char leaderName[32];
+            snprintf( leaderName, sizeof(leaderName), "DungeonDelver_%d", (int)(mapId * 10 + 1) );
+            CPlayer* delverLead = SpawnBot( leaderName, 121, 35, mapId, spawnPos, true );
+
+            if ( delverLead && delverLead->bot_ai )
+            {
+                CPlayerBot* leadAi = reinterpret_cast<CPlayerBot*>( delverLead->bot_ai );
+                leadAi->SetAutoRoam( true );
+                leadAi->SetRoamRadius( 80.0f );
+                leadAi->Say( "Entering the dungeon depths with the expedition team! Stay vigilant!" );
+
+                for ( int s = 2; s <= 4; s++ )
+                {
+                    char memName[32];
+                    snprintf( memName, sizeof(memName), "DungeonDelver_%d", (int)(mapId * 10 + s) );
+                    int job = ( s == 2 ) ? 222 : ( ( s == 3 ) ? 221 : 322 );
+                    fPoint memPos = spawnPos;
+                    memPos.x += ( (float)s * 2.0f );
+                    CPlayer* delverMem = SpawnBot( memName, job, 35, mapId, memPos, true );
+                    if ( delverMem && delverMem->bot_ai )
+                    {
+                        CPlayerBot* memAi = reinterpret_cast<CPlayerBot*>( delverMem->bot_ai );
+                        memAi->SetCompanion( true, delverLead );
+                        memAi->SetFollowTarget( delverLead );
+                        memAi->SetState( BOT_STATE_FOLLOW );
+                    }
+                }
+            }
+        }
+    }
 }
 

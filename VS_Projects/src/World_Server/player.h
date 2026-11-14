@@ -115,6 +115,9 @@ class CPlayer: public CCharacter
     clock_t lastTargetPlayerTime;
     UINT uw_kills;  //LMA: for Union War.
     unsigned int hits;
+    long long meter_damage;
+    long long meter_healing;
+    long long meter_taken;
     USEDITEM* UsedItem;
     INFO* CharInfo;
     RIDE* Ride;

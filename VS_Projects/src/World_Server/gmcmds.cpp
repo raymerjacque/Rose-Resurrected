@@ -587,6 +587,10 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
             if (!botAction || strcmp(botAction, "help") == 0)
             {
                 SendPM(thisclient, "=== Party Bot Commands ===");
+                SendPM(thisclient, "/party bot meter [reset]  - Combat performance parser (DPS, healing, mitigation)");
+                SendPM(thisclient, "/party bot spec <tank|2h|healer|smite|bow|gun> [bot] - Companion spec loadout swap");
+                SendPM(thisclient, "/party bot raid [dismiss] - Mobilize 8-man AI raid co-op alliance");
+                SendPM(thisclient, "/party bot pet [summon|dismiss] - Summon/dismiss companion battle pet & fairies");
                 SendPM(thisclient, "/party bot aggressive  - Set Hunter stance (proactively pulls mobs)");
                 SendPM(thisclient, "/party bot defensive   - Set Bodyguard stance (protects party)");
                 SendPM(thisclient, "/party bot passive     - Set Pacifist stance (holds fire, follows)");
@@ -1210,6 +1214,149 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                 SendPM(thisclient, "[Castle Siege] Set siege warfare posture to %s for %d bots.", modeName, botCount);
                 return true;
             }
+            else if (strcmp(botAction, "meter") == 0 || strcmp(botAction, "dps") == 0 || strcmp(botAction, "parse") == 0)
+            {
+                char* meterArg = strtok(NULL, " ");
+                if (meterArg && (strcmp(meterArg, "reset") == 0 || strcmp(meterArg, "clear") == 0))
+                {
+                    thisclient->meter_damage = 0;
+                    thisclient->meter_healing = 0;
+                    thisclient->meter_taken = 0;
+                    for (UINT i = 0; i < party->Members.size(); i++)
+                    {
+                        CPlayer* m = party->Members[i];
+                        if (m)
+                        {
+                            m->meter_damage = 0;
+                            m->meter_healing = 0;
+                            m->meter_taken = 0;
+                            if (m->bot_ai) m->bot_ai->ResetMeter();
+                        }
+                    }
+                    SendPM(thisclient, "[Combat Parse] Combat performance meters reset to zero.");
+                    return true;
+                }
+
+                long long totalDamage = 0;
+                long long totalHealing = 0;
+                long long totalTaken = 0;
+
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (!m) continue;
+                    totalDamage += m->meter_damage;
+                    totalHealing += m->meter_healing;
+                    totalTaken += m->meter_taken;
+                }
+
+                SendPM(thisclient, "=== Squad Combat Parse (Current Encounter) ===");
+                SendPM(thisclient, "Total Squad Output: %lld DMG | %lld HEAL | %lld TAKEN", totalDamage, totalHealing, totalTaken);
+
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (!m) continue;
+
+                    int dmgPct = (totalDamage > 0) ? (int)((m->meter_damage * 100) / totalDamage) : 0;
+                    int healPct = (totalHealing > 0) ? (int)((m->meter_healing * 100) / totalHealing) : 0;
+                    const char* tag = m->is_bot ? "[Bot]" : "[Leader]";
+
+                    SendPM(thisclient, "%s %s: %lld DMG (%d%%) | %lld HEAL (%d%%) | %lld TAKEN",
+                        tag, m->CharInfo->charname, m->meter_damage, dmgPct, m->meter_healing, healPct, m->meter_taken);
+                }
+                SendPM(thisclient, "Tip: Type '/party bot meter reset' to reset encounter parsing.");
+                return true;
+            }
+            else if (strcmp(botAction, "spec") == 0 || strcmp(botAction, "loadout") == 0)
+            {
+                char* specName = strtok(NULL, " ");
+                if (!specName)
+                {
+                    SendPM(thisclient, "[Party Bot] Usage: /party bot spec <tank|2h|healer|smite|bow|gun> [bot_name]");
+                    SendPM(thisclient, "Available specs: 2h (Greatsword Cleave), smite (Battle Priest Mace), gun (Firearms Burst), tank/healer/bow (Default)");
+                    return true;
+                }
+                char* targetBot = strtok(NULL, " ");
+                int swappedCount = 0;
+
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        if (targetBot && strcasecmp(m->CharInfo->charname, targetBot) != 0)
+                            continue;
+
+                        if (m->bot_ai->SetSubSpec(specName))
+                        {
+                            swappedCount++;
+                        }
+                    }
+                }
+
+                if (swappedCount > 0)
+                {
+                    SendPM(thisclient, "[Party Bot] Successfully updated spec loadout to '%s' for %d companion bot(s).", specName, swappedCount);
+                }
+                else
+                {
+                    SendPM(thisclient, "[Party Bot] Could not swap spec. Verify the spec name (tank, 2h, healer, smite, bow, gun) or bot name.");
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "raid") == 0 || strcmp(botAction, "alliance") == 0)
+            {
+                char* raidArg = strtok(NULL, " ");
+                if (raidArg && (strcmp(raidArg, "dismiss") == 0 || strcmp(raidArg, "disband") == 0 || strcmp(raidArg, "leave") == 0))
+                {
+                    if (CBotManager::GetInstance()->DismissRaidAlliance(thisclient))
+                    {
+                        SendPM(thisclient, "[Raid Alliance] 8-man raid alliance disbanded. Returned to standard 4-man fireteam.");
+                    }
+                    else
+                    {
+                        SendPM(thisclient, "[Raid Alliance] No active auxiliary raid alliance squad to dismiss.");
+                    }
+                    return true;
+                }
+
+                if (CBotManager::GetInstance()->SpawnRaidAlliance(thisclient))
+                {
+                    SendPM(thisclient, "[Raid Alliance] 8-Man Raid Alliance mobilized! Auxiliary Vanguard strike squad joined formation.");
+                }
+                else
+                {
+                    SendPM(thisclient, "[Raid Alliance] Raid Alliance already active or could not be deployed.");
+                }
+                return true;
+            }
+            else if (strcmp(botAction, "pet") == 0 || strcmp(botAction, "fairy") == 0)
+            {
+                char* petArg = strtok(NULL, " ");
+                int affected = 0;
+
+                for (UINT i = 0; i < party->Members.size(); i++)
+                {
+                    CPlayer* m = party->Members[i];
+                    if (m && m->is_bot && m->bot_ai)
+                    {
+                        bool doToggle = true;
+                        if (petArg)
+                        {
+                            if (strcmp(petArg, "dismiss") == 0 && !m->bot_ai->HasActivePet()) doToggle = false;
+                            else if (strcmp(petArg, "summon") == 0 && m->bot_ai->HasActivePet()) doToggle = false;
+                        }
+
+                        if (doToggle && m->bot_ai->ToggleCompanionPet())
+                        {
+                            affected++;
+                        }
+                    }
+                }
+                SendPM(thisclient, "[Companion Pets] Toggled companion battle pet/fairy for %d companion bot(s).", affected);
+                return true;
+            }
             else if (strcmp(botAction, "info") == 0)
             {
                 SendPM(thisclient, "=== Party Bot Roster ===");
@@ -1220,9 +1367,11 @@ bool CWorldServer::pakGMCommand( CPlayer* thisclient, CPacket* P )
                     {
                         int hpPct = (m->Stats->MaxHP > 0) ? (m->Stats->HP * 100 / m->Stats->MaxHP) : 100;
                         int mpPct = (m->Stats->MaxMP > 0) ? (m->Stats->MP * 100 / m->Stats->MaxMP) : 100;
-                        SendPM(thisclient, "Bot: %s (Lvl %d, %s) | HP: %d%% MP: %d%% | Stance: %s | Tactic: %s | Synergy: %d%% | Aura: %s | Affinity: %d/100 (%s)%s",
+                        SendPM(thisclient, "Bot: %s (Lvl %d, %s) | HP: %d%% MP: %d%% | Stance: %s | Spec: %s | Pet: %s | Tactic: %s | Synergy: %d%% | Aura: %s | Affinity: %d/100 (%s)%s",
                             m->CharInfo->charname, m->Stats->Level, m->bot_ai->GetPersonalityString(),
-                            hpPct, mpPct, m->bot_ai->GetStanceString(), m->bot_ai->GetTacticString(),
+                            hpPct, mpPct, m->bot_ai->GetStanceString(), m->bot_ai->GetSubSpecString(),
+                            m->bot_ai->HasActivePet() ? m->bot_ai->GetPetName() : "None",
+                            m->bot_ai->GetTacticString(),
                             m->bot_ai->GetSynergy(), m->bot_ai->GetLoyaltyAuraName(),
                             m->bot_ai->GetAffinity(), m->bot_ai->GetAffinityTierString(),
                             (m->bot_ai->GetAffinity() >= 90) ? " [Soulbound Perk Active]" : "");

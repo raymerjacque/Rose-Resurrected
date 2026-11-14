@@ -32,6 +32,7 @@ Recommended Client to use with Server : https://162.35.161.103/downloads/Rose-cl
    - [Milestone 10 — Advanced Companion Tactics, Convoy PAT Driving & Squad Affinity](#milestone-10--advanced-companion-tactics-convoy-pat-driving--squad-affinity-completed--verified)
    - [Milestone 11 — Tactical Gambits, Field Services, Mercenary Hiring & Squad Arena](#milestone-11--tactical-gambits-field-services-mercenary-hiring--squad-arena-completed--verified)
    - [Milestone 12 — Squad Unison Ultimates, Field Crafting, Siege Warfare & Loyalty Quests](#milestone-12--squad-unison-ultimates-field-crafting-siege-warfare--loyalty-quests-completed--verified)
+   - [Milestone 13 — Combat DPS & Healing Parser, Dynamic Loadouts, 8-Man Raid Alliances & Dungeon Expeditions](#milestone-13--combat-dps--healing-parser-dynamic-loadouts-8-man-raid-alliances--dungeon-expeditions-completed--verified)
 3. [Roadmap & Upcoming Milestones](#roadmap--upcoming-milestones)
 4. [Intelligent AI Companion & PlayerBot Deep-Dive](#intelligent-ai-companion--playerbot-deep-dive)
    - [1. Real Player Auto-Grouping](#1-real-player-auto-grouping)
@@ -316,11 +317,40 @@ RosE Resurrected utilizes a distributed 3-tier server model communicating via TC
   - Executing `/party bot dance` triggers synchronized party dance routines (`DoEmote 6`).
   - Vanquishing dungeon bosses automatically triggers squad victory cheers (`DoEmote 3`), celebrations, and fanfares.
 
+### Milestone 13 — Combat DPS & Healing Parser, Dynamic Loadouts, 8-Man Raid Alliances & Dungeon Expeditions (Completed & Verified)
+- **Real-Time Combat Performance Parser (`/party bot meter [reset]`)**:
+  - Live encounter tracking across all combat encounters for the party leader and companion bots:
+    - Damage output (DMG) and percentage squad DPS contribution.
+    - Healing done (HEAL) and percentage triage contribution.
+    - Damage mitigated/taken (TAKEN) to evaluate tank durability.
+  - `/party bot meter reset` zeroes out all combat values for clean encounter analysis.
+- **Dynamic Companion Spec Swapping & Weapon Loadouts (`/party bot spec <tank|2h|healer|smite|bow|gun> [bot]`)**:
+  - Instant field loadout transitions altering weapon sets, stances, and rotation logic:
+    - `2h` / `berserker`: Frontline Soldiers/Knights swap to massive two-handed greatswords with cleaving AOE strikes.
+    - `smite` / `battlepriest`: Muses/Clerics wield sacred maces and sturdy shields for frontline melee smiting.
+    - `gun` / `launcher`: Hawkers/Scouts switch from composite bows to heavy rapid-fire firearms and explosive launchers.
+    - `default` / `tank` / `healer` / `bow`: Restores classic defensive shields, support wands, and precision bows.
+- **8-Man AI Co-Op Raid Alliances (`/party bot raid [dismiss]`)**:
+  - Commands the deployment of an auxiliary Vanguard strike squad (`Vanguard_Roland`, `Vanguard_Seraphina`, `Vanguard_Kael`, `Vanguard_Theron`).
+  - Merges with the player's core 4-man fireteam to assemble a complete 8-man raid alliance for world bosses and high-tier dungeons.
+- **Auxiliary Combat Battle Pets & Fairies (`/party bot pet [summon|dismiss]`)**:
+  - Companion bots summon signature battle familiars that pulse unique squad utility:
+    - **Lyra**: *Celestial Healing Sprite* (MP regeneration aura).
+    - **Brom**: *War Mastiff* (Armor-shredding bark).
+    - **Barnaby**: *Clockwork Scrapper* (Automated field vacuum for monster gold/drops).
+    - **Sylvia**: *Hunting Falcon* (Critical strike boosts and stealth detection).
+- **Hidden Field Treasure Hunting & Mineral Geodes**:
+  - High-affinity companions (Affinity ≥ 40) passively prospect the open world while following the player, uncovering buried mineral geodes and ancient adventurer caches with celebration horns and Zuly bounties.
+- **Dynamic Audio-Visual Combat Cues**:
+  - Added visual telegraphs and audio ding/fanfare packets for low-HP warnings (`0x79f`), victory horns (`0x7b1`), and Limit Break bursts (`0x7b2`).
+- **Autonomous Living Dungeon Bot Parties**:
+  - Dynamic dungeon population engine: when caves such as Goblin Cave B1 (Map 51) and George Cave B1 (Map 24) have no bots, an autonomous 4-bot delving squad (`DungeonDelver_511..514`) is spawned to clear rooms and fight monsters independently.
+
 ---
 
 ## Roadmap & Upcoming Milestones
 
-### Milestone 13 — Advanced World Events, Raids & Planetary Expansion (In Design)
+### Milestone 14 — Advanced World Events, Raids & Planetary Expansion (In Design)
 - [ ] **Planet Luna & Orlo Expansion Polish**: Review and verify space flight transitions, low-gravity physics, and unique monster spawn definitions.
 - [ ] **World Boss Multi-Phase Mechanics**: Implement multi-phase enrage timers, area-of-effect telegraphs, and tiered reward chests for world bosses (*King Spider*, *Chapeau*, *Karkome*).
 - [ ] **Seasonal Event Automation**: Automated in-game holidays (Halloween pumpkin drops, Christmas gift boxes, Summer festival events).

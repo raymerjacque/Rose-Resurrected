@@ -487,5 +487,14 @@ MILESTONE 12 — Squad Unison Ultimates, Field Crafting, Siege Warfare & Loyalty
 [x] Expedition Campfire Feasts & Squad Resting Buffs: Resting together at camp or commanding `/party bot feast` cooks an adventurer's meal granting the 30-minute "Well-Fed & Inspired" buff (+15% EXP co-op boost, +10% Attack Power & Defense, full HP/MP refresh).
 [x] Synchronized Squad Emotes & Boss Victory Fanfares: Executing `/party bot dance` triggers synchronized party dance routines; vanquishing dungeon bosses automatically triggers squad victory cheers (`DoEmote 3`), celebrations, and fanfares.
 
+MILESTONE 13 — Combat DPS & Healing Parser, Dynamic Loadouts, 8-Man Raid Alliances & Dungeon Expeditions (COMPLETED & VERIFIED)
+[x] Real-Time Combat Performance Parser: Squad encounter DPS, healing, and damage mitigation tracking via `/party bot meter` (or `/party bot dps|parse`). Calculates total squad damage, percentage contribution for player and companions, total healing performed, and incoming damage absorbed. Includes `/party bot meter reset` for fresh encounter parses.
+[x] Dynamic Companion Spec Swapping & Weapon Loadouts: Implemented `/party bot spec <tank|2h|healer|smite|bow|gun> [bot]` allowing instant field stance and weapon swaps. Knights/Soldiers equip 2H Greatswords with wide cleaves; Clerics/Muses equip battle maces and shields with frontline smiting; Scouts/Hawkers toggle between longbows and heavy firearm burst rotations.
+[x] 8-Man AI Co-Op Raid Alliances: Implemented `/party bot raid [dismiss]` mobilizing an auxiliary Vanguard strike squad (Vanguard Roland, Seraphina, Kael, and Theron) alongside the player's core 4-man fireteam, forming an 8-man formation for world bosses and epic raids.
+[x] Auxiliary Combat Battle Pets & Fairies: Implemented `/party bot pet [summon|dismiss]`. Companion bots summon battle familiars and fairies granting persistent squad auras (Lyra's Celestial Sprite MP aura, Brom's War Mastiff armor shred, Barnaby's Clockwork Scrapper auto-vacuum loot, and Sylvia's Hunting Falcon stealth sense).
+[x] Hidden Field Treasure Hunting & Mineral Geodes: High-affinity companions (Affinity >= 40) passively scan open-world terrain during exploration, uncovering buried ancient chests, mineral geodes, and lucky starstones with celebration horns and Zuly rewards.
+[x] Dynamic Audio-Visual Combat Cues: Added visual and audio cues for critical squad events, including low-HP danger warnings (`0x79f`), level-up and treasure victory horns (`0x7b1` & `0x7b2`), and Limit Break activation effects.
+[x] Autonomous Living Dungeon Bot Parties: Dynamic dungeon population monitoring in Goblin Cave B1 and George Cave B1; automatically deploys autonomous 4-bot delving parties (`DungeonDelver_511..514`) that clear dungeon rooms, navigate corridors, and engage cave monsters independently.
+
 ================================================================================
 
