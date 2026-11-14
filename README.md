@@ -622,33 +622,76 @@ Stationed at prime leveling areas across Planet Junon:
 - **Large Bonfire (ID 806)**: Emits a 25-meter aura granting 3x HP and MP natural regeneration. Bots maintain and renew bonfires automatically.
 - **7-Charm Blessing Rotation**: Pure, Mental, Dash/Haste, Might, Defense, Magic Defense, and Accuracy charms. Real human players are placed at the front of the queue.
 
-### 12. Autonomous Market Vending Bots (Junon & Zant)
+### 21. Autonomous Market Vending Bots (Junon & Zant)
 18 permanent vendors populate commercial avenues in Junon Polis and Canyon City of Zant:
 - Full stock of weapons (+4 to +7), class armor sets, T1–T7 cut gems, refining catalysts (Talismans, Planetary Runes, Arua Fate), crafting materials, ammunition, and PAT parts.
 - Infinite auto-restocking keeps stacks at 999 and equipment at 1.
 - Database queries are bypassed (`SaveSlot41` skips bot items), ensuring zero database clutter.
 
-### 13. Social Engine, Whispers, Duels, Trading & GM Teleport Suite
+### 22. Social Engine, Whispers, Duels, Trading & GM Teleport Suite
 - **Interactive Whispers (`/w <BotName>`)**: Bots respond intelligently to player whispers with their coordinates, party invitations, or duel challenges.
 - **Open-World Duels (`/duel <BotName>`)**: Players can challenge any bot to a duel. Bots yield at 10% HP with a polite bow.
 - **Direct Trading (`/trade <BotName>`)**: Bots accept trades, placing 25,000 Zulies into the trade window.
-- **Party Bot Chat Commands**:
-  - `/party bot aggressive`: Sets Hunter stance (proactively pulls mobs).
-  - `/party bot defensive`: Sets Bodyguard stance (defends squad).
-  - `/party bot passive`: Sets Pacifist stance (holds fire, strictly follows).
-  - `/party bot assist`: Sets Focus Fire stance on player's target.
-  - `/party bot mark`: Marks target mob for squad focus-fire.
-  - `/party bot pull`: Commands Tank to pull target mob back to party.
-  - `/party bot tactic <speedrun|safe|eco|balanced>`: Selects combat pacing and resource gambit.
-  - `/party bot appraise`: Orders companion bot to appraise unidentified bag items.
-  - `/party bot repair`: Orders companion bot to restore gear durability (50/50).
-  - `/party bot salvage <slot>`: Converts bag item into Zulies for squad fund.
-  - `/party bot recruit <name>`: Hires veteran mercenary (Brom, Lyra, Ignis, Sylvia, Barnaby).
-  - `/party bot arena`: Queues and launches full fireteam into Akram 4v4 Arena.
-  - `/party bot equip <slot> [bot]`: Gifts weapon/armor to companion bot.
-  - `/party bot buff`: Forces healers to buff the party immediately.
-  - `/party bot follow`: Orders all bots into formation.
-  - `/party bot info`: Displays squad roster, roles, stances, tactics, affinity, and stats.
+
+#### Comprehensive Companion Chat Command Reference
+
+| Category | Command | Description |
+| :--- | :--- | :--- |
+| **Tactical Stances** | `/party bot aggressive` (or `/party bot hunt`) | **Hunter Stance**: Proactively pulls quest targets and nearby mobs within 22m. |
+| | `/party bot defensive` (or `/party bot guard`) | **Bodyguard Stance (Default)**: Defends squad members and intercepts attackers. |
+| | `/party bot passive` (or `/party bot hold`) | **Pacifist Stance**: Ceases attacks, strictly follows formation (ideal for dodging aggro). |
+| | `/party bot assist` (or `/party bot focus`) | **Focus Fire**: Directs all companions to attack the leader's active target. |
+| | `/party bot mark` | Designates the active target as the priority kill target for the squad. |
+| | `/party bot pull` | Orders the party Tank to run out, tag the mob, and kite it back to the ambush anchor. |
+| | `/party bot follow` | Breaks combat engagements and rallies all companions into formation immediately. |
+| **Combat & Pacing** | `/party bot tactic <speedrun\|safe\|eco\|balanced>` | Dynamically adjusts combat aggressiveness, healing thresholds, and resource usage. |
+| | `/party bot meter` (or `/party bot meter reset`) | Real-time combat DPS, healing, and damage mitigation parser breakdown. |
+| | `/party bot spec <tank\|2h\|healer\|smite\|bow\|gun> [bot]` | Instant field sub-spec and weapon loadout swapping for party companions. |
+| | `/party bot raid [dismiss]` | Mobilizes an auxiliary 4-man Vanguard strike squad for 8-man raid alliances. |
+| | `/party bot pet [summon\|dismiss]` | Deploys combat familiars/fairies providing persistent squad auras and auto-loot. |
+| | `/party bot ultimate` (or `/party bot unison`) | Unleashes coordinated class Limit Break ultimates when synergy reaches 100%. |
+| | `/party bot duel [bot\|stop]` | Initiates safe 1v1 practice sparring duels anywhere with zero death penalty. |
+| | `/party bot arena` | Queues and deploys the full bot fireteam into Akram 4v4 Arena match battles. |
+| | `/party bot siege <attack\|defend\|normal>` | Commands bot fireteam to assault enemy relics or fortify core defenses during wars. |
+| **Tactical Scripting** | `/party bot rule <condition> <action> [bot]` | Sets automated mini-gambit triggers (`leader_hp<50` $\rightarrow$ `heal`, `boss` $\rightarrow$ `taunt`, etc.). |
+| | `/party bot rules [clear]` | Views or clears active tactical gambit scripts. |
+| **Field Logistics** | `/party bot appraise` | Identifies all unidentified equipment in player bags and reveals hidden stats. |
+| | `/party bot repair` | Restores equipped and bag items to maximum durability (50/50). |
+| | `/party bot salvage <slot>` | Converts unwanted inventory items into squad Zulies. |
+| | `/party bot refine <slot>` | Mobile field forge hammering to refine weapons and armor (+1 to +9). |
+| | `/party bot socket <slot> <gem_slot>` | Embeds gems into open gear sockets with attribute endowment. |
+| | `/party bot brew [hp\|mp] [amount]` | Cleric/Muse companion brews fresh health or mana recovery potions on demand. |
+| | `/party bot forge [arrows\|bullets] [amount]` | Artisan/Bourgeois companion smiths ammunition directly into player quiver slots. |
+| | `/party bot equip <slot> [bot]` | Gifts weapons or armor directly to a companion, updating 3D visuals and affinity. |
+| | `/party bot dispatch <start\|claim\|list>` | Dispatches off-duty mercenaries on timed expeditions for Zulies, EXP, and materials. |
+| **Squad & Progression** | `/party bot recruit <name>` | Hires veteran mercenary specialists (Brom, Lyra, Ignis, Sylvia, Barnaby). |
+| | `/party bot outfit <casual\|armored\|swimwear\|festive\|default>` | Instant transmog wardrobe cosmetic swaps with visual broadcast. |
+| | `/party bot talent <bastion\|luminary\|spellweaver\|scavenger\|none>` | Assigns specialized passive talent masteries to party companions. |
+| | `/party bot story [bot]` | Displays unlocked loyalty narrative chronicles and signature companion auras. |
+| | `/party bot feast` | Cooks an adventurer's feast granting the 30-minute "Well-Fed & Inspired" squad buff. |
+| | `/party bot dance` | Triggers synchronized squad dance routines. |
+| | `/party bot buff` | Forces healer companions to refresh party charms immediately. |
+| | `/party bot info` | Displays squad roster, roles, stances, tactics, affinity, and combat stats. |
+
+#### Autonomous Living Behaviors (100% Autonomous — Zero Player Commands Required)
+
+| Autonomous Behavior | Trigger Condition | Natural Response |
+| :--- | :--- | :--- |
+| **🛡️ AFK Guard Perimeter** | Leader stationary $>35\text{s}$ | Squad forms 360° defensive ring (3.5m radius), neutralizing hostiles within 15m; reforms upon leader movement ($>2.5\text{m}$). |
+| **🏃 Panic Kite & Tank Peel** | Squishy HP $<25\%$ & enemy $<4.5\text{m}$ | Squishy sprints 12m back chugging potions and crying for cover; Tank bot charges in with taunts to peel the beast. |
+| **🍻 Ambient Social Circles** | Ambient bots within 5.5m in towns/hubs | Bots stop, sit together by campfire, or exchange emotes (`DoEmote 1/3`), conversing about ore veins, raids, and market prices. |
+| **🎁 Rare Drop Celebrations** | Drop $\ge 1,000$ Zulies or rare equipment | Companions celebrate with cheers (`DoEmote 3`), hype callouts, and specialized Artisan gear appraisal remarks. |
+| **⛈️ Biome Transition Commentary** | Crossing zone / map boundaries | Companions offer atmospheric lore commentary for Adventurer Plains, Junon Polis, Breezy Hills, El Vergel, and Goblin Caves. |
+| **💖 Revive Gratitude & Morale** | Revived in combat by ally | Companions shout grateful morale boosts (*"Back on my feet! Arua bless your healing hands!"*) and cheer before rejoining battle. |
+| **⚔️ Bodyguard Interception** | Monster flanking / backstabbing leader | Nearest companion detects threat and intercepts, charging into melee to shield leader without command. |
+| **🎉 Leader Level-Up Celebrations** | Party leader levels up | Companions turn to face leader, play victory horn cues, salute/cheer (`DoEmote 3`), and shout congratulations. |
+| **🏕️ Camp Rest & Biome Vignettes** | Leader idle $>15\text{s}$ in safe areas | Companions sit by campfire, stretch (`DoEmote 1`), and chat about local forge smoke, cave dampness, or mountain breezes. |
+| **🤝 "Good Samaritan" Rescues** | Real player struggling in the wild | Ambient roaming bots rush over to cast emergency heals/cleanses or taunt away secondary beasts, bowing on victory. |
+| **🩹 Natural Grinding Life Cycles** | Ambient bot slays 8–12 monsters | Pauses grinding run to sit by roadside, bandage up, drink potions, and inspect weapons before hunting again. |
+| **🏙️ Living Town Street Life** | Walking through cities (Zant, Junon) | Bots browse merchant stalls, inspect anvil temperatures, and wave (`DoEmote 1`) to greet passing players. |
+| **💥 Clutch Combat Finishers** | Decisive takedowns in battle | Companions call out critical kills and offer respectful apologies if their blow clipped a monster the player was battling. |
+| **🚜 PAT Convoy Mount Driving** | Leader mounts Cart or Castle Gear | Companions Level 30+ instantly mount matching vehicles and drive alongside leader in mechanized formation. |
+
 - **GM Fast Teleport Suite (`/tele <name>` & `/go <name>`)**:
   - *Cities & Fields*: `/tele zant`, `/tele adventure`, `/tele junonpolis` (`/go junon`), `/tele eucar`, `/tele xitasanctuary` (`/tele xita`), `/tele luxem`, `/tele breezy`, `/tele elvergel`, `/tele animalake`, `/tele kenji`, `/tele forestofwisdom`, `/tele desertofthedead`.
   - *Dungeons & Arenas*: `/tele goblincaveb1` through `b3`, `/tele georgecaveb1` through `b2`, `/tele forgottentempleb1` through `b2`, `/tele clanfield`, `/tele teamdeathmatcharena`.
